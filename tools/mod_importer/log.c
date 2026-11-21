@@ -2,8 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL3/SDL_log.h>
-
+#include "aeron/log.h"
 #include "aeron/sync.h"
 #include "import_internal.h"
 
@@ -19,8 +18,9 @@ struct XwaModImportLogRing {
 	XwaModImportProgress* progress;
 	ToolLogSink echo;
 	void* echo_user;
-	SDL_LogOutputFunction sdl_output; /* SDL's log output before the import */
-	void* sdl_user;
+	/* The import thread's log sink before the import. */
+	AeronLogSink previous_sink;
+	void* previous_sink_user;
 };
 
 XwaModImportLogRing* ImportLog_CreateRing(void) {
@@ -73,13 +73,16 @@ static void sink(void* user, ToolLogLevel level, const char* line) {
 	Aeron_MutexUnlock(ring->mutex);
 }
 
-/* SDL's log, which the flight model libraries write to. */
-static void sdl_output(void* user, int category, SDL_LogPriority priority, const char* message) {
+/* Gets the lines that the import's threads log through SDL. The flight
+   model code, for example, calls SDL_Log directly. The worker threads that
+   the import starts get this sink too. It is called under SDL's log lock,
+   and sink() then takes the ring's mutex, so code that holds that mutex must
+   not log. */
+static void thread_sink(void* user, AeronLogLevel level, const char* message) {
 	(void)user;
-	(void)category;
-	ToolLog_Write(priority >= SDL_LOG_PRIORITY_ERROR  ? TOOL_LOG_ERROR
-				  : priority == SDL_LOG_PRIORITY_WARN ? TOOL_LOG_WARNING
-													  : TOOL_LOG_INFO,
+	ToolLog_Write(level >= AERON_LOG_ERROR  ? TOOL_LOG_ERROR
+				  : level == AERON_LOG_WARN ? TOOL_LOG_WARNING
+											: TOOL_LOG_INFO,
 				  "%s", message);
 }
 
@@ -88,9 +91,10 @@ void ImportLog_Open(XwaModImportProgress* progress, const XwaModImportOptions* o
 	ring->progress = progress;
 	ring->echo = options->echo;
 	ring->echo_user = options->echo_user;
-	SDL_GetLogOutputFunction(&ring->sdl_output, &ring->sdl_user);
-	SDL_SetLogOutputFunction(sdl_output, NULL);
 	ToolLog_SetSink(sink, ring);
+	Aeron_LogGetThreadSink(&ring->previous_sink, &ring->previous_sink_user);
+	if (!Aeron_LogSetThreadSink(thread_sink, NULL))
+		ToolLog_Write(TOOL_LOG_WARNING, "The engine's messages can't be added to this log.");
 }
 
 bool ImportLog_SetFile(XwaModImportProgress* progress, const char* path) {
@@ -104,8 +108,8 @@ bool ImportLog_SetFile(XwaModImportProgress* progress, const char* path) {
 
 void ImportLog_Close(XwaModImportProgress* progress) {
 	XwaModImportLogRing* ring = progress->log;
+	Aeron_LogSetThreadSink(ring->previous_sink, ring->previous_sink_user);
 	ToolLog_SetSink(NULL, NULL);
-	SDL_SetLogOutputFunction(ring->sdl_output, ring->sdl_user);
 	Aeron_MutexLock(ring->mutex);
 	if (ring->file)
 		fclose(ring->file);

@@ -71,40 +71,66 @@ static void mod_list_folder_name(const char* path, char* out, size_t capacity) {
 	snprintf(out, capacity, "%.*s", (int)(end - start), path + start);
 }
 
-/* Sets the state and the problem text of `mod` from its mod.yaml. The text
- * tells the player to import the mod again when the importer made it. */
+/* Sets the state and the problem text of `mod` from its mod.yaml. */
 static void mod_list_check(const AeronConfigFile* manifest, XwaModEntry* mod) {
 	const int64_t version = AeronConfigFile_GetInt(manifest, "version", 0);
 	const int imported = AeronConfigFile_Has(manifest, "imported");
 
 	mod->problem[0] = '\0';
+	mod->imported = imported;
+	mod->version = version > 0 && version < 1000000 ? (int)version : 0;
 	if (version != XWA_MOD_FORMAT_VERSION) {
 		mod->state = XWA_MOD_OTHER_VERSION;
 		if (imported && version < XWA_MOD_FORMAT_VERSION) {
-			snprintf(mod->problem, sizeof mod->problem,
-					 "It was imported by an older version of OpenXWA. Import it again with the "
-					 "OpenXWA Mod Importer.");
+			snprintf(mod->problem, sizeof mod->problem, "It was imported by an older version of OpenXWA.");
 		} else if (imported) {
-			snprintf(mod->problem, sizeof mod->problem,
-					 "It was imported by a newer version of OpenXWA. Update OpenXWA, or import it again "
-					 "with this version's OpenXWA Mod Importer.");
+			snprintf(mod->problem, sizeof mod->problem, "It was imported by a newer version of OpenXWA.");
 		} else if (!AeronConfigFile_Has(manifest, "version")) {
 			snprintf(mod->problem, sizeof mod->problem,
-					 "Its mod.yaml has no version, and this OpenXWA needs version %d.",
+					 "Its mod.yaml doesn't give a mod format version. This version of OpenXWA needs "
+					 "format %d.",
 					 XWA_MOD_FORMAT_VERSION);
 		} else {
 			snprintf(mod->problem, sizeof mod->problem,
-					 "Made for mod format version %lld, and this OpenXWA needs version %d.",
+					 "It was made for mod format %lld, and this version of OpenXWA needs format %d.",
 					 (long long)version, XWA_MOD_FORMAT_VERSION);
 		}
 	} else if (!AeronConfigFile_GetBool(manifest, "complete", 1)) {
 		mod->state = XWA_MOD_UNFINISHED;
 		snprintf(mod->problem, sizeof mod->problem, "%s",
-				 imported ? "Its import didn't finish. Import it again with the OpenXWA Mod Importer."
-						  : "Its mod.yaml says that it isn't complete.");
+				 imported ? "Its import didn't finish." : "Its author marked it as unfinished.");
 	} else {
 		mod->state = XWA_MOD_READY;
 	}
+}
+
+const char* XwaModList_Advice(const XwaModEntry* mod, XwaModAdvicePlace place) {
+	const int in_tab = place == XWA_MOD_ADVICE_MODS_TAB;
+
+	if (!mod) {
+		return NULL;
+	}
+	switch (mod->state) {
+		case XWA_MOD_UNFINISHED:
+			if (!mod->imported) {
+				return NULL;
+			}
+			return in_tab ? "Import it again to finish it." : "Import it again in OpenXWA Options > Mods.";
+		case XWA_MOD_OTHER_VERSION:
+			if (!mod->imported) {
+				return "Ask its author for an update.";
+			}
+			if (mod->version > XWA_MOD_FORMAT_VERSION) {
+				return in_tab ? "Update OpenXWA, or import the mod again."
+							  : "Update OpenXWA, or import the mod again in OpenXWA Options > Mods.";
+			}
+			return in_tab ? "Import it again to use it." : "Import it again in OpenXWA Options > Mods.";
+		case XWA_MOD_UNREADABLE:
+			return "Ask its author for a fixed version.";
+		case XWA_MOD_READY:
+			break;
+	}
+	return NULL;
 }
 
 /* Reads the mod.yaml of folder `path` with `vfs`. Returns 0 when there is
@@ -137,6 +163,12 @@ static int mod_list_read(AeronVfs* vfs, const char* path, XwaModEntry* out) {
 	name = AeronConfigFile_GetString(manifest, "name", NULL);
 	snprintf(out->name, sizeof out->name, "%s", name && name[0] ? name : folder[0] ? folder : path);
 	mod_list_check(manifest, out);
+	if (out->imported) {
+		const char* source = AeronConfigFile_GetString(manifest, "source", NULL);
+		const char* authoring = AeronConfigFile_GetString(manifest, "authoring", NULL);
+		snprintf(out->source, sizeof out->source, "%s", source ? source : "");
+		snprintf(out->authoring, sizeof out->authoring, "%s", authoring ? authoring : "");
+	}
 	AeronConfigFile_Destroy(manifest);
 	return 1;
 }

@@ -395,7 +395,7 @@ static int XwaMovieTask_SubmitCurrent(void) {
 	AeronVideoPresentDesc present;
 	XwaPresentationRect frame;
 
-	frame = XwaPresentation_Frame();
+	frame = XwaPresentation_Frame2D();
 	memset(&present, 0, sizeof(present));
 	present.bounds = (AeronRectI) { frame.x, frame.y, frame.width, frame.height };
 	present.scale_mode = AERON_VIDEO_SCALE_CONTAIN;

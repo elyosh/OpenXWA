@@ -7,7 +7,7 @@
 
 static struct {
 	XwaModernInputOptions defaults;
-	XwaControllerProfile gamepad_defaults;
+	XwaControllerDefaults controller_defaults;
 	XwaModernInputOptions options;
 	XwaModernInputOptionsApplyFn apply;
 	XwaModernInputOptionsPersistFn persist;
@@ -56,6 +56,13 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 		options->rumble_strength > XWA_MODERN_RUMBLE_STRENGTH_MAX) {
 		return XwaModernInputOptions_Error(error, error_size, "mouse or rumble setting is invalid");
 	}
+	if (options->vr_stick < XWA_MODERN_VR_STICK_OFF || options->vr_stick >= XWA_MODERN_VR_STICK_MODE_COUNT ||
+		!(options->vr_stick_range >= XWA_MODERN_VR_STICK_RANGE_MIN) ||
+		options->vr_stick_range > XWA_MODERN_VR_STICK_RANGE_MAX ||
+		!(options->vr_button_ray_m >= XWA_MODERN_VR_BUTTON_RAY_MIN_M) ||
+		options->vr_button_ray_m > XWA_MODERN_VR_BUTTON_RAY_MAX_M) {
+		return XwaModernInputOptions_Error(error, error_size, "VR controller setting is invalid");
+	}
 	return XwaControllerOptions_Validate(&options->controllers, error, error_size) &&
 		   XwaModernInputOptions_ValidateKeyboard(&options->keyboard, error, error_size);
 }
@@ -64,6 +71,13 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->mouse_flight_enabled = options->mouse_flight_enabled != 0;
 	options->mouse_invert_y = options->mouse_invert_y != 0;
 	options->rumble_enabled = options->rumble_enabled != 0;
+	options->vr_show_hands = options->vr_show_hands != 0;
+	options->vr_mod_hands = options->vr_mod_hands != 0;
+	options->vr_mod_keyboard = options->vr_mod_keyboard != 0;
+	options->vr_menu_controllers = options->vr_menu_controllers != 0;
+	options->vr_stick_hand = options->vr_stick_hand != 0;
+	options->vr_throttle = options->vr_throttle != 0;
+	options->vr_cockpit_buttons = options->vr_cockpit_buttons != 0;
 	XwaKeyboardMapping_Sort(&options->keyboard);
 }
 
@@ -71,27 +85,36 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 	return a->mouse_flight_enabled == b->mouse_flight_enabled && a->mouse_mode == b->mouse_mode &&
 		   a->mouse_sensitivity == b->mouse_sensitivity && a->mouse_invert_y == b->mouse_invert_y &&
 		   a->rumble_enabled == b->rumble_enabled && a->rumble_strength == b->rumble_strength &&
+		   a->vr_show_hands == b->vr_show_hands && a->vr_mod_hands == b->vr_mod_hands &&
+		   a->vr_mod_keyboard == b->vr_mod_keyboard && a->vr_menu_controllers == b->vr_menu_controllers &&
+		   a->vr_stick == b->vr_stick && a->vr_stick_hand == b->vr_stick_hand &&
+		   a->vr_throttle == b->vr_throttle && a->vr_stick_range == b->vr_stick_range &&
+		   a->vr_cockpit_buttons == b->vr_cockpit_buttons && a->vr_button_ray_m == b->vr_button_ray_m &&
 		   XwaControllerOptions_Equals(&a->controllers, &b->controllers) &&
 		   XwaKeyboardMapping_Equal(&a->keyboard, &b->keyboard);
 }
 
 void XwaModernInputOptions_Configure(const XwaModernInputOptions* defaults,
-									 const XwaControllerProfile* gamepad_defaults,
+									 const XwaControllerDefaults* controller_defaults,
 									 const XwaModernInputOptions* options, XwaModernInputOptionsApplyFn apply,
 									 XwaModernInputOptionsPersistFn persist) {
 	char error[256];
 
 	memset(&g_modernInputOptions, 0, sizeof(g_modernInputOptions));
 	if (!XwaModernInputOptions_Validate(defaults, error, sizeof error) ||
-		!XwaModernInputOptions_Validate(options, error, sizeof error) || !gamepad_defaults ||
-		!XwaControllerOptions_ValidateProfile(gamepad_defaults, AERON_CONTROLLER_KIND_GAMEPAD, error,
-											  sizeof error)) {
+		!XwaModernInputOptions_Validate(options, error, sizeof error) || !controller_defaults ||
+		!XwaControllerOptions_ValidateProfile(&controller_defaults->gamepad, AERON_CONTROLLER_KIND_GAMEPAD,
+											  error, sizeof error) ||
+		!XwaControllerOptions_ValidateProfile(&controller_defaults->vr_left, AERON_CONTROLLER_KIND_VR_HAND,
+											  error, sizeof error) ||
+		!XwaControllerOptions_ValidateProfile(&controller_defaults->vr_right, AERON_CONTROLLER_KIND_VR_HAND,
+											  error, sizeof error)) {
 		Aeron_LogError("xwa.config", "cannot configure invalid modern input options: %s", error);
 		return;
 	}
 
 	g_modernInputOptions.defaults = *defaults;
-	g_modernInputOptions.gamepad_defaults = *gamepad_defaults;
+	g_modernInputOptions.controller_defaults = *controller_defaults;
 	g_modernInputOptions.options = *options;
 	XwaModernInputOptions_Normalize(&g_modernInputOptions.defaults);
 	XwaModernInputOptions_Normalize(&g_modernInputOptions.options);
@@ -112,8 +135,8 @@ void XwaModernInputOptions_GetDefaults(XwaModernInputOptions* out) {
 	}
 }
 
-const XwaControllerProfile* XwaModernInputOptions_GamepadDefaults(void) {
-	return &g_modernInputOptions.gamepad_defaults;
+const XwaControllerDefaults* XwaModernInputOptions_ControllerDefaults(void) {
+	return &g_modernInputOptions.controller_defaults;
 }
 
 int XwaModernInputOptions_Set(const XwaModernInputOptions* options) {

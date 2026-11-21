@@ -60,9 +60,9 @@ AeronTexture* XwaRemasterCutscene_Render(AeronCommandBuffer* cmd, const XwaSnaps
 		return NULL;
 	}
 
-	const XwaPresentationRect safe = XwaPresentation_AspectFit(
-		XWA_CLASSIC_WIDTH, XWA_CLASSIC_HEIGHT,
-		(XwaPresentationRect) { 0, 0, presentation_width, presentation_height });
+	const XwaPresentationRect safe =
+		XwaPresentation_AspectFit(XWA_CLASSIC_WIDTH, XWA_CLASSIC_HEIGHT,
+								  (XwaPresentationRect) { 0, 0, presentation_width, presentation_height });
 	width = safe.width;
 	height = safe.height;
 	if (width <= 0 || height <= 0 || !cutscene_ensure(width, height)) {

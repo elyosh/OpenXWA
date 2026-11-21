@@ -46,7 +46,8 @@ static int GameFiles_IsModFile(const char* path) {
 		strcmp(path, "frontres/medals/familyawards.txt") == 0) {
 		return 1;
 	}
-	if (strncmp(path, "music/", 6) == 0 && strchr(path + 6, '/') == NULL && GameFiles_EndsWith(path, ".imc")) {
+	if (strncmp(path, "music/", 6) == 0 && strchr(path + 6, '/') == NULL &&
+		GameFiles_EndsWith(path, ".imc")) {
 		return 1;
 	}
 	return strncmp(path, "wave/", 5) == 0;
@@ -114,7 +115,8 @@ static void GameFiles_ReadRemovedFiles(const AeronConfigNode* removed) {
 		}
 		s_removedFiles[s_removedFileCount] = (char*)malloc(strlen(lower) + 1);
 		if (s_removedFiles[s_removedFileCount] == NULL) {
-			Aeron_LogError("xwa.file", "%s: out of memory. The rest of the removed list is ignored", GAME_FILES_SETTINGS);
+			Aeron_LogError("xwa.file", "%s: out of memory. The rest of the removed list is ignored",
+						   GAME_FILES_SETTINGS);
 			break;
 		}
 		strcpy(s_removedFiles[s_removedFileCount++], lower);
@@ -159,8 +161,8 @@ XwaGameFileSource XwaGameFiles_Find(AeronVfs* vfs, const char* path, char* modPa
 		!GameFiles_IsModFile(lower)) {
 		return XWA_GAME_FILE_ORIGINAL;
 	}
-	if (s_removedFileCount > 0 &&
-		bsearch(&key, s_removedFiles, s_removedFileCount, sizeof *s_removedFiles, GameFiles_Compare) != NULL) {
+	if (s_removedFileCount > 0 && bsearch(&key, s_removedFiles, s_removedFileCount, sizeof *s_removedFiles,
+										  GameFiles_Compare) != NULL) {
 		Aeron_LogDebug("xwa.file", "%s: removed by the mod", path);
 		return XWA_GAME_FILE_REMOVED;
 	}

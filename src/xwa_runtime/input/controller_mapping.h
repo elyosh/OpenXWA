@@ -27,7 +27,30 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side);
 /* Returns and clears the latch set when a pause binding is pressed while
  * the game is paused. */
 int XwaControllerMapping_TakeResume(void);
+/* Reads the buttons that are bound to host actions (actions.h). Call it
+ * once for each host frame, in flight and outside it: the other bindings
+ * are only read in flight. Outside flight (`in_flight` is 0) it also reads
+ * the buttons bound to options_menu, so that a player with only a
+ * controller can open the options and quit from the menus. */
+void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input, int in_flight);
+/* Returns 1 once for each press of a binding of the host action `action`
+ * that XwaControllerMapping_UpdateHostActions saw. Outside flight it does
+ * the same for XWA_INPUT_ACTION_OPTIONS_MENU. */
+int XwaControllerMapping_TakeHostAction(XwaInputAction action);
 void XwaControllerMapping_ReleaseCommands(void);
+
+/* Does a game action as a pressed binding would, for something that isn't a
+ * binding, such as a cockpit button. A press sends the action's key once,
+ * and holds the action for the held kinds (fire, look, roll) until the
+ * release. The key is only sent in flight, when the game isn't loading and
+ * the player isn't typing a message. PressAction returns a number to give
+ * back to ReleaseAction: a release does nothing when the holds were cleared
+ * meanwhile, as when the game pauses. Host actions are ignored here. */
+uint32_t XwaControllerMapping_PressAction(XwaInputAction action);
+void XwaControllerMapping_ReleaseAction(XwaInputAction action, uint32_t press);
+/* Presses a host action (actions.h): XwaControllerMapping_TakeHostAction
+ * then returns 1 for it once. Other actions are ignored. */
+void XwaControllerMapping_PressHostAction(XwaInputAction action);
 uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind kind, int source,
 											   bool invert);
 bool XwaControllerMapping_ThrottleSample(uint16_t* position, uint32_t* generation);
@@ -36,9 +59,18 @@ int XwaControllerMapping_Present(void);
 /* Returns 1 once after Present() changes. */
 int XwaControllerMapping_ConsumePresenceChange(void);
 
-/* Rumble goes to one device that can rumble: a connected device of the first
- * model that binds pitch, else of the first that binds yaw, else of the first
- * gamepad model, the one with the lowest instance id. */
+/* Turns some inputs of a VR hand off for the bindings: they read as not
+ * pressed. `hand` is 0 for the left hand and 1 for the right one. `buttons`
+ * has one bit for each AeronVrHandButton, and `axes` one bit for each
+ * AeronVrHandAxis; an axis bit covers the bindings that use the axis as a
+ * button. Something else uses these inputs meanwhile, such as a pointer that
+ * clicks with the trigger. An input that is still pressed when its bit is
+ * cleared stays off until it is released. */
+void XwaControllerMapping_SetSourceMask(int hand, uint32_t buttons, uint32_t axes);
+
+/* Rumble goes to one device that can rumble: the VR hand that last held the
+ * virtual stick, else a connected device of the first model that binds pitch, else of the first that binds
+ * yaw, else of the first gamepad or VR hand model, the one with the lowest instance id. */
 uint32_t XwaControllerMapping_RumbleInstance(void);
 /* Returns 1 once after the rumble device changes. */
 int XwaControllerMapping_ConsumeRumbleChange(void);

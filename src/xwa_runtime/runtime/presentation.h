@@ -8,7 +8,7 @@
  * composites layers and maps input in. Its height is fixed; its width tracks
  * the host window aspect (XwaPresentation_SyncToWindow) so the frame covers
  * the whole display at any aspect ratio. Classic 640x480 content is
- * aspect-fitted into the frame — pillarboxed or letterboxed, never stretched.
+ * aspect-fitted into the 2D frame — pillarboxed or letterboxed, never stretched.
  * These coordinates are deliberately independent of both the classic drawing
  * space and physical GPU render-target sizes.
  */
@@ -34,6 +34,17 @@ void XwaPresentation_SyncToWindow(int window_width, int window_height);
 
 /* The full application-logical frame. */
 XwaPresentationRect XwaPresentation_Frame(void);
+
+/* Tells the presentation that the frame covers a surround setup, and which
+ * part of the frame's width is the centre screen: it starts at `center_x`
+ * and is `center_width` wide, out of `total_width`, in any unit. The frame
+ * then has no maximum width. A `total_width` of 0 turns surround off. */
+void XwaPresentation_SetSurround(int center_x, int center_width, int total_width);
+
+/* The part of the frame that 2D content is fitted in: the frontend, movies
+ * and the classic picture. It is the centre screen in surround, and the
+ * whole frame otherwise. */
+XwaPresentationRect XwaPresentation_Frame2D(void);
 
 /* The centered 4:3 region classic content presents into. */
 XwaPresentationRect XwaPresentation_ClassicSafeFrame(void);

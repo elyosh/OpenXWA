@@ -9,17 +9,40 @@
 extern "C" {
 #endif
 
-extern const uint16_t g_projectileLifetimeSecondsByObjectType[OBJ_LaserImperialDS + 1];
-extern const uint16_t g_projectileLifetimeFracQ16ByObjectType[OBJ_LaserImperialDS + 1];
-extern const uint16_t g_projectileLifetimeSecondsByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
-extern const uint16_t g_projectileLifetimeFracQ16ByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
-extern const uint16_t g_projectileSpeedByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
-extern const int      g_projectileDamageByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
-extern const uint8_t  g_projectileWarheadClassByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
-/* The side of each projectile type (0 or 1, 0xff for none), the projectile type of
-   the other side, and the side of each IFF. */
-extern const uint8_t g_projectileRequiredIffByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
-extern const uint16_t g_projectileAlternateIffTypeByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
+/* The projectile tables, in projectile_tables.inc. A mod can change them at
+   startup (xwa_runtime/models/projectiles.h). */
+extern int g_projectileDamageByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileSpeedByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileLifetimeSecondsByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileLifetimeFracQ16ByType[XWA_PROJECTILE_TYPE_COUNT];
+extern int16_t g_projectileLaunchOffsetByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint8_t g_projectileWarheadClassByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileScoreByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint8_t g_projectileRequiredIffByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileAlternateIffTypeByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint8_t g_projectileHomingProfileBaseByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileHomingTurnRateByProfile[42];
+extern uint16_t g_projectileHomingSpeedAdjustRateByProfile[42];
+
+#ifndef XWA_MODERN
+/* The original code reads some projectile tables by object type, at the
+   table's address minus 280 entries. */
+// GLOBAL: XWA 0x5B62F8
+extern const uint16_t g_projectileSpeedByObjectType_BiasedBase[];
+// GLOBAL: XWA 0x5B6330
+extern const uint16_t g_projectileLifetimeSecondsByObjectType_BiasedBase[];
+// GLOBAL: XWA 0x5B6368
+extern const uint16_t g_projectileLifetimeFracQ16ByObjectType_BiasedBase[];
+// GLOBAL: XWA 0x5B63F8
+extern const uint16_t g_projectileScoreByObjectType_BiasedBase[];
+extern const uint8_t g_projectileRequiredIffByObjectType_BiasedBase[];
+extern const uint16_t g_projectileAlternateIffTypeByObjectType_BiasedBase[];
+// GLOBAL: XWA 0x5B6658
+extern const uint8_t g_projectileHomingProfileBaseByObjectType_BiasedBase[];
+#endif
+
+extern const uint16_t g_warheadLeadErrorModulusByAiLevel[6];
+extern const uint16_t g_warheadFireChanceThresholdByAiLevel[6];
 extern const uint8_t g_projectileRequiredIffByShooterIff[8];
 
 #ifdef XWA_MODERN
@@ -27,7 +50,7 @@ extern const uint8_t g_projectileRequiredIffByShooterIff[8];
 static inline int laser_GetProjectileWarheadClass(ObjectTypeId objectType) {
 	uint16_t type = (uint16_t)objectType;
 
-	if (type < OBJ_LaserRebel || type > OBJ_LaserImperialDS) {
+	if (type < OBJ_LaserRebel || type > OBJ_NoAsset_307) {
 		return -1;
 	}
 
@@ -35,31 +58,19 @@ static inline int laser_GetProjectileWarheadClass(ObjectTypeId objectType) {
 }
 #endif
 
-/* Mission-score point value lost when a player-owned warhead is destroyed, indexed by warhead
-   object type. Original is a biased-base table; only the warhead object-type window is populated. */
-extern const uint16_t g_warheadProjectilePointValueByObjectType[OBJ_LaserImperialDS + 1];
-extern const uint16_t g_warheadProjectilePointValue[11];
-/* Per-warhead homing profile base, indexed by warhead object type. Added to the guidance homing
-   tier to select a profile row in the homing turn-rate / speed-adjust tables. */
-extern const uint8_t  g_projectileHomingProfileBaseByObjectType[OBJ_LaserImperialDS + 1];
-/* Homing turn rate (Q16 angle/step scale) per resolved homing profile row. */
-extern const uint16_t g_projectileHomingTurnRateByProfile[42];
-/* Homing speed adjustment rate per resolved homing profile row. */
-extern const uint16_t g_projectileHomingSpeedAdjustRateByProfile[42];
-
 uint16_t laser_GetProjectileLifetimeTicks(ObjectTypeId projectileObjectType);
-void     laser_weaponsfire(void);
-void     laser_UpdateMineWeaponFire(int mineObjIdx);
-int      laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTypeId projectileType,
-								int playerIdx);
-void     laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, uint16_t targetRef);
-int      laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsigned int fireMode);
-void     laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int playerIdx,
-							   uint16_t updateFireDelay);
-void     laser_firerocketsystem(int firerObjIdx, unsigned int fireMode);
-void     laser_fireplayerweapon(int playerIdx);
+void laser_weaponsfire(void);
+void laser_UpdateMineWeaponFire(int mineObjIdx);
+int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTypeId projectileType,
+						   int playerIdx);
+void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, uint16_t targetRef);
+int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsigned int fireMode);
+void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int playerIdx,
+						   uint16_t updateFireDelay);
+void laser_firerocketsystem(int firerObjIdx, unsigned int fireMode);
+void laser_fireplayerweapon(int playerIdx);
 uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shooterObjIdx);
-int      laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId projectileObjectType);
+int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId projectileObjectType);
 
 #ifdef __cplusplus
 }

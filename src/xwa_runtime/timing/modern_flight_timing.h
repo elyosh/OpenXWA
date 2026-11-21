@@ -21,6 +21,15 @@ void XwaModernFlightTiming_Configure(int requested_step_ticks);
 void XwaModernFlightTiming_BeginSession(int player_count);
 void XwaModernFlightTiming_EndSession(void);
 int XwaModernFlightTiming_StepTicks(void);
+/* How much Sound_FlushQueuedEffects lowers the priority of the playing
+   sounds at game time `game_time`. The original flushes once per flight
+   frame, and its flight frames are 8 ticks apart, so a playing sound loses 1
+   every 8 ticks and new sounds can take its slot. With unlocked timing,
+   flight frames come faster, and sounds would lose their slots sooner,
+   depending on the frame rate. So in unlocked timing this counts the 8-tick
+   steps of game time since the last call, and carries the rest over; in
+   compatibility timing, it is 1, as in the original. */
+int XwaModernFlightTiming_SoundPriorityDecay(int game_time);
 /* Uses `step_ticks` for the rest of the flight session: a film plays with
    the step that it was recorded with. Values outside 1 to 8 are ignored. */
 void XwaModernFlightTiming_UseFilmStepTicks(int step_ticks);

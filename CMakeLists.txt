@@ -49,7 +49,7 @@ endif()
 option(XWA_BUILD_TOOLS "Build OpenXWA and Aeron asset/developer tools" ON)
 # The mod importer is built from the tool libraries, so it needs the tools.
 include(CMakeDependentOption)
-cmake_dependent_option(XWA_BUILD_MOD_IMPORTER "Build the OpenXWA Mod Importer" ON "XWA_BUILD_TOOLS" OFF)
+cmake_dependent_option(XWA_BUILD_MOD_IMPORTER "Build the mod importer into OpenXWA" ON "XWA_BUILD_TOOLS" OFF)
 set(AERON_BUILD_TOOLS ${XWA_BUILD_TOOLS})
 set(AERON_ENABLE_VIDEO ON)
 set(AERON_HOST_TOOLS_ONLY OFF)
@@ -215,8 +215,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_pilot_profiles_screen.c
     src/xwa_runtime/config/modern_video_options.c
-    src/xwa_runtime/config/modern_mods.c
-    src/xwa_runtime/config/modern_mods_screen.c
+    src/xwa_runtime/config/modern_audio_options.c
     src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
     src/xwa_runtime/config/modern_target_readout_options.c
@@ -243,6 +242,8 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/input/rumble_provider.c
     src/xwa_runtime/input/winmm_joystick_provider.c
     src/xwa_runtime/input/mouse_flight.c
+    src/xwa_runtime/input/vr_stick.c
+    src/xwa_runtime/input/vr_keyboard.c
     src/xwa_runtime/models/cockpit_eye.c
     src/xwa_runtime/models/cockpit_view.c
     src/xwa_runtime/models/craft_definitions.c
@@ -259,6 +260,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/hangars.c
     src/xwa_runtime/models/headlights.c
     src/xwa_runtime/models/cockpit_lights.c
+    src/xwa_runtime/models/vr_hands.c
     src/xwa_runtime/models/particle_lights.c
     src/xwa_runtime/models/mission_backdrops.c
     src/xwa_runtime/models/mission_file.c
@@ -270,6 +272,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/craft_names.c
     src/xwa_runtime/models/model_source.c
     src/xwa_runtime/models/object_limits.c
+    src/xwa_runtime/models/hangar_crafts.c
     src/xwa_runtime/models/object_profiles.c
     src/xwa_runtime/models/shield_recharge.c
     src/xwa_runtime/models/craft_hyperspace.c
@@ -285,7 +288,11 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/warhead_launchers.c
     src/xwa_runtime/models/warhead_lock.c
     src/xwa_runtime/models/ai_attack.c
+    src/xwa_runtime/compat/projectile_tables.c
+    src/xwa_runtime/compat/rank_tables.c
     src/xwa_runtime/models/flight_config.c
+    src/xwa_runtime/models/formations.c
+    src/xwa_runtime/models/projectiles.c
     src/xwa_runtime/models/mod_files.c
     src/xwa_runtime/models/mag_pulse.c
     src/xwa_runtime/models/units.c
@@ -294,6 +301,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/weapon_stats.c
     src/xwa_runtime/audio/sound_banks.c
     src/xwa_runtime/audio/mission_sounds.c
+    src/xwa_runtime/audio/sound_slots.c
     src/xwa_runtime/models/craft_sounds.c
     src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/models/mission_art.c
@@ -313,6 +321,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/snapshot/snapshot_flight_map.c
     src/xwa_runtime/snapshot/snapshot_hud.c
     src/xwa_runtime/text/text_overrides.c
+    src/xwa_runtime/timing/ai_lead.c
     src/xwa_runtime/timing/host_clock.c
     src/xwa_runtime/timing/modern_flight_timing.c
 )
@@ -356,6 +365,8 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/hud_cmd_math.c
     src/xwa_remaster/hud_fixed.c
     src/xwa_remaster/hud_layout.c
+    src/xwa_remaster/hud_planes.c
+    src/xwa_remaster/hud_reproject_math.c
     src/xwa_remaster/hud_readout.c
     src/xwa_remaster/hud_text.c
     src/xwa_remaster/preview.c
@@ -367,6 +378,11 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/sky_stars.c
     src/xwa_remaster/speed_effect.c
     src/xwa_remaster/suns.c
+    src/xwa_remaster/vr_hands.c
+    src/xwa_remaster/cockpit_buttons.c
+    src/xwa_remaster/menu_beam.c
+    src/xwa_remaster/menu_hands.c
+    src/xwa_remaster/vr_keyboard.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
 )
@@ -400,6 +416,7 @@ aeron_compile_hlsl(XWA_SHADER_OUTPUTS ${CMAKE_BINARY_DIR}/shaders
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.vert.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/target_display_edges.frag.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hud_reproject.frag.hlsl
 )
 add_custom_target(xwa_shaders DEPENDS ${XWA_SHADER_OUTPUTS})
 add_dependencies(xwa_remaster xwa_shaders)
@@ -425,11 +442,12 @@ target_link_libraries(xwa_core
 )
 
 # The paths.* keys of config.yaml, the game data check and the mod list.
-# The game and the mod importer both link it. It doesn't depend on the game.
+# It doesn't depend on the game's code.
 set(XWA_INSTALL_SOURCES
     src/xwa_app/install_check.c
     src/xwa_app/install_paths.c
     src/xwa_app/mod_list.c
+    src/xwa_app/mod_update.c
 )
 add_library(xwa_install STATIC ${XWA_INSTALL_SOURCES})
 target_include_directories(xwa_install PUBLIC
@@ -445,8 +463,10 @@ set(XWA_APP_SOURCES
     src/xwa_app/options/bindings_editor.c
     src/xwa_app/options/controller_page.c
     src/xwa_app/options/keyboard_page.c
+    src/xwa_app/options/mods_page.c
     src/xwa_app/options/mouse_page.c
     src/xwa_app/options/video_page.c
+    src/xwa_app/options/audio_page.c
     src/xwa_app/options/options_window.c
     src/xwa_app/setup.c
     src/xwa_app/ui.c
@@ -472,6 +492,8 @@ target_compile_definitions(xwa_core PRIVATE
     OPENXWA_VERSION="${XWA_VERSION}"
 )
 target_compile_definitions(xwa PRIVATE OPENXWA_VERSION="${XWA_VERSION}")
+# 1 when the Mods tab can import mods (src/xwa_app/options/mods_import.c).
+target_compile_definitions(xwa PRIVATE XWA_HAS_MOD_IMPORT=$<BOOL:${XWA_BUILD_MOD_IMPORTER}>)
 
 if(APPLE)
     set(XWA_MACOS_BUILD_VERSION "1" CACHE STRING
@@ -513,8 +535,13 @@ if(APPLE)
         HEADER_FILE_ONLY TRUE
         MACOSX_PACKAGE_LOCATION Resources/resources/aeron)
 
-    # The font of the OpenXWA Options window.
+    # The font of the OpenXWA Options window, and the fonts that the mod
+    # importer gives the mods it makes.
     set(XWA_MACOS_FONT_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/DejaVu-LICENSE.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/DejaVuSans.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-Bold.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-OFL.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
         "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.ktx2")
     target_sources(xwa PRIVATE ${XWA_MACOS_FONT_FILES})
@@ -639,15 +666,19 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/import.c
         tools/mod_importer/log.c
         tools/mod_importer/models.c
+        tools/mod_importer/stock_formations.c
+        tools/mod_importer/stock_keys.c
+        tools/mod_importer/vr_hands.c
         tools/mod_importer/stock_model_defs.c
+        tools/mod_importer/stock_projectiles.c
         tools/mod_importer/stock_tables.c
-        # The game's craft tables, which the importer uses for its stock
-        # tables. The library is built without XWA_MODERN, so the tables have
-        # the stock sizes.
-        src/xwa/assets/object_type.c
-        src/xwa/assets/object_type_info.c
-        # The game's name tables. The importer writes these names in its files.
-        src/xwa_runtime/models/names.c
+        # The importer's own copy of the game's craft and name tables. The
+        # library is built without XWA_MODERN, so the tables keep their stock
+        # sizes. stock_symbols.h renames their symbols so they don't clash
+        # with the game's copy in xwa_core.
+        tools/mod_importer/stock_names.c
+        tools/mod_importer/stock_object_type.c
+        tools/mod_importer/stock_object_type_info.c
     )
     target_include_directories(xwa_mod_import_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/mod_importer)
     target_include_directories(xwa_mod_import_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -665,72 +696,19 @@ if(XWA_BUILD_MOD_IMPORTER)
     set_target_properties(xwa_mod_import PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-    # The importer's window. It needs Aeron's shaders and the fonts in
-    # resources/assets/fonts. On macOS it is a second bundle with its own
-    # copy of both. Elsewhere it sits beside OpenXWA, uses the same shaders
-    # folder and has its own copy of the resources.
-    add_executable(xwa_mod_importer
-        tools/mod_importer/app/main.c
-        tools/mod_importer/app/ui.c
-    )
-    target_link_libraries(xwa_mod_importer PRIVATE xwa_mod_import_lib xwa_install)
-    target_compile_definitions(xwa_mod_importer PRIVATE OPENXWA_VERSION="${XWA_VERSION}")
-    set_target_properties(xwa_mod_importer PROPERTIES
-        OUTPUT_NAME "OpenXWA Mod Importer"
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-    if(APPLE)
-        set_target_properties(xwa_mod_importer PROPERTIES
-            MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_INFO_PLIST
-                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
-            MACOSX_BUNDLE_BUNDLE_NAME "OpenXWA Mod Importer"
-            MACOSX_BUNDLE_GUI_IDENTIFIER "${XWA_MACOS_BUNDLE_IDENTIFIER}.modimporter"
-            INSTALL_RPATH "@executable_path/../Frameworks"
-        )
-        target_sources(xwa_mod_importer PRIVATE "${XWA_MACOS_ICON}")
-
-        set(XWA_MOD_IMPORTER_FONTS
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/DejaVu-LICENSE.txt"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/DejaVuSans.ttf"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-Bold.ttf"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-OFL.txt"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.ktx2")
-        target_sources(xwa_mod_importer PRIVATE ${XWA_MOD_IMPORTER_FONTS})
-        set_source_files_properties(${XWA_MOD_IMPORTER_FONTS} PROPERTIES
-            HEADER_FILE_ONLY TRUE
-            MACOSX_PACKAGE_LOCATION Resources/resources/assets/fonts)
-
-        # Only Aeron's shaders: the game's own aren't used here. Their
-        # bundle location is set with the game's.
-        target_sources(xwa_mod_importer PRIVATE ${AERON_SHADER_OUTPUTS})
-
-        install(TARGETS xwa_mod_importer BUNDLE DESTINATION .)
-        set(XWA_MACOS_FIXUP_BUNDLE "OpenXWA Mod Importer.app")
-        configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/FixupBundle.cmake.in"
-            "${CMAKE_CURRENT_BINARY_DIR}/FixupMacImporterBundle.cmake"
-            @ONLY
-        )
-        install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/FixupMacImporterBundle.cmake")
-    else()
-        if(WIN32)
-            set_target_properties(xwa_mod_importer PROPERTIES WIN32_EXECUTABLE TRUE)
-        endif()
-        add_custom_command(TARGET xwa_mod_importer POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_CURRENT_SOURCE_DIR}/resources
-                $<TARGET_FILE_DIR:xwa_mod_importer>/resources
-            COMMENT "Staging the mod importer's resources"
-        )
-    endif()
+    # The Mods tab of OpenXWA's options window, which imports mods.
+    target_sources(xwa PRIVATE src/xwa_app/options/mods_import.c)
+    target_link_libraries(xwa PRIVATE xwa_mod_import_lib)
 endif()
 
-# Replacement-model simulation data must be bit-identical across compilers.
+# Replacement-model simulation data and the single-precision AI arrival test
+# must be bit-identical across compilers.
 if(MSVC)
-    set_source_files_properties(src/xwa_runtime/models/opt_synth.c PROPERTIES COMPILE_OPTIONS "/fp:precise")
+    set_source_files_properties(src/xwa_runtime/models/opt_synth.c src/xwa_runtime/models/craft_hyperspace.c
+        PROPERTIES COMPILE_OPTIONS "/fp:precise")
 else()
-    set_source_files_properties(src/xwa_runtime/models/opt_synth.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+    set_source_files_properties(src/xwa_runtime/models/opt_synth.c src/xwa_runtime/models/craft_hyperspace.c
+        PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
 if(MSVC)
@@ -758,178 +736,27 @@ if(XWA_BUILD_MOD_IMPORTER)
     if(MSVC)
         target_compile_options(xwa_mod_import_lib PRIVATE /W4)
         target_compile_options(xwa_mod_import PRIVATE /W4)
-        target_compile_options(xwa_mod_importer PRIVATE /W4)
     else()
         target_compile_options(xwa_mod_import_lib PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(xwa_mod_import PRIVATE -Wall -Wextra -Wpedantic)
-        target_compile_options(xwa_mod_importer PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()
 
-set(XWA_FORMAT_HEADERS
-    src/xwa_runtime/camera/camera_motion.h
-    src/xwa_runtime/camera/exterior_hud.h
-    src/xwa_runtime/config/modern_camera_options.h
-    src/xwa_runtime/config/modern_camera_shake_options.h
-    src/xwa_runtime/config/modern_input_options.h
-    src/xwa_runtime/config/modern_options_menu.h
-    src/xwa_runtime/config/modern_pilot_profiles_screen.h
-    src/xwa_runtime/config/modern_speed_effect_options.h
-    src/xwa_runtime/config/modern_sun_options.h
-    src/xwa_runtime/config/modern_target_readout_options.h
-    src/xwa_runtime/config/modern_video_options.h
-    src/xwa_runtime/config/option_section.h
-    src/xwa_runtime/config/modern_mods.h
-    src/xwa_runtime/config/modern_mods_screen.h
-    src/xwa/audio/cd_audio.h
-    src/xwa/audio/music.h
-    src/xwa/config/game_config.h
-    src/xwa/config/pilot.h
-    src/xwa/input/forcefeedback.h
-    src/xwa/assets/file_io.h
-    src/xwa/assets/flight_model.h
-    src/xwa/assets/linez.h
-    src/xwa/assets/model_bounds.h
-    src/xwa/assets/model_def.h
-    src/xwa/assets/model_mesh.h
-    src/xwa/assets/model_texture.h
-    src/xwa/assets/object_type_info.h
-    src/xwa/assets/object_type.h
-    src/xwa/assets/opt_model.h
-    src/xwa/assets/ship_list.h
-    src/xwa/assets/sprite_resource.h
-    src/xwa/assets/sprite_texture.h
-    src/xwa/assets/string_table.h
-    src/xwa/assets/ui_string.h
-    src/xwa/frontend/briefing_room.h
-    src/xwa/frontend/briefing_script.h
-    src/xwa/frontend/combat_sim_menu.h
-    src/xwa/frontend/cutscene.h
-    src/xwa/frontend/family_transport_room.h
-    src/xwa/frontend/frontend_button.h
-    src/xwa/frontend/concourse.h
-    src/xwa/frontend/frontend_bootstrap.h
-    src/xwa/frontend/frontend_color.h
-    src/xwa/frontend/frontend_cursor.h
-    src/xwa/frontend/frontend_display.h
-    src/xwa/frontend/frontend_dialog.h
-    src/xwa/frontend/frontend_draw.h
-    src/xwa/frontend/frontend_escape.h
-    src/xwa/frontend/frontend_file_list.h
-    src/xwa/frontend/frontend_file_stream.h
-    src/xwa/frontend/frontend_flight.h
-    src/xwa/frontend/frontend_image.h
-    src/xwa/frontend/frontend_input.h
-    src/xwa/frontend/frontend_medals.h
-    src/xwa/frontend/frontend_email.h
-    src/xwa/frontend/frontend_mission.h
-    src/xwa/frontend/frontend_mission_list.h
-    src/xwa/frontend/frontend_mission_session.h
-    src/xwa/frontend/frontend_net.h
-    src/xwa/frontend/frontend_rect.h
-    src/xwa/frontend/frontend_resources.h
-    src/xwa/frontend/frontend_scratch.h
-    src/xwa/frontend/frontend_screen.h
-    src/xwa/frontend/frontend_scrollbar.h
-    src/xwa/frontend/frontend_sound.h
-    src/xwa/frontend/frontend_text.h
-    src/xwa/frontend/frontend_wave_stream.h
-    src/xwa/frontend/film_room.h
-    src/xwa/frontend/flight_loading.h
-    src/xwa/frontend/mission_debrief.h
-    src/xwa/flight/ai/pai.h
-    src/xwa/flight/ai/ai_internal.h
-    src/xwa/flight/ai/paifight.h
-    src/xwa/flight/ai/paiman.h
-    src/xwa/flight/ai/paiorder.h
-    src/xwa/flight/ai/pai_plan.h
-    src/xwa/flight/flight.h
-    src/xwa/flight/flight_debug.h
-    src/xwa/flight/flight_map.h
-    src/xwa/flight/flight_sync.h
-    src/xwa/flight/object/collision.h
-    src/xwa/flight/object/damage.h
-    src/xwa/flight/flight_light.h
-    src/xwa/flight/flight_text.h
-    src/xwa/math/trig2.h
-    src/xwa/frontend/mission_setup.h
-    src/xwa/frontend/skirmish.h
-    src/xwa/frontend/tech_library.h
-    src/xwa/movie/movie.h
-    src/xwa/flight/player/player.h
-    src/xwa/render/renderer.h
-    src/xwa/xwa.h
-    src/xwa/xwa_options.h
-    src/xwa_runtime/runtime/flight_pause_task.h
-    src/xwa_runtime/runtime/flight_task.h
-    src/xwa_runtime/runtime/film_benchmark.h
-    src/xwa_runtime/runtime/film_state.h
-    src/xwa_runtime/runtime/frontend_task.h
-    src/xwa_runtime/timing/host_clock.h
-    src/xwa_runtime/frontend/awards.h
-    src/xwa_runtime/frontend/concourse_layout.h
-    src/xwa_runtime/frontend/concourse_planet.h
-    src/xwa_runtime/frontend/family_missions.h
-    src/xwa_runtime/frontend/frontend_config.h
-    src/xwa_runtime/frontend/frontend_geometry.h
-    src/xwa_runtime/frontend/frontend_screens.h
-    src/xwa_runtime/frontend/frontend_fonts.h
-    src/xwa_runtime/frontend/frontend_video.h
-    src/xwa_runtime/frontend/room_anims.h
-    src/xwa_runtime/input/actions.h
-    src/xwa_runtime/input/capture.h
-    src/xwa_runtime/input/controller_options.h
-    src/xwa_runtime/input/flight_controls.h
-    src/xwa_runtime/input/input_bridge.h
-    src/xwa_runtime/input/keyboard_mapping.h
-    src/xwa_runtime/input/rumble_provider.h
-    src/xwa_runtime/input/winmm_joystick_provider.h
-    src/xwa_runtime/input/controller_mapping.h
-    src/xwa_runtime/input/mouse_flight.h
-    src/xwa_runtime/timing/modern_flight_timing.h
-    src/xwa_runtime/runtime/movie_task.h
-    src/xwa_runtime/hooks/orientation_hook.h
-    src/xwa_runtime/runtime/port.h
-    src/xwa_runtime/runtime/presentation.h
-    src/xwa_runtime/snapshot/snapshot.h
-    src/xwa_runtime/snapshot/snapshot_camera.h
-    src/xwa_runtime/snapshot/snapshot_flight_map.h
-    src/xwa_runtime/snapshot/snapshot_hud.h
-    src/xwa_runtime/compat/middleware_crt.h
-    src/xwa_app/controller_config.h
-    src/xwa_app/host_config.h
-    src/xwa_app/install_check.h
-    src/xwa_app/keyboard_config.h
-    src/xwa_app/options/bindings_editor.h
-    src/xwa_app/options/controller_page.h
-    src/xwa_app/options/keyboard_page.h
-    src/xwa_app/options/mouse_page.h
-    src/xwa_app/options/video_page.h
-    src/xwa_app/options/options_window.h
-    src/xwa_app/ui.h
-    src/xwa_app/install_paths.h
-    src/xwa_app/mod_format.h
-    src/xwa_app/mod_list.h
-    src/xwa_app/setup.h
-    src/xwa/util/byte_order.h
-    src/xwa/util/color.h
-    src/xwa/util/debug.h
-    src/xwa/util/memory.h
-    src/xwa/util/string.h
-    src/xwa/util/time.h
-    tools/mod_importer/import.h
-    tools/mod_importer/import_internal.h
-    tools/mod_importer/app/ui.h
+# Every C and C++ file of the project. The aeron submodule formats its own
+# files with its aeron-format target, and its third_party folder keeps the
+# upstream formatting. The .inc data tables are left as they are, and so are generated files.
+file(GLOB_RECURSE XWA_FORMAT_FILES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/*.c"
+    "${CMAKE_SOURCE_DIR}/src/*.h"
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_SOURCE_DIR}/src/*.hpp"
+    "${CMAKE_SOURCE_DIR}/tools/*.c"
+    "${CMAKE_SOURCE_DIR}/tools/*.h"
+    "${CMAKE_SOURCE_DIR}/tools/*.cpp"
+    "${CMAKE_SOURCE_DIR}/tools/*.hpp"
 )
-
-set(XWA_FORMAT_FILES
-    ${XWA_FORMAT_HEADERS}
-    ${XWA_RECOVERED_SOURCES}
-    ${XWA_RUNTIME_SOURCES}
-    ${XWA_INSTALL_SOURCES}
-    ${XWA_APP_SOURCES}
-    ${XWA_TOOL_SOURCES}
-)
+# packaging/icons/icon_tools.py writes this file.
+list(FILTER XWA_FORMAT_FILES EXCLUDE REGEX "/src/xwa_app/window_icon\\.h$")
 
 find_program(CLANG_FORMAT clang-format)
 if(CLANG_FORMAT)

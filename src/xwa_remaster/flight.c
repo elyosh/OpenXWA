@@ -15,14 +15,18 @@
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
+#include "aeron/scene/view_rig.h"
 #include "aeron/scene/world.h"
 #include "xwa_remaster/captured_lighting.h"
+#include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/effects.h"
 #include "xwa_remaster/environment.h"
 #include "xwa_remaster/flight_map.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/hud.h"
+#include "xwa_remaster/hud_planes.h"
+#include "xwa_remaster/hud_reproject_math.h"
 #include "xwa_remaster/hyperspace.h"
 #include "xwa_remaster/probe_outlines.h"
 #include "xwa_remaster/ship.h"
@@ -30,12 +34,13 @@
 #include "xwa_remaster/sky_stars.h"
 #include "xwa_remaster/speed_effect.h"
 #include "xwa_remaster/suns.h"
+#include "xwa_remaster/vr_hands.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/models/cockpit_lights.h"
-#include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/timing/host_clock.h"
 
@@ -114,6 +119,8 @@ typedef struct FlBillboard {
 	 * basis rather than approximating history with a translation. */
 	float prev_corners[4][3];
 	uint8_t has_prev;
+	/* The build view (s.build) that the billboard faces. */
+	uint8_t build;
 } FlBillboard;
 
 /* One lens-flare source (classic LensFlare_QueueSource): the anchored
@@ -191,6 +198,26 @@ enum {
 	FL_TARGET_WARHEAD_LOCKED,
 };
 
+/* A camera that sprites are built for. Billboards, particles, trails, engine
+ * glows and backdrops are built on the CPU to face one camera, so they are
+ * right only in the views that look the same way. A frame has one build view
+ * for all its views, or one for each view. */
+typedef struct FlBuildView {
+	XwaRemasterFlightView view;
+	/* The camera's world-to-eye rows, from the quaternion the scene uses. */
+	float crows[9];
+	/* The camera's position minus the seat camera's, in world axes. */
+	float offset[3];
+	/* The views that draw the sprites, one bit each. 0 is every view. */
+	uint32_t view_mask;
+	XwaRemasterEffectView effect_view;
+	/* The same camera for the previous snapshot, for the sprites' motion
+	 * vectors. Without camera blur it is the current camera. */
+	float history_crows[9];
+	float history_offset[3];
+	XwaRemasterEffectView history_effect_view;
+} FlBuildView;
+
 /* The scene owns the pass topology (prepass / SSAO / forward color /
  * motion-blur resolve — AeronScene_Render); this driver submits mesh
  * instances and draws the non-mesh geometry through the scene's pass
@@ -204,14 +231,75 @@ static struct {
 	uint64_t scene_serial;
 	uint64_t prepared_scene_serial;
 	uint64_t prepared_mesh_generation;
-	XwaRemasterTrails* trails;
-	XwaRemasterParticles* particles;
+	/* One set of trails and particles for each build view. */
+	XwaRemasterTrails* trails[AERON_MAX_VIEWS];
+	XwaRemasterParticles* particles[AERON_MAX_VIEWS];
 	XwaRemasterHyperspace* hyperspace;
 	XwaRemasterSkyStars* sky_stars;
 	XwaRemasterSpeedEffect* speed_effect;
 	FlBeforeOpaqueMode before_opaque_mode;
+	/* The size of one view: the scene, the bloom and the HUD have it. */
 	int rt_w;
 	int rt_h;
+	/* The size of present_rt, which holds all the views. It is the view size
+	 * unless a rig is set. */
+	int out_w;
+	int out_h;
+	/* The size of the flat view: the single view from the game camera that the
+	 * map uses. It is the view size, except in a headset. There the flat view
+	 * is shown on the virtual screen, so it has the shape of present_rt and is
+	 * drawn in the upper left part of the scene. The flat HUD, hud_rt, has this
+	 * size. */
+	int flat_w;
+	int flat_h;
+	/* This frame is a flat view that doesn't cover the whole scene. */
+	int flat_cropped;
+	/* The rig set by XwaRemasterFlight_SetViewRig, and whether it has
+	 * several views. `rig_previous` is the rig of the last rendered frame,
+	 * for the views' motion vectors. */
+	AeronViewRig rig;
+	int rig_active;
+	AeronViewRig rig_previous;
+	int rig_previous_valid;
+	/* Set while present_rt holds a frame composed from the rig's views. */
+	int rig_composed;
+	/* A headset's rig: each view is drawn into its own target, such as an
+	 * eye image, instead of a rectangle of present_rt. The targets are set
+	 * for one frame (XwaRemasterFlight_SetViewTargets). */
+	AeronRenderTarget* view_targets[AERON_MAX_VIEWS];
+	int view_targets_set;
+	/* The part of each view's image that the headset's lens never shows
+	 * (XwaRemasterFlight_SetViewAreas). */
+	AeronXrAreaMesh view_hidden_areas[AERON_MAX_VIEWS];
+	AeronXrAreaMesh view_visible_areas[AERON_MAX_VIEWS];
+	int view_areas_set;
+	/* The last render drew the rig's views into their own targets. */
+	int view_targets_rendered;
+	/* While set, a rig's frame is composed before the tonemap and without
+	 * the HUD, for film captures. */
+	int compose_before_tonemap;
+	/* This frame's cameras. The seat view is the game camera, and the rig's
+	 * origin. The centre view is where the head is: the frame's choices that
+	 * need one viewpoint use it. Only `views` are rendered. Without a rig,
+	 * and for the map and the hyperspace tunnel, all of them are the game
+	 * camera. */
+	XwaRemasterFlightView seat_view;
+	float seat_crows[9];
+	XwaRemasterFlightView center_view;
+	/* The centre view's position minus the seat view's, in world axes. */
+	float center_offset[3];
+	XwaRemasterFlightView views[AERON_MAX_VIEWS];
+	/* The world-to-eye rows of each view, from its quaternion. */
+	float view_crows[AERON_MAX_VIEWS][9];
+	XwaRemasterFlightView previous_views[AERON_MAX_VIEWS];
+	int view_count;
+	int primary_view;
+	FlBuildView build[AERON_MAX_VIEWS];
+	uint32_t build_count;
+	/* The tick of the last rendered snapshot. A tracked rig renders the
+	 * same snapshot again when the head moves between two game ticks. */
+	uint64_t rendered_tick;
+	int rendered_tick_valid;
 	AeronSampleCount scene_requested_samples;
 	AeronSampleCount configured_msaa_samples;
 	int configured_hdr_output;
@@ -224,7 +312,53 @@ static struct {
 	AeronScenePresentChain* present;
 	AeronScenePresentChain* present_direct;
 	AeronTextureFormat direct_present_format;
+	/* The chain that tone maps into the views' own targets. */
+	AeronScenePresentChain* present_views;
+	AeronTextureFormat present_views_format;
 	AeronRenderTarget* present_rt;
+	/* With a rig, the 2D HUD is drawn into this target of the view size,
+	 * with premultiplied alpha, and then over the primary view. */
+	AeronRenderTarget* hud_rt;
+	AeronDrawList2D* hud_composite;
+	/* The headset HUD (hud.h), also used by the debug stereo view. It is laid
+	 * out for hud_view: the seat's view with the game camera's vertical field
+	 * of view, in an image of presentation.vr_hud_*_px. The markers (hud.h) are
+	 * drawn into each eye on the planes of hud_planes (hud_planes.h). The rest
+	 * of the HUD is drawn into hud_panel_rt and shown on a panel in the
+	 * cockpit. hud_head_view follows the head and has no image. It is used to
+	 * place the arrow that points to a target out of view. */
+	AeronRenderTarget* hud_panel_rt;
+	XwaRemasterFlightView hud_view;
+	XwaRemasterFlightView hud_head_view;
+	XwaRemasterHudPlanes hud_planes;
+	/* This frame draws the headset HUD, and the panel's image is already
+	 * drawn. */
+	int headset_hud;
+	int headset_hud_drawn;
+	/* This frame draws the HUD's markers on planes in every surround screen
+	 * (hud.h). The rest of the HUD is flat, over the primary view. */
+	int surround_markers;
+	AeronShader* hud_reproject_vs;
+	AeronShader* hud_reproject_fs;
+	AeronGraphicsPipeline* hud_reproject_pipeline;
+	AeronTextureFormat hud_reproject_format;
+	/* presentation.vr_hud_*: the image's size, and the panel's distance
+	 * from the seat's eye point in metres. vr_hud_panel_scale is the
+	 * panel's size, where 1 covers the HUD's view
+	 * (XwaRemasterFlight_SetHudPanelScale). */
+	int vr_hud_width_px;
+	int vr_hud_height_px;
+	float vr_hud_panel_distance_m;
+	float vr_hud_panel_scale;
+	float vr_hud_reticle_scale;
+	/* presentation.vr_hud_arrow_*: where the arrow to a target out of view
+	 * is, and when it shows, as fractions of what both eyes see
+	 * (XwaRemasterFlightView.arrow_rect). */
+	float vr_hud_arrow_position;
+	float vr_hud_arrow_view;
+	/* Scene units for one metre of the player's head movement
+	 * (XwaRemasterFlight_SetViewTargets). */
+	float head_units_per_meter;
 	AeronSampler* present_sampler;
 	AeronTexture* present_scene_tex;
 	AeronTexture* present_bloom_tex;
@@ -265,18 +399,21 @@ static struct {
 	/* model_lod.max_error, in pixels of a 1080-line view, and the debug
 	 * UI's tint by level. */
 	float lod_max_error;
-	int   lod_tint;
+	int lod_tint;
 	/* The projectiles settings, and their values in remaster/config.yaml,
 	 * which the debug UI's reset restores. */
 	XwaFlightProjectileParams projectiles;
 	XwaFlightProjectileParams projectiles_default;
-	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
+	float map_ambient_min[3];    /* lighting.map_ambient_min_* */
 	float death_star_ambient[3]; /* lighting.death_star_ambient_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
 	 * horizontal field of view stays the one at this aspect. 0 turns it
 	 * off. */
 	float cockpit_fov_min_aspect;
+	/* presentation.debug_stereo_*: the eyes of the debug UI's stereo view. */
+	float debug_stereo_ipd_m;
+	float debug_stereo_fov_deg;
 	XwaFlightTextureFilteringParams texture_filtering;
 	XwaFlightTextureFilteringParams texture_filtering_default;
 
@@ -376,18 +513,26 @@ static struct {
 	float hyperspace_keep_depth;
 	XwaFlightHyperspaceWarpView hyperspace_warp_view;
 	/* The region's sky cube for the scene warp this frame
-	 * (fl_note_hyperspace_sky): only its sky and overlay fields are set. */
+	 * (fl_note_hyperspace_sky). Only the sky and overlay fields are set. The
+	 * matrices from view space to the cubes depend on the view, so each view
+	 * computes them from the two world-to-cube matrices. */
 	XwaRemasterHyperspaceWarpInput hyperspace_sky;
+	float hyperspace_sky_world_to_cube[9];
+	float hyperspace_overlay_world_to_cube[9];
+	/* The hyperspace effect's projection and axes for each view of the
+	 * frame. */
+	XwaRemasterHyperspaceTunnelView hyperspace_views[AERON_MAX_VIEWS];
 	/* The scene warp's image, presented instead of the scene this frame. */
 	AeronTexture* present_scene_override;
 
 	const XwaSnapshot* snap;
-	/* Camera world->eye rows re-derived from the quaternion the scene
-	 * consumes (not the raw snapshot rows): view-space geometry rotated
+	/* The centre view's world->eye rows, re-derived from the quaternion the
+	 * scene consumes (not the raw snapshot rows): view-space geometry rotated
 	 * by these matches the scene's view matrix exactly; the Q15->quat
 	 * round-trip noise stays common to both paths. */
 	float crows[9];
 	int32_t origin_world[3];
+	/* The centre view's position. */
 	float camera_local[3];
 
 	/* Pre-resolved frame data (atlas uploads must precede the scene's
@@ -401,10 +546,10 @@ static struct {
 	uint32_t bb_capacity;
 	XwaAssetRef glow_ref;
 	int glow_ok;
-	/* Lens flares: sources + the per-ring flare sprite frames of
-	 * LightingEffects group 1000 (classic ring->frame map). */
-	FlLensSource lens_src[FL_MAX_LENS_SOURCES];
-	uint32_t lens_src_count;
+	/* Lens flares: the sources of each view + the per-ring flare sprite
+	 * frames of LightingEffects group 1000 (classic ring->frame map). */
+	FlLensSource lens_src[AERON_MAX_VIEWS][FL_MAX_LENS_SOURCES];
+	uint32_t lens_src_count[AERON_MAX_VIEWS];
 	XwaAssetRef lens_ref[FL_LENS_RINGS];
 	int lens_dim[FL_LENS_RINGS][2]; /* classic level-0 dims */
 	int lens_ok;
@@ -416,10 +561,12 @@ static struct {
 	uint32_t pl_cand_dropped;
 	uint32_t pl_invalid_count;
 	/* The valid candidates and the models' lights as scene lights, culled
-	 * by the view (frustum planes, camera position), ranked at submit. */
+	 * by the views (frustum planes), ranked by the distance to the centre
+	 * view at submit. */
 	FlPoolLight pl_pool[FL_MAX_PL_POOL];
 	uint32_t pl_pool_count;
-	float pl_frustum[5][4];
+	float pl_frustum[AERON_MAX_VIEWS][5][4];
+	int pl_view_count;
 	float pl_eye[3];
 	uint32_t pl_model_count;
 	uint32_t pl_culled[2]; /* [model] */
@@ -458,6 +605,9 @@ static struct {
 	int map_present;
 	int suppress_hud;
 } s;
+
+static int fl_set_scene_views(int several);
+static int fl_render_world_hyperspace(AeronCommandBuffer* cmd, int view);
 
 /* The next element of `pool`, without taking it (pool->used++ takes it), or
  * NULL when out of memory. */
@@ -570,6 +720,10 @@ static void fl_draw_before_opaque(AeronCommandBuffer* command_buffer, AeronRende
 	(void)user;
 	switch (s.before_opaque_mode) {
 		case FL_BEFORE_OPAQUE_HYPERSPACE:
+			if (s.view_count > 1) {
+				XwaRemasterHyperspace_SetView(s.hyperspace,
+											  &s.hyperspace_views[AeronScene_CurrentView(s.scene)]);
+			}
 			XwaRemasterHyperspace_Draw(command_buffer, render_pass, rt_w, rt_h, s.hyperspace);
 			break;
 		case FL_BEFORE_OPAQUE_SKY_STARS:
@@ -669,11 +823,21 @@ static int fl_cfg_has_type(const AeronConfigFile* config, const char* path, Aero
 static int fl_cfg_validate(const AeronConfigFile* config, const char** error_path) {
 	static const char* ints[] = {
 		"presentation.vsync_divisor", "presentation.frames_in_flight",     "presentation.msaa_samples",
+		"presentation.vr_screen_width_px", "presentation.vr_screen_height_px",
+		"presentation.vr_hud_width_px", "presentation.vr_hud_height_px",
 		"motion_blur.quality",        "point_lights.cluster_depth_slices", "hyperspace_jump.star_count",
 		"hyperspace_jump.warp_taps",  "hyperspace_jump.warp_sky_taps",
 	};
 	static const char* floats[] = {
 		"presentation.cockpit_fov_min_aspect",
+		"presentation.debug_stereo_ipd_m",
+		"presentation.debug_stereo_fov_deg",
+		"presentation.vr_screen_distance_m",
+		"presentation.vr_screen_width_deg",
+		"presentation.vr_hud_panel_distance_m",
+		"presentation.vr_hud_reticle_scale",
+		"presentation.vr_hud_arrow_position",
+		"presentation.vr_hud_arrow_view",
 		"hangar_lighting.direction_x",
 		"hangar_lighting.direction_y",
 		"hangar_lighting.direction_z",
@@ -807,7 +971,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"dynamic_cockpit.classic_hud",   "dynamic_cockpit.holograms",
 		"point_lights.model_lights",     "presentation.latency_pacing",
 		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
-		"models.backface_fill",
+		"models.backface_fill",          "point_lights.merge_spot_lights",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -892,7 +1056,8 @@ static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 /* Reads the three numbers at `key` of `entry` into `out`, if the key is
    there. Logs an error and returns 0 when the value is wrong. */
 static int fl_read_light_vector(const AeronConfigNode* entry, const char* path, const char* section,
-								const char* name, const char* key, int non_negative, float out[3], int* found) {
+								const char* name, const char* key, int non_negative, float out[3],
+								int* found) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(entry, key);
 	if (!node) {
 		return 1;
@@ -1108,8 +1273,9 @@ static int fl_load_particle_lights_config(const AeronConfigFile* cf, const char*
 		}
 		const AeronConfigNode* fade = AeronConfigNode_MapGet(entry, "fade");
 		if (fade && AeronConfigNode_Type(fade) != AERON_CONFIG_BOOL) {
-			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.particle_lights.%s.fade must be true or false",
-						   path, AeronConfigNode_Line(fade), name);
+			Aeron_LogError("xwa.remaster",
+						   "%s:%d: point_lights.particle_lights.%s.fade must be true or false", path,
+						   AeronConfigNode_Line(fade), name);
 			return 0;
 		}
 		light->fade = AeronConfigNode_Bool(fade, 0);
@@ -1233,7 +1399,8 @@ static float fl_clampf(float value, float lo, float hi) { return fminf(fmaxf(val
 
 static int fl_hyperspace_jump_valid(const XwaFlightHyperspaceJumpParams* p) {
 	if (!(p->star_count >= FL_JUMP_STAR_COUNT_MIN && p->star_count <= FL_JUMP_STAR_COUNT_MAX &&
-		  fl_in_range(p->streak_brightness, 0.0f, 16.0f) && fl_in_range(p->whiteout_brightness, 1.0f, 128.0f) &&
+		  fl_in_range(p->streak_brightness, 0.0f, 16.0f) &&
+		  fl_in_range(p->whiteout_brightness, 1.0f, 128.0f) &&
 		  fl_in_range(p->brightness_range, 1.0f, 1000.0f) && fl_in_range(p->streak_width_px, 0.5f, 8.0f) &&
 		  fl_in_range(p->width_from_brightness, 0.0f, 1.0f) && fl_in_range(p->width_variation, 1.0f, 4.0f) &&
 		  fl_in_range(p->head_widening, 1.0f, 16.0f) && fl_in_range(p->tail_taper, 0.0f, 1.0f) &&
@@ -1242,19 +1409,21 @@ static int fl_hyperspace_jump_valid(const XwaFlightHyperspaceJumpParams* p) {
 		  fl_in_range(p->glow_width, 1.0f, 16.0f) && fl_in_range(p->tail_brightness, 0.0f, 1.0f) &&
 		  fl_in_range(p->stretch_scale, 0.25f, 4.0f) && fl_in_range(p->white_fade_seconds, 0.05f, 0.5f) &&
 		  fl_in_range(p->tunnel_entry_brightness, 1.0f, 16.0f) &&
-		  fl_in_range(p->tunnel_settle_seconds, 0.05f, 2.0f) && fl_in_range(p->mesh_light_strength, 0.0f, 16.0f) &&
-		  fl_in_range(p->mesh_light_start, 0.0f, 2.0f) && fl_in_range(p->mesh_light_curve, 0.25f, 8.0f) &&
-		  fl_in_range(p->warp_start, 0.0f, 2.0f) && fl_in_range(p->warp_end, 0.2f, 2.5f) &&
-		  p->warp_end >= p->warp_start + FL_JUMP_WARP_MIN_SECONDS && fl_in_range(p->warp_curve, 0.25f, 8.0f) &&
-		  fl_in_range(p->warp_distance_m, 0.0f, 200000.0f) && fl_in_range(p->warp_sky_zoom, 1.0f, 16.0f) &&
-		  fl_in_range(p->warp_smear, 0.05f, 1.0f) && fl_in_range(p->warp_sky_highlights, 1.0f, 3.0f) &&
+		  fl_in_range(p->tunnel_settle_seconds, 0.05f, 2.0f) &&
+		  fl_in_range(p->mesh_light_strength, 0.0f, 16.0f) && fl_in_range(p->mesh_light_start, 0.0f, 2.0f) &&
+		  fl_in_range(p->mesh_light_curve, 0.25f, 8.0f) && fl_in_range(p->warp_start, 0.0f, 2.0f) &&
+		  fl_in_range(p->warp_end, 0.2f, 2.5f) && p->warp_end >= p->warp_start + FL_JUMP_WARP_MIN_SECONDS &&
+		  fl_in_range(p->warp_curve, 0.25f, 8.0f) && fl_in_range(p->warp_distance_m, 0.0f, 200000.0f) &&
+		  fl_in_range(p->warp_sky_zoom, 1.0f, 16.0f) && fl_in_range(p->warp_smear, 0.05f, 1.0f) &&
+		  fl_in_range(p->warp_sky_highlights, 1.0f, 3.0f) &&
 		  fl_in_range(p->warp_reveal_softness, 0.25f, 2.0f) && p->warp_taps >= FL_JUMP_WARP_TAPS_MIN &&
 		  p->warp_taps <= FL_JUMP_WARP_TAPS_MAX && p->warp_sky_taps >= FL_JUMP_WARP_SKY_TAPS_MIN &&
 		  p->warp_sky_taps <= FL_JUMP_WARP_SKY_TAPS_MAX)) {
 		return 0;
 	}
 	for (int channel = 0; channel < 3; channel++) {
-		if (!fl_in_range(p->tint[channel], 0.0f, 16.0f) || !fl_in_range(p->tail_color[channel], 0.0f, 16.0f)) {
+		if (!fl_in_range(p->tint[channel], 0.0f, 16.0f) ||
+			!fl_in_range(p->tail_color[channel], 0.0f, 16.0f)) {
 			return 0;
 		}
 	}
@@ -1265,7 +1434,8 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 	XwaFlightHyperspaceJumpParams* p = &s.hyperspace_jump;
 	p->star_count = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.star_count", 0);
 	p->streak_brightness = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.streak_brightness", 0.0);
-	p->whiteout_brightness = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.whiteout_brightness", 0.0);
+	p->whiteout_brightness =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.whiteout_brightness", 0.0);
 	p->brightness_range = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.brightness_range", 0.0);
 	p->streak_width_px = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.streak_width_px", 0.0);
 	p->width_from_brightness =
@@ -1285,12 +1455,14 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 		p->tail_color[channel] = (float)AeronConfigFile_GetFloat(config, tail_color_paths[channel], 0.0);
 	}
 	p->stretch_scale = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.stretch_scale", 0.0);
-	p->white_fade_seconds = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.white_fade_seconds", 0.0);
+	p->white_fade_seconds =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.white_fade_seconds", 0.0);
 	p->tunnel_entry_brightness =
 		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.tunnel_entry_brightness", 0.0);
 	p->tunnel_settle_seconds =
 		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.tunnel_settle_seconds", 0.0);
-	p->mesh_light_strength = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.mesh_light_strength", 0.0);
+	p->mesh_light_strength =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.mesh_light_strength", 0.0);
 	p->mesh_light_start = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.mesh_light_start", 0.0);
 	p->mesh_light_curve = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.mesh_light_curve", 0.0);
 	static const char* tint_paths[3] = { "hyperspace_jump.tint_r", "hyperspace_jump.tint_g",
@@ -1304,7 +1476,8 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 	p->warp_distance_m = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_distance_m", 0.0);
 	p->warp_sky_zoom = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_sky_zoom", 0.0);
 	p->warp_smear = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_smear", 0.0);
-	p->warp_sky_highlights = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_sky_highlights", 0.0);
+	p->warp_sky_highlights =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_sky_highlights", 0.0);
 	p->warp_reveal_softness =
 		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_reveal_softness", 0.0);
 	p->warp_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_taps", 0);
@@ -1602,6 +1775,44 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.debug_stereo_ipd_m = (float)AeronConfigFile_GetFloat(cf, "presentation.debug_stereo_ipd_m", 0.0);
+	s.debug_stereo_fov_deg = (float)AeronConfigFile_GetFloat(cf, "presentation.debug_stereo_fov_deg", 0.0);
+	if (!fl_in_range(s.debug_stereo_ipd_m, 0.0f, 0.2f) ||
+		!fl_in_range(s.debug_stereo_fov_deg, 30.0f, 150.0f)) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: presentation.debug_stereo_ipd_m must be between 0 and 0.2, and "
+					   "presentation.debug_stereo_fov_deg between 30 and 150",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.vr_hud_width_px = (int)AeronConfigFile_GetInt(cf, "presentation.vr_hud_width_px", 0);
+	s.vr_hud_height_px = (int)AeronConfigFile_GetInt(cf, "presentation.vr_hud_height_px", 0);
+	s.vr_hud_panel_distance_m =
+		(float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_panel_distance_m", 0.0);
+	s.vr_hud_reticle_scale = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_reticle_scale", 0.0);
+	s.vr_hud_arrow_position = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_arrow_position", 0.0);
+	s.vr_hud_arrow_view = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_arrow_view", 0.0);
+	if (!fl_in_range(s.vr_hud_arrow_position, 0.1f, 1.0f) ||
+		!fl_in_range(s.vr_hud_arrow_view, s.vr_hud_arrow_position, 1.2f)) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: presentation.vr_hud_arrow_position must be between 0.1 and 1, and "
+					   "vr_hud_arrow_view between vr_hud_arrow_position and 1.2",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	if (s.vr_hud_width_px < 640 || s.vr_hud_width_px > 8192 || s.vr_hud_height_px < 480 ||
+		s.vr_hud_height_px > 8192 || !fl_in_range(s.vr_hud_panel_distance_m, 0.2f, 20.0f) ||
+		!fl_in_range(s.vr_hud_reticle_scale, 0.3f, 1.5f)) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: presentation.vr_hud_width_px must be between 640 and 8192, "
+					   "vr_hud_height_px between 480 and 8192, vr_hud_panel_distance_m between 0.2 and 20, "
+					   "and vr_hud_reticle_scale between 0.3 and 1.5",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	s.shadow_debug_atlas_cascade = -1;
 	s.hangar_lighting.enabled = AeronConfigFile_GetBool(cf, "hangar_lighting.enabled", 0);
 	s.hangar_lighting.direction[0] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_x", 0.0);
@@ -1670,6 +1881,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.enabled = AeronConfigFile_GetBool(cf, "point_lights.enabled", 0);
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
+	s.plight.merge_spot_lights = AeronConfigFile_GetBool(cf, "point_lights.merge_spot_lights", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
 	s.plight.cockpit_explosion_light_scale =
@@ -1765,7 +1977,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemasterShip_ConfigurePbrTuning(&pbr);
-	static const char* const map_ambient_keys[3] = { "lighting.map_ambient_min_r", "lighting.map_ambient_min_g",
+	static const char* const map_ambient_keys[3] = { "lighting.map_ambient_min_r",
+													 "lighting.map_ambient_min_g",
 													 "lighting.map_ambient_min_b" };
 	for (int c = 0; c < 3; c++) {
 		s.map_ambient_min[c] = (float)AeronConfigFile_GetFloat(cf, map_ambient_keys[c], 0.0);
@@ -2203,14 +2416,14 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out) {
 void XwaRemasterFlight_GetLod(XwaFlightLodParams* out) {
 	if (out) {
 		out->max_error = s.lod_max_error;
-		out->tint      = s.lod_tint;
+		out->tint = s.lod_tint;
 	}
 }
 
 void XwaRemasterFlight_SetLod(const XwaFlightLodParams* in) {
 	if (in) {
 		s.lod_max_error = isfinite(in->max_error) && in->max_error > 0.0f ? in->max_error : 0.0f;
-		s.lod_tint      = in->tint != 0;
+		s.lod_tint = in->tint != 0;
 	}
 }
 
@@ -2229,6 +2442,30 @@ void XwaRemasterFlight_LogLodStats(void) {
 				  "%u %u %u %u instances, %llu %llu %llu %llu k triangles",
 				  (double)s.lod_max_error, stats.instances[0], stats.instances[1], stats.instances[2],
 				  stats.instances[3], k_triangles[0], k_triangles[1], k_triangles[2], k_triangles[3]);
+}
+
+void XwaRemasterFlight_LogFrameStats(void) {
+	if (!s.scene) {
+		return;
+	}
+	AeronSceneFrameStats frame;
+	AeronSceneDirectionalShadowStats shadows;
+	AeronScene_GetFrameStats(s.scene, &frame);
+	AeronScene_GetDirectionalShadowStats(s.scene, &shadows);
+	unsigned casters = shadows.receiver_local_caster_count;
+	for (uint32_t cascade = 0; cascade < shadows.cascade_count && cascade < AERON_SCENE_SHADOW_MAX_CASCADES;
+		 cascade++) {
+		casters += shadows.caster_count[cascade];
+	}
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: scene: %u instances, %u shadow-only casters, %u lights, %u billboards; "
+				  "shadows: %u casters in %u cascades, %u draws",
+				  frame.instances, frame.shadow_casters, frame.lights, frame.billboards, casters,
+				  shadows.cascade_count, frame.shadow_draws);
+	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
+		Aeron_LogInfo("xwa.benchmark", "film benchmark: view %u of %u: %u instances drawn, %u draws",
+					  view + 1, frame.view_count, frame.visible_instances[view], frame.view_draws[view]);
+	}
 }
 
 float XwaRemasterFlight_Exposure(void) {
@@ -2267,6 +2504,11 @@ void XwaRemasterFlight_SetPresentDebugView(int view) {
 
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out) {
 	return out && s.scene && AeronScene_GetExposureReadout(s.scene, out);
+}
+
+int XwaRemasterFlight_ExposureReadoutPending(void) {
+	AeronSceneExposureReadout readout;
+	return s.exposure.metered && !s.map_present && s.scene && !AeronScene_GetExposureReadout(s.scene, &readout);
 }
 
 void XwaRemasterFlight_GetPointLights(XwaFlightPointLightParams* out) {
@@ -2567,12 +2809,13 @@ void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in
 		p.star_count = FL_JUMP_STAR_COUNT_MIN;
 	if (p.star_count > FL_JUMP_STAR_COUNT_MAX)
 		p.star_count = FL_JUMP_STAR_COUNT_MAX;
-	p.warp_taps = p.warp_taps < FL_JUMP_WARP_TAPS_MIN ? FL_JUMP_WARP_TAPS_MIN
-					: (p.warp_taps > FL_JUMP_WARP_TAPS_MAX ? FL_JUMP_WARP_TAPS_MAX : p.warp_taps);
-	p.warp_sky_taps = p.warp_sky_taps < FL_JUMP_WARP_SKY_TAPS_MIN
-						  ? FL_JUMP_WARP_SKY_TAPS_MIN
-						  : (p.warp_sky_taps > FL_JUMP_WARP_SKY_TAPS_MAX ? FL_JUMP_WARP_SKY_TAPS_MAX
-																		 : p.warp_sky_taps);
+	p.warp_taps = p.warp_taps < FL_JUMP_WARP_TAPS_MIN
+					  ? FL_JUMP_WARP_TAPS_MIN
+					  : (p.warp_taps > FL_JUMP_WARP_TAPS_MAX ? FL_JUMP_WARP_TAPS_MAX : p.warp_taps);
+	p.warp_sky_taps =
+		p.warp_sky_taps < FL_JUMP_WARP_SKY_TAPS_MIN
+			? FL_JUMP_WARP_SKY_TAPS_MIN
+			: (p.warp_sky_taps > FL_JUMP_WARP_SKY_TAPS_MAX ? FL_JUMP_WARP_SKY_TAPS_MAX : p.warp_sky_taps);
 	/* The end stays after the start: a start moved past it pushes it. */
 	if (p.warp_end < p.warp_start + FL_JUMP_WARP_MIN_SECONDS)
 		p.warp_end = fminf(p.warp_start + FL_JUMP_WARP_MIN_SECONDS, 2.5f);
@@ -2711,13 +2954,19 @@ void XwaRemasterFlight_SetHyperspacePreviewLookBlend(float blend) {
 float XwaRemasterFlight_GetHyperspacePreviewLookBlend(void) { return s.hyperspace_preview_look_blend; }
 
 void XwaRemasterFlight_SetHyperspaceWarpView(XwaFlightHyperspaceWarpView view) {
-	s.hyperspace_warp_view =
-		view >= 0 && view < XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT ? view : XWA_FLIGHT_HYPERSPACE_WARP_VIEW_IMAGE;
+	s.hyperspace_warp_view = view >= 0 && view < XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT
+								 ? view
+								 : XWA_FLIGHT_HYPERSPACE_WARP_VIEW_IMAGE;
 }
 
 XwaFlightHyperspaceWarpView XwaRemasterFlight_GetHyperspaceWarpView(void) { return s.hyperspace_warp_view; }
 
 float XwaRemasterFlight_GetCockpitFovMinAspect(void) { return s.cockpit_fov_min_aspect; }
+
+void XwaRemasterFlight_GetDebugStereoDefaults(float* ipd_m, float* fov_deg) {
+	*ipd_m = s.debug_stereo_ipd_m;
+	*fov_deg = s.debug_stereo_fov_deg;
+}
 
 void XwaRemasterFlight_SetCockpitFovMinAspect(float aspect) {
 	if (fl_in_range(aspect, 0.0f, 4.0f))
@@ -2774,6 +3023,50 @@ void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out) {
 	out->profile_available = AeronScene_GetTemporalProfileInfo(s.scene, &out->profile);
 }
 
+/* The field of view of the view that follows the head of `rig`. The arrow that
+ * points to a target out of view is placed in this view. It covers every eye
+ * with a small margin, because the eyes of some headsets point slightly
+ * apart. */
+static AeronViewFov fl_headset_world_fov(const AeronViewRig* rig) {
+	const float margin = 3.0f * (3.14159265f / 180.0f);
+	const float limit = 80.0f * (3.14159265f / 180.0f);
+	AeronViewFov fov = rig->views[0].fov;
+	for (int i = 1; i < rig->count; i++) {
+		fov.angle_left = fminf(fov.angle_left, rig->views[i].fov.angle_left);
+		fov.angle_right = fmaxf(fov.angle_right, rig->views[i].fov.angle_right);
+		fov.angle_up = fmaxf(fov.angle_up, rig->views[i].fov.angle_up);
+		fov.angle_down = fminf(fov.angle_down, rig->views[i].fov.angle_down);
+	}
+	fov.angle_left = fmaxf(fov.angle_left - margin, -limit);
+	fov.angle_right = fminf(fov.angle_right + margin, limit);
+	fov.angle_up = fminf(fov.angle_up + margin, limit);
+	fov.angle_down = fmaxf(fov.angle_down - margin, -limit);
+	return fov;
+}
+
+/* Returns the part of the head's view `head_view` that every eye of `rig`
+ * sees, in the view's pixels. The eyes' fields of view are taken as if the
+ * eyes looked the same way as the head. */
+static AeronRectI fl_headset_shared_rect(const AeronViewRig* rig, const XwaRemasterFlightView* head_view) {
+	AeronViewFov fov = rig->views[0].fov;
+	for (int i = 1; i < rig->count; i++) {
+		fov.angle_left = fmaxf(fov.angle_left, rig->views[i].fov.angle_left);
+		fov.angle_right = fminf(fov.angle_right, rig->views[i].fov.angle_right);
+		fov.angle_up = fminf(fov.angle_up, rig->views[i].fov.angle_up);
+		fov.angle_down = fmaxf(fov.angle_down, rig->views[i].fov.angle_down);
+	}
+	/* Eye space is X right, Y down, Z forward. */
+	const float top_left[3] = { tanf(fov.angle_left), -tanf(fov.angle_up), 1.0f };
+	const float bottom_right[3] = { tanf(fov.angle_right), -tanf(fov.angle_down), 1.0f };
+	float x0, y0, x1, y1;
+	AeronRectI rect = { 0, 0, 0, 0 };
+	if (XwaRemasterFlight_ProjectView(head_view, top_left, &x0, &y0) &&
+		XwaRemasterFlight_ProjectView(head_view, bottom_right, &x1, &y1) && x1 > x0 && y1 > y0) {
+		rect = (AeronRectI) { (int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0) };
+	}
+	return rect;
+}
+
 static void fl_destroy_sized_resources(void) {
 	XwaRemasterDc_ReleaseTargets();
 	s.direct_ready = 0;
@@ -2782,6 +3075,13 @@ static void fl_destroy_sized_resources(void) {
 	if (s.present_rt) {
 		Aeron_DestroyRenderTarget(s.present_rt);
 	}
+	if (s.hud_rt) {
+		Aeron_DestroyRenderTarget(s.hud_rt);
+	}
+	if (s.hud_panel_rt) {
+		Aeron_DestroyRenderTarget(s.hud_panel_rt);
+	}
+	s.hud_panel_rt = NULL;
 	if (s.bloom) {
 		AeronSceneBloom_Destroy(s.bloom);
 	}
@@ -2789,10 +3089,14 @@ static void fl_destroy_sized_resources(void) {
 		AeronScene_Destroy(s.scene);
 	}
 	s.present_rt = NULL;
+	s.hud_rt = NULL;
+	s.rig_composed = 0;
 	s.bloom = NULL;
 	s.scene = NULL;
 	s.rt_w = 0;
 	s.rt_h = 0;
+	s.out_w = 0;
+	s.out_h = 0;
 	s.scene_requested_samples = 0;
 	s.mb_enabled = 0;
 	s.mb_prev_snap = NULL;
@@ -2810,17 +3114,17 @@ static int fl_ensure(int target_w, int target_h) {
 	if (target_w <= 0 || target_h <= 0) {
 		return 0;
 	}
-	if (!s.trails) {
-		s.trails = XwaRemasterTrails_Create();
-		if (!s.trails) {
-			Aeron_LogError("xwa.remaster", "flight: trail renderer create failed");
-			return 0;
+	/* A rig without shared sprites builds them for each view. */
+	const int build_views = s.rig_active && !s.rig.shared_sprites ? s.rig.count : 1;
+	for (int i = 0; i < build_views; i++) {
+		if (!s.trails[i]) {
+			s.trails[i] = XwaRemasterTrails_Create();
 		}
-	}
-	if (!s.particles) {
-		s.particles = XwaRemasterParticles_Create();
-		if (!s.particles) {
-			Aeron_LogError("xwa.remaster", "flight: particle renderer create failed");
+		if (!s.particles[i]) {
+			s.particles[i] = XwaRemasterParticles_Create();
+		}
+		if (!s.trails[i] || !s.particles[i]) {
+			Aeron_LogError("xwa.remaster", "flight: trail or particle renderer create failed");
 			return 0;
 		}
 	}
@@ -2859,27 +3163,57 @@ static int fl_ensure(int target_w, int target_h) {
 		Aeron_LogError("xwa.remaster", "flight: present resources create failed");
 		return 0;
 	}
+	if (!s.hud_composite) {
+		s.hud_composite = AeronDrawList_Create(4);
+		if (!s.hud_composite) {
+			Aeron_LogError("xwa.remaster", "flight: HUD draw list create failed");
+			return 0;
+		}
+	}
 	const AeronSampleCount requested_samples = XwaRemaster_MsaaSampleCount();
-	if (s.scene && s.rt_w == target_w && s.rt_h == target_h &&
+	/* The target holds all the views of a rig, and the scene has the size of
+	 * one view. */
+	const int view_w = s.rig_active ? s.rig.width : target_w;
+	const int view_h = s.rig_active ? s.rig.height : target_h;
+	/* A rig that follows a head uses the headset HUD: a real headset, or the
+	 * debug stereo view, which is used to test it. */
+	const int tracked = s.rig_active && s.rig.tracked;
+	if (s.scene && s.rt_w == view_w && s.rt_h == view_h && s.out_w == target_w && s.out_h == target_h &&
+		(s.hud_rt != NULL) == (s.rig_active != 0) && (s.hud_panel_rt != NULL) == (tracked != 0) &&
 		s.scene_requested_samples == requested_samples) {
 		return 1;
 	}
 	fl_destroy_sized_resources();
-	s.rt_w = target_w;
-	s.rt_h = target_h;
+	s.rt_w = view_w;
+	s.rt_h = view_h;
+	s.out_w = target_w;
+	s.out_h = target_h;
+	s.flat_w = view_w;
+	s.flat_h = view_h;
+	if (s.view_targets_set) {
+		/* The largest part of the scene with the shape of present_rt. */
+		if ((int64_t)view_w * target_h > (int64_t)view_h * target_w) {
+			s.flat_w = (int)((int64_t)view_h * target_w / target_h);
+		} else {
+			s.flat_h = (int)((int64_t)view_w * target_h / target_w);
+		}
+	}
 	s.scene = AeronScene_Create(&(AeronScene3DDesc) {
-		.rt_width = target_w,
-		.rt_height = target_h,
+		.rt_width = view_w,
+		.rt_height = view_h,
 		.color_format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
 		.with_normal_rt = 1, /* SSAO / motion-blur G-buffer */
 		.sample_count = requested_samples,
-		.temporal_mode = s.fsr_mode,
+		/* The temporal upscaler works on one view. */
+		.temporal_mode = s.rig_active ? AERON_TEMPORAL_OFF : s.fsr_mode,
 		.temporal_sharpness = s.fsr_sharpness,
 		.view_space_to_meters = AERON_OPT_METERS_PER_UNIT,
 	});
 	if (!s.scene) {
-		Aeron_LogError("xwa.remaster", "flight: scene create failed at %dx%d", target_w, target_h);
+		Aeron_LogError("xwa.remaster", "flight: scene create failed at %dx%d", view_w, view_h);
 		s.rt_w = s.rt_h = 0;
+		s.out_w = s.out_h = 0;
+		s.flat_w = s.flat_h = 0;
 		return 0;
 	}
 	s.scene_requested_samples = requested_samples;
@@ -2893,22 +3227,123 @@ static int fl_ensure(int target_w, int target_h) {
 	}
 	AeronScene_SetEffectAtlas(s.scene, XwaRemasterShip_EffectAtlas());
 
-	s.bloom = AeronSceneBloom_Create(target_w, target_h);
+	s.bloom = AeronSceneBloom_Create(view_w, view_h);
 	s.present_rt =
 		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = target_w,
 															.height = target_h,
 															.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
 															.debug_name = "xwa.flight.present" });
+	if (s.rig_active) {
+		/* The HUD's lists hold linear colours, and all its pipelines blend
+		 * colour and alpha as premultiplied, so this target ends up with a
+		 * correct premultiplied image. */
+		s.hud_rt =
+			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = s.flat_w,
+																.height = s.flat_h,
+																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+																.debug_name = "xwa.flight.hud" });
+	}
 	if (!s.bloom) {
 		Aeron_LogError("xwa.remaster", "flight: bloom create failed");
 		return 0;
 	}
-	if (!s.present_rt) {
+	if (tracked) {
+		s.hud_panel_rt =
+			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = s.vr_hud_width_px,
+																.height = s.vr_hud_height_px,
+																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+																.debug_name = "xwa.flight.hud_panel" });
+	}
+	if (!s.present_rt || (s.rig_active && !s.hud_rt) || (tracked && !s.hud_panel_rt)) {
 		Aeron_LogError("xwa.remaster", "flight: present target create failed");
 		return 0;
 	}
-	Aeron_LogInfo("xwa.remaster", "flight render targets: %dx%d", target_w, target_h);
+	if (s.rig_active) {
+		Aeron_LogInfo("xwa.remaster", "flight render targets: %d views of %dx%d in %dx%d", s.rig.count,
+					  view_w, view_h, target_w, target_h);
+	} else {
+		Aeron_LogInfo("xwa.remaster", "flight render targets: %dx%d", target_w, target_h);
+	}
 	return 1;
+}
+
+/* Returns whether `rig` can be rendered: several views of one size, each
+ * with a rectangle of that size. */
+static int fl_rig_usable(const AeronViewRig* rig) {
+	if (!rig || rig->count < 2 || rig->count > AERON_MAX_VIEWS || rig->width <= 0 || rig->height <= 0 ||
+		rig->primary < 0 || rig->primary >= rig->count) {
+		return 0;
+	}
+	for (int i = 0; i < rig->count; i++) {
+		if (rig->views[i].rect.width != rig->width || rig->views[i].rect.height != rig->height) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig) {
+	const int active = fl_rig_usable(rig);
+	if (active) {
+		/* A new generation means the head's pose jumped: the views of the
+		 * last frame say nothing about how the views moved. */
+		if (!s.rig_active || s.rig.count != rig->count || s.rig.generation != rig->generation) {
+			s.rig_previous_valid = 0;
+		}
+		s.rig = *rig;
+	} else {
+		memset(&s.rig, 0, sizeof s.rig);
+		s.rig_previous_valid = 0;
+	}
+	s.rig_active = active;
+	s.view_targets_set = 0;
+	s.view_areas_set = 0;
+}
+
+void XwaRemasterFlight_SetViewAreas(const AeronXrAreaMesh* hidden, const AeronXrAreaMesh* visible) {
+	s.view_areas_set = 0;
+	if (!hidden || !visible || !s.rig_active || !s.view_targets_set) {
+		return;
+	}
+	memcpy(s.view_hidden_areas, hidden, (size_t)s.rig.count * sizeof *hidden);
+	memcpy(s.view_visible_areas, visible, (size_t)s.rig.count * sizeof *visible);
+	s.view_areas_set = 1;
+}
+
+void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter) {
+	s.view_targets_set = 0;
+	s.head_units_per_meter = head_units_per_meter > 0.0f ? head_units_per_meter : AERON_OPT_UNITS_PER_METER;
+	if (!targets || !s.rig_active) {
+		return;
+	}
+	for (int i = 0; i < s.rig.count; i++) {
+		if (!targets[i] || Aeron_TextureGetWidth(Aeron_RenderTargetGetTexture(targets[i])) != s.rig.width ||
+			Aeron_TextureGetHeight(Aeron_RenderTargetGetTexture(targets[i])) != s.rig.height) {
+			return;
+		}
+		s.view_targets[i] = targets[i];
+	}
+	s.view_targets_set = 1;
+}
+
+void XwaRemasterFlight_SetHudPanelScale(float scale) {
+	if (scale > 0.0f) {
+		s.vr_hud_panel_scale = scale;
+	}
+}
+
+int XwaRemasterFlight_ViewTargetsRendered(void) { return s.view_targets_rendered; }
+
+void XwaRemasterFlight_GetViewLayout(int* count, int* width, int* height) {
+	if (count) {
+		*count = s.rig_active ? s.rig.count : 1;
+	}
+	if (width) {
+		*width = s.rig_active ? s.rig.width : s.rt_w;
+	}
+	if (height) {
+		*height = s.rig_active ? s.rig.height : s.rt_h;
+	}
 }
 
 /* Row-major world->eye rotation rows -> (w, x, y, z) quaternion —
@@ -3033,6 +3468,164 @@ int XwaRemasterFlight_BuildView(const XwaFlightCamera* cam, int target_w, int ta
 	return cam ? fl_build_view_at_origin(cam, cam->world_pos, target_w, target_h, NULL, out) : 0;
 }
 
+/* Builds the view of a rig pose and field of view. `seat` is the game
+ * camera's view: the rig's origin. The view is `width` x `height` pixels. */
+static void fl_build_rig_view(const XwaFlightCamera* cam, const XwaRemasterFlightView* seat,
+							  const AeronViewPose* pose, const AeronViewFov* fov, int width, int height,
+							  XwaRemasterFlightView* out) {
+	float seat_rows[9], rows[9];
+	fl_quat_to_mat3(seat->camera.ori, seat_rows);
+	*out = *seat;
+	AeronSceneCamera* camera = &out->camera;
+	AeronViewPose_ComposeCamera(pose, seat_rows, seat->camera.pos, AERON_OPT_UNITS_PER_METER, rows,
+								camera->pos);
+	fl_rows_to_quat(rows, camera->ori);
+	AeronViewFov_ToCamera(fov, &camera->h_half_rad, &camera->v_half_rad, &camera->proj_x_offset,
+						  &camera->proj_y_offset);
+	camera->viewport = (AeronRectI) { 0, 0, width, height };
+	out->viewport = camera->viewport;
+	/* A classic pixel covers the same angle as in the game's own view: one
+	 * unit of the game's focal length is one pixel. */
+	const float projection = cam->proj_scale > 0.0f ? cam->proj_scale : 512.0f;
+	const float focal_px = (float)height / (2.0f * tanf(camera->v_half_rad));
+	out->classic_pixel_scale = focal_px / projection;
+	out->projection_pixel_scale = out->classic_pixel_scale;
+	out->rig_view = 1;
+	AeronScene_ComputeViewProj(camera, out->view_proj);
+}
+
+void XwaRemasterFlight_RigViewCamera(const AeronRigView* view, int width, int height, float units_per_meter,
+									 float near_z, AeronSceneCamera* out, float out_rows[9]) {
+	static const float seat_rows[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+	static const float seat_pos[3] = { 0.0f, 0.0f, 0.0f };
+	float rows[9];
+	memset(out, 0, sizeof *out);
+	AeronViewPose_ComposeCamera(&view->pose, seat_rows, seat_pos, units_per_meter, rows, out->pos);
+	fl_rows_to_quat(rows, out->ori);
+	AeronViewFov_ToCamera(&view->fov, &out->h_half_rad, &out->v_half_rad, &out->proj_x_offset,
+						  &out->proj_y_offset);
+	out->near_z = near_z;
+	out->viewport = (AeronRectI) { 0, 0, width, height };
+	if (out_rows) {
+		memcpy(out_rows, rows, sizeof rows);
+	}
+}
+
+void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]) {
+	AeronSceneCamera camera;
+	float view_proj[16];
+	/* One unit is one metre here. */
+	XwaRemasterFlight_RigViewCamera(view, width, height, 1.0f, 0.02f, &camera, NULL);
+	AeronScene_ComputeViewProj(&camera, view_proj);
+	XwaHudPlanes_ViewRows(view_proj, out);
+}
+
+/* Sets a build view's camera, and its history to the same camera. */
+static void fl_set_build_view(FlBuildView* build, const XwaRemasterFlightView* view,
+							  const XwaRemasterFlightView* seat, uint32_t view_mask, int rig_view) {
+	build->view = *view;
+	fl_quat_to_mat3(view->camera.ori, build->crows);
+	for (int axis = 0; axis < 3; axis++) {
+		build->offset[axis] = view->camera.pos[axis] - seat->camera.pos[axis];
+	}
+	build->view_mask = view_mask;
+	XwaRemasterEffectView_Main(&build->effect_view, view, build->crows);
+	build->effect_view.view_mask = view_mask;
+	if (rig_view) {
+		/* A sprite then covers the same angle in every view, whatever the
+		 * shape of the view's pixels. */
+		build->effect_view.focal_x_px = build->effect_view.focal_y_px;
+	}
+	memcpy(build->history_crows, build->crows, sizeof build->history_crows);
+	memcpy(build->history_offset, build->offset, sizeof build->history_offset);
+	build->history_effect_view = build->effect_view;
+}
+
+/* Sets the frame's cameras from the game camera's view `seat`. With `rig`,
+ * the views are the rig's; otherwise the seat view is the only view. */
+static void fl_set_frame_views(const XwaFlightCamera* cam, const XwaRemasterFlightView* seat,
+							   const AeronViewRig* rig) {
+	s.seat_view = *seat;
+	fl_quat_to_mat3(seat->camera.ori, s.seat_crows);
+	if (!rig) {
+		s.center_view = *seat;
+		s.views[0] = *seat;
+		s.view_count = 1;
+		s.primary_view = 0;
+		s.build_count = 1;
+		fl_set_build_view(&s.build[0], seat, seat, 0, 0);
+	} else {
+		for (int i = 0; i < rig->count; i++) {
+			fl_build_rig_view(cam, seat, &rig->views[i].pose, &rig->views[i].fov, rig->width, rig->height,
+							  &s.views[i]);
+			s.views[i].head_tracked = rig->tracked != 0;
+		}
+		fl_build_rig_view(cam, seat, &rig->center, &rig->views[rig->primary].fov, rig->width, rig->height,
+						  &s.center_view);
+		s.center_view.head_tracked = rig->tracked != 0;
+		s.view_count = rig->count;
+		s.primary_view = rig->primary;
+		if (rig->shared_sprites) {
+			s.build_count = 1;
+			fl_set_build_view(&s.build[0], &s.center_view, seat, 0, 1);
+		} else {
+			s.build_count = (uint32_t)rig->count;
+			for (int i = 0; i < rig->count; i++) {
+				fl_set_build_view(&s.build[i], &s.views[i], seat, 1u << i, 1);
+			}
+		}
+	}
+	for (int i = 0; i < s.view_count; i++) {
+		fl_quat_to_mat3(s.views[i].camera.ori, s.view_crows[i]);
+	}
+	fl_quat_to_mat3(s.center_view.camera.ori, s.crows);
+	memcpy(s.camera_local, s.center_view.camera.pos, sizeof s.camera_local);
+	for (int axis = 0; axis < 3; axis++) {
+		s.center_offset[axis] = s.center_view.camera.pos[axis] - seat->camera.pos[axis];
+	}
+}
+
+/* Sets the views and the build views of the previous snapshot, for motion
+ * vectors. `previous_seat` is the previous game camera's view, at this
+ * frame's render origin. With `camera_blur`, sprites take the motion of
+ * their build view; otherwise their history keeps the current camera. */
+static void fl_set_frame_history(const XwaFlightCamera* previous_cam,
+								 const XwaRemasterFlightView* previous_seat, const AeronViewRig* rig,
+								 int camera_blur) {
+	if (!rig) {
+		s.previous_views[0] = *previous_seat;
+	} else {
+		/* Without the rig of the last frame, the head has no motion. */
+		const AeronViewRig* previous_rig = s.rig_previous_valid ? &s.rig_previous : rig;
+		for (int i = 0; i < rig->count; i++) {
+			fl_build_rig_view(previous_cam, previous_seat, &previous_rig->views[i].pose, &rig->views[i].fov,
+							  rig->width, rig->height, &s.previous_views[i]);
+		}
+	}
+	if (!camera_blur) {
+		return;
+	}
+	for (uint32_t b = 0; b < s.build_count; b++) {
+		FlBuildView* build = &s.build[b];
+		XwaRemasterFlightView previous = *previous_seat;
+		if (rig && rig->shared_sprites) {
+			const AeronViewRig* previous_rig = s.rig_previous_valid ? &s.rig_previous : rig;
+			fl_build_rig_view(previous_cam, previous_seat, &previous_rig->center,
+							  &rig->views[rig->primary].fov, rig->width, rig->height, &previous);
+		} else if (rig) {
+			previous = s.previous_views[b];
+		}
+		fl_quat_to_mat3(previous.camera.ori, build->history_crows);
+		for (int axis = 0; axis < 3; axis++) {
+			build->history_offset[axis] = previous.camera.pos[axis] - previous_seat->camera.pos[axis];
+		}
+		XwaRemasterEffectView_Main(&build->history_effect_view, &previous, build->history_crows);
+		build->history_effect_view.view_mask = build->view_mask;
+		build->history_effect_view.focal_x_px =
+			rig ? build->history_effect_view.focal_y_px : build->history_effect_view.focal_x_px;
+	}
+}
+
 int XwaRemasterFlight_ProjectLocal(const XwaRemasterFlightView* view, const float local[3], float* out_x,
 								   float* out_y, float* out_depth) {
 	if (!view || !local || !out_x || !out_y) {
@@ -3074,6 +3667,19 @@ int XwaRemasterFlight_ProjectView(const XwaRemasterFlightView* view, const float
 	*out_x = view->viewport.x + (ndc_x + 1.0f) * 0.5f * view->viewport.width;
 	*out_y = view->viewport.y + (1.0f - ndc_y) * 0.5f * view->viewport.height;
 	return 1;
+}
+
+void XwaRemasterFlight_WorldToEyeI32(const XwaRemasterFlightView* view, const int32_t world[3],
+									 float out_eye[3]) {
+	float rows[9], local[3];
+	fl_quat_to_mat3(view->camera.ori, rows);
+	AeronWorld_LocalI32(view->origin_world, world, local);
+	for (int axis = 0; axis < 3; axis++) {
+		local[axis] -= view->camera.pos[axis];
+	}
+	for (int row = 0; row < 3; row++) {
+		out_eye[row] = rows[row * 3] * local[0] + rows[row * 3 + 1] * local[1] + rows[row * 3 + 2] * local[2];
+	}
 }
 
 int XwaRemasterFlight_ClipProjectLine(const XwaRemasterFlightView* view, float a[3], float b[3], float* ax,
@@ -3286,7 +3892,9 @@ static int fl_object_in_render_region(const XwaFlightObject* object, uint8_t reg
 }
 
 /* Shared pose law for ordinary flight and the map. Projectile roll alignment
- * is view-dependent; every other object uses the captured orientation as-is. */
+ * is view-dependent; every other object uses the captured orientation as-is.
+ * The bolts face the centre view, which is `camera_world` moved by
+ * s.center_offset. */
 static void fl_object_pose(const XwaFlightObject* object, const int32_t camera_world[3], int roll_align,
 						   float basis[9], float local[3], float model[16]) {
 	float cur[3][3];
@@ -3297,6 +3905,9 @@ static void fl_object_pose(const XwaFlightObject* object, const int32_t camera_w
 	if (roll_align) {
 		float camera_delta[3];
 		AeronWorld_DeltaI32(camera_world, object->world_pos, camera_delta);
+		for (int axis = 0; axis < 3; axis++) {
+			camera_delta[axis] += s.center_offset[axis];
+		}
 		const float side_dot =
 			camera_delta[0] * cur[0][0] + camera_delta[1] * cur[0][1] + camera_delta[2] * cur[0][2];
 		const float up_dot =
@@ -3450,8 +4061,8 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 
 /* Rotate inverted gunner cockpits about the model-local X axis,
  * keeping the seat's eye point fixed relative to the camera. */
-static void fl_apply_inverted_cockpit_pivot(float basis[9], const XwaCockpit* cockpit,
-										   const float sway[3], const float camera_local[3], float position[3]) {
+static void fl_apply_inverted_cockpit_pivot(float basis[9], const XwaCockpit* cockpit, const float sway[3],
+											const float camera_local[3], float position[3]) {
 	for (int axis = 0; axis < 3; ++axis) {
 		basis[3 + axis] = -basis[3 + axis];
 		basis[6 + axis] = -basis[6 + axis];
@@ -3460,8 +4071,7 @@ static void fl_apply_inverted_cockpit_pivot(float basis[9], const XwaCockpit* co
 		const float rotated_eye = basis[axis] * cockpit->seat_eye_local[0] +
 								  basis[3 + axis] * cockpit->seat_eye_local[1] +
 								  basis[6 + axis] * cockpit->seat_eye_local[2];
-		position[axis] = camera_local[axis] - cockpit->camera_pan[axis] * 0.0625f -
-						 sway[axis] - rotated_eye;
+		position[axis] = camera_local[axis] - cockpit->camera_pan[axis] * 0.0625f - sway[axis] - rotated_eye;
 	}
 }
 
@@ -3520,7 +4130,14 @@ typedef struct FlQuadTarget {
 	AeronScene3D* scene;
 	const float* crows;
 	const float* camera_local;
+	/* The views that draw the quad, one bit each. 0 is every view. */
+	uint32_t view_mask;
 } FlQuadTarget;
+
+/* The flight scene, with the camera of a build view. */
+static FlQuadTarget fl_build_target(const FlBuildView* build) {
+	return (FlQuadTarget) { s.scene, build->crows, build->view.camera.pos, build->view_mask };
+}
 
 /* Converts a quad's view-space corners to render-local space:
  * local = camera_local + crows^T * view. */
@@ -3546,6 +4163,7 @@ static void fl_submit_view_quad_to(const FlQuadTarget* target, AeronSceneBillboa
 	 * soft-alpha sprite (flare ghosts, glow rims). */
 	d.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 	d.stage = stage;
+	d.view_mask = target->view_mask;
 	d.depth_bias_view = depth_bias;
 	if (anchor_local) {
 		memcpy(d.anchor_world, anchor_local, sizeof d.anchor_world);
@@ -3570,11 +4188,11 @@ static void fl_submit_view_quad_to(const FlQuadTarget* target, AeronSceneBillboa
 	AeronScene_AddBillboard(target->scene, &d);
 }
 
-static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float corners[4][3],
-								   const float uvs[4][2], const XwaAssetRef* ref, uint32_t argb,
-								   const float* anchor_local, float depth_bias,
+static void fl_submit_view_quad_ex(const FlBuildView* build, AeronSceneBillboardStage stage,
+								   const float corners[4][3], const float uvs[4][2], const XwaAssetRef* ref,
+								   uint32_t argb, const float* anchor_local, float depth_bias,
 								   const float (*prev_corners)[3], float emissive_strength) {
-	const FlQuadTarget target = { s.scene, s.crows, s.camera_local };
+	const FlQuadTarget target = fl_build_target(build);
 	fl_submit_view_quad_to(&target, stage, corners, uvs, ref, argb, anchor_local, depth_bias, prev_corners,
 						   emissive_strength);
 }
@@ -3589,12 +4207,14 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 /* Queues a backdrop sun as a procedural star on its quad (AeronSceneBillboardStar).
  * The sun's colour comes from its image's `light`; a sun without one is
  * white. `radiance` is the radiance of the white of the sun's disc. */
-static void fl_submit_star_quad(const FlBackdropQuad* q, const XwaSnapshot* snap, float radiance) {
-	const FlQuadTarget target = { s.scene, s.crows, s.camera_local };
+static void fl_submit_star_quad(const FlBuildView* build, const FlBackdropQuad* q, const XwaSnapshot* snap,
+								float radiance) {
+	const FlQuadTarget target = fl_build_target(build);
 	AeronSceneBillboardDesc d;
 	memset(&d, 0, sizeof d);
 	d.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 	d.stage = AERON_SCENE_BILLBOARD_STAGE_SKY;
+	d.view_mask = target.view_mask;
 	d.shader = AERON_SCENE_BILLBOARD_SHADER_STAR;
 	for (int c = 0; c < 3; c++) {
 		d.star.tint[c] = q->ref.has_light ? q->ref.light[c] : 1.0f;
@@ -3610,12 +4230,6 @@ static void fl_submit_star_quad(const FlBackdropQuad* q, const XwaSnapshot* snap
 		d.colors[v][3] = 1.0f;
 	}
 	AeronScene_AddBillboard(s.scene, &d);
-}
-
-static void fl_submit_view_quad(AeronSceneBillboardStage stage, const float corners[4][3],
-								const float uvs[4][2], const XwaAssetRef* ref, uint32_t argb,
-								const float* anchor_local) {
-	fl_submit_view_quad_ex(stage, corners, uvs, ref, argb, anchor_local, 0.0f, NULL, 1.0f);
 }
 
 /* Resolve a object-type-bound DAT frame from the baked resdata group
@@ -3887,14 +4501,19 @@ static float fl_billboard_roll(const XwaFlightObject* f, int force_zero_angle_d,
 	return ax[0] < 0.0f ? atan2f(ax[1], -ax[0]) : -atan2f(ax[1], ax[0]);
 }
 
+/* `offset` is the build view's position minus the game camera's (`cam`). */
 static void fl_bb_geometry_corners_local(const FlBillboardGeometry* g, const XwaFlightCamera* cam,
-										 const float world_to_view[9], float out[4][3]) {
+										 const float world_to_view[9], const float offset[3],
+										 float out[4][3]) {
 	const float ca = cosf(g->rot);
 	const float sa = sinf(g->rot);
 	const float ax[2] = { g->half_w * ca, -g->half_w * sa };
 	const float ay[2] = { g->half_h * sa, g->half_h * ca };
 	float camera_local[3];
 	AeronWorld_LocalI32(s.origin_world, cam->world_pos, camera_local);
+	for (int axis = 0; axis < 3; axis++) {
+		camera_local[axis] += offset[axis];
+	}
 	for (int c = 0; c < 4; c++) {
 		const float sw = (c == 0 || c == 3) ? 1.0f : -1.0f;
 		const float sh = c <= 1 ? 1.0f : -1.0f;
@@ -3906,8 +4525,8 @@ static void fl_bb_geometry_corners_local(const FlBillboardGeometry* g, const Xwa
 	}
 }
 
-static void fl_bb_push(const FlBillboardGeometry* g, const XwaAssetRef* ref, uint32_t argb,
-					   const float (*prev_corners)[3], float emissive_strength) {
+static void fl_bb_push(const FlBuildView* build, const FlBillboardGeometry* g, const XwaAssetRef* ref,
+					   uint32_t argb, const float (*prev_corners)[3], float emissive_strength) {
 	if (s.bb_count == s.bb_capacity) {
 		const uint32_t capacity = s.bb_capacity ? s.bb_capacity * 2 : 1024;
 		FlBillboard* grown = realloc(s.bb, (size_t)capacity * sizeof *grown);
@@ -3929,6 +4548,7 @@ static void fl_bb_push(const FlBillboardGeometry* g, const XwaAssetRef* ref, uin
 	b->has_prev = prev_corners != NULL;
 	if (b->has_prev)
 		memcpy(b->prev_corners, prev_corners, sizeof b->prev_corners);
+	b->build = (uint8_t)(build - s.build);
 }
 
 static const XwaFlightObject* fl_bb_previous_object(uint32_t snap_index) {
@@ -3953,8 +4573,11 @@ static float fl_object_billboard_emissive_strength(const XwaFlightObject* f) {
 	return 1.0f;
 }
 
+/* The sprite faces a build view: the game camera `cam` moved by `offset`,
+ * with the rows `world_to_view`. */
 static int fl_object_billboard_geometry(const XwaFlightObject* f, const XwaFlightCamera* cam,
-										const float world_to_view[9], FlBillboardGeometry* out) {
+										const float world_to_view[9], const float offset[3],
+										FlBillboardGeometry* out) {
 	const int type = f->object_type;
 	if (type == XWA_SNAP_TYPE_DEBRIS_CHUNK)
 		return 0; /* rendered through the source-craft mesh path */
@@ -3968,7 +4591,8 @@ static int fl_object_billboard_geometry(const XwaFlightObject* f, const XwaFligh
 	float delta_world[3];
 	AeronWorld_DeltaI32(f->world_pos, cam->world_pos, delta_world);
 	float v[3];
-	fl_world_to_view(world_to_view, delta_world[0], delta_world[1], delta_world[2], v);
+	fl_world_to_view(world_to_view, delta_world[0] - offset[0], delta_world[1] - offset[1],
+					 delta_world[2] - offset[2], v);
 	if (v[2] < 1.0f)
 		return 0;
 	float z = v[2];
@@ -4006,13 +4630,16 @@ static int fl_object_billboard_geometry(const XwaFlightObject* f, const XwaFligh
 	return 1;
 }
 
-/* One object sprite (SceneBillboard_QueueObjectTextured mirror). */
-static void fl_derive_object_billboard(const XwaFlightObject* f, uint32_t snap_index,
-									   XwaRemasterAssets* assets, const XwaFlightCamera* history_cam,
-									   const float history_world_to_view[9]) {
+/* One object sprite (SceneBillboard_QueueObjectTextured mirror), facing
+ * `build`. `history_cam` is the game camera that `build`'s history belongs
+ * to, or NULL for a sprite without motion vectors. */
+static void fl_derive_object_billboard(const FlBuildView* build, const XwaFlightObject* f,
+									   uint32_t snap_index, XwaRemasterAssets* assets,
+									   const XwaFlightCamera* history_cam) {
 	const XwaFlightCamera* cam = &s.snap->flight_camera;
+	const float* history_world_to_view = build->history_crows;
 	FlBillboardGeometry geometry;
-	if (!fl_object_billboard_geometry(f, cam, s.crows, &geometry))
+	if (!fl_object_billboard_geometry(f, cam, build->crows, build->offset, &geometry))
 		return;
 	XwaAssetRef ref;
 	if (!fl_resolve_type_frame(assets, f->object_type, f->type_specific_0, &ref))
@@ -4020,23 +4647,26 @@ static void fl_derive_object_billboard(const XwaFlightObject* f, uint32_t snap_i
 	float previous_corners[4][3];
 	const float (*previous_corners_ptr)[3] = NULL;
 	const XwaFlightObject* pf = fl_bb_previous_object(snap_index);
-	if (pf && pf->object_type == f->object_type && history_cam && history_world_to_view &&
+	if (pf && pf->object_type == f->object_type && history_cam &&
 		fl_object_billboard_candidate(pf, history_cam)) {
 		FlBillboardGeometry previous_geometry;
-		if (fl_object_billboard_geometry(pf, history_cam, history_world_to_view, &previous_geometry)) {
+		if (fl_object_billboard_geometry(pf, history_cam, history_world_to_view, build->history_offset,
+										 &previous_geometry)) {
 			fl_bb_geometry_corners_local(&previous_geometry, history_cam, history_world_to_view,
-										 previous_corners);
+										 build->history_offset, previous_corners);
 			previous_corners_ptr = previous_corners;
 		}
 	}
 	/* Classic billboards draw with color arg -1 = opaque white (the
 	 * texture as authored; the level argbColor is draw scratch). */
-	fl_bb_push(&geometry, &ref, 0xffffffffu, previous_corners_ptr, fl_object_billboard_emissive_strength(f));
+	fl_bb_push(build, &geometry, &ref, 0xffffffffu, previous_corners_ptr,
+			   fl_object_billboard_emissive_strength(f));
 }
 
 static int fl_wreck_flame_base_geometry(const XwaFlightObject* f, const XwaFlightCamera* cam,
-										const float world_to_view[9], FlBillboardGeometry* out,
-										uint8_t mesh_types[XWA_SNAP_MAX_MESH_SLOTS], int* mesh_count) {
+										const float world_to_view[9], const float offset[3],
+										FlBillboardGeometry* out, uint8_t mesh_types[XWA_SNAP_MAX_MESH_SLOTS],
+										int* mesh_count) {
 	if (!f->has_craft || f->anim_frame == 0)
 		return 0;
 	*mesh_count = XwaSnapshotExport_ModelMeshTypes(f->object_type, mesh_types);
@@ -4049,7 +4679,8 @@ static int fl_wreck_flame_base_geometry(const XwaFlightObject* f, const XwaFligh
 	}
 	float delta_world[3];
 	AeronWorld_DeltaI32(f->world_pos, cam->world_pos, delta_world);
-	fl_world_to_view(world_to_view, delta_world[0], delta_world[1], delta_world[2], out->center);
+	fl_world_to_view(world_to_view, delta_world[0] - offset[0], delta_world[1] - offset[1],
+					 delta_world[2] - offset[2], out->center);
 	if (out->center[2] < 1.0f)
 		return 0;
 	float proj = (float)maxb * 256.0f / out->center[2];
@@ -4068,13 +4699,15 @@ static int fl_wreck_flame_base_geometry(const XwaFlightObject* f, const XwaFligh
  * sprite per destroyed MESH_Fuselage slot, all at the object center,
  * the object's roll accumulating onto the billboard angle per flame,
  * frame from the anim_frame byte (componentState[49] originally), base size 256. */
-static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index, XwaRemasterAssets* assets,
-								   const XwaFlightCamera* history_cam, const float history_world_to_view[9]) {
+static void fl_derive_wreck_flames(const FlBuildView* build, const XwaFlightObject* f, uint32_t snap_index,
+								   XwaRemasterAssets* assets, const XwaFlightCamera* history_cam) {
 	const XwaFlightCamera* cam = &s.snap->flight_camera;
+	const float* history_world_to_view = build->history_crows;
 	uint8_t mesh_types[XWA_SNAP_MAX_MESH_SLOTS];
 	int mesh_count = 0;
 	FlBillboardGeometry base_geometry;
-	if (!fl_wreck_flame_base_geometry(f, cam, s.crows, &base_geometry, mesh_types, &mesh_count))
+	if (!fl_wreck_flame_base_geometry(f, cam, build->crows, build->offset, &base_geometry, mesh_types,
+									  &mesh_count))
 		return;
 	XwaAssetRef ref;
 	if (!fl_resolve_type_frame(assets, XWA_SNAP_TYPE_FLAME_2008, f->anim_frame, &ref))
@@ -4087,10 +4720,10 @@ static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index
 	int previous_mesh_count = 0;
 	const XwaFlightObject* pf = fl_bb_previous_object(snap_index);
 	const int have_previous_base =
-		pf && pf->object_type == f->object_type && history_cam && history_world_to_view &&
-		pf->slot_class == XWA_SNAP_SLOT_MAIN && pf->genus == XWA_SNAP_GENUS_SALVAGE_JUNK &&
-		fl_wreck_flame_base_geometry(pf, history_cam, history_world_to_view, &previous_base,
-									 previous_mesh_types, &previous_mesh_count);
+		pf && pf->object_type == f->object_type && history_cam && pf->slot_class == XWA_SNAP_SLOT_MAIN &&
+		pf->genus == XWA_SNAP_GENUS_SALVAGE_JUNK &&
+		fl_wreck_flame_base_geometry(pf, history_cam, history_world_to_view, build->history_offset,
+									 &previous_base, previous_mesh_types, &previous_mesh_count);
 	if (have_previous_base) {
 		float rot = previous_base.rot;
 		const float roll_rad = (float)(int16_t)pf->roll * FL_Q16_TO_RAD;
@@ -4119,10 +4752,10 @@ static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index
 			FlBillboardGeometry previous_geometry = previous_base;
 			previous_geometry.rot = previous_rot[mesh];
 			fl_bb_geometry_corners_local(&previous_geometry, history_cam, history_world_to_view,
-										 previous_corners);
+										 build->history_offset, previous_corners);
 			previous_corners_ptr = previous_corners;
 		}
-		fl_bb_push(&geometry, &ref, 0xffffffffu, previous_corners_ptr, 1.0f);
+		fl_bb_push(build, &geometry, &ref, 0xffffffffu, previous_corners_ptr, 1.0f);
 	}
 }
 
@@ -4134,9 +4767,8 @@ static int fl_bb_depth_cmp(const void* pa, const void* pb) {
 
 /* Derives the billboards of entry `i`: a transient object, or an explosion,
  * debris or salvage of the main slots. */
-static void fl_derive_billboard_object(const XwaSnapshot* snap, uint32_t i, XwaRemasterAssets* assets,
-									   const XwaFlightCamera* history_cam,
-									   const float history_world_to_view[9]) {
+static void fl_derive_billboard_object(const FlBuildView* build, const XwaSnapshot* snap, uint32_t i,
+									   XwaRemasterAssets* assets, const XwaFlightCamera* history_cam) {
 	const XwaFlightObject* f = &snap->flight_objects[i];
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	/* Slot topology is authoritative: several dynamic effect spawners
@@ -4148,29 +4780,36 @@ static void fl_derive_billboard_object(const XwaSnapshot* snap, uint32_t i, XwaR
 		if (f->genus == XWA_SNAP_GENUS_DEBRIS && cam->external) {
 			return; /* classic hides transient debris externally */
 		}
-		fl_derive_object_billboard(f, i, assets, history_cam, history_world_to_view);
+		fl_derive_object_billboard(build, f, i, assets, history_cam);
 	} else if (f->slot_class == XWA_SNAP_SLOT_MAIN) {
 		if (f->genus == XWA_SNAP_GENUS_EXPLOSION || f->genus == XWA_SNAP_GENUS_DEBRIS) {
-			fl_derive_object_billboard(f, i, assets, history_cam, history_world_to_view);
+			fl_derive_object_billboard(build, f, i, assets, history_cam);
 		} else if (f->genus == XWA_SNAP_GENUS_SALVAGE_JUNK) {
-			fl_derive_wreck_flames(f, i, assets, history_cam, history_world_to_view);
+			fl_derive_wreck_flames(build, f, i, assets, history_cam);
 		}
 	}
 }
 
+/* Derives the frame's billboards for each build view. `history_cam` is the
+ * game camera that the build views' history belongs to, or NULL for
+ * billboards without motion vectors. */
 static void fl_derive_billboards(const XwaSnapshot* snap, XwaRemasterAssets* assets,
-								 const XwaFlightCamera* history_cam, const float history_world_to_view[9]) {
+								 const XwaFlightCamera* history_cam) {
 	static const XwaFlightObjectList lists[] = { XWA_SNAP_LIST_EXPLOSION, XWA_SNAP_LIST_DEBRIS,
 												 XWA_SNAP_LIST_TRANSIENT };
 	s.bb_count = 0;
-	for (uint32_t li = 0; li < sizeof lists / sizeof lists[0]; li++) {
-		for (uint32_t k = 0; k < snap->flight_list_count[lists[li]]; k++) {
-			fl_derive_billboard_object(snap, snap->flight_lists[lists[li]][k], assets, history_cam,
-									   history_world_to_view);
+	for (uint32_t b = 0; b < s.build_count; b++) {
+		const uint32_t first = s.bb_count;
+		for (uint32_t li = 0; li < sizeof lists / sizeof lists[0]; li++) {
+			for (uint32_t k = 0; k < snap->flight_list_count[lists[li]]; k++) {
+				fl_derive_billboard_object(&s.build[b], snap, snap->flight_lists[lists[li]][k], assets,
+										   history_cam);
+			}
 		}
+		/* Classic flush order: back-to-front across the whole set. A view
+		 * only draws the billboards of its own build view. */
+		qsort(s.bb + first, s.bb_count - first, sizeof s.bb[0], fl_bb_depth_cmp);
 	}
-	/* Classic flush order: back-to-front across the whole set. */
-	qsort(s.bb, s.bb_count, sizeof s.bb[0], fl_bb_depth_cmp);
 }
 
 /* ---- lens flares (state-derived) --------------------------------------
@@ -4200,9 +4839,10 @@ static const float fl_lens_size[FL_LENS_RINGS] = { 256.0f, 160.0f, 128.0f, 96.0f
 static const uint32_t fl_lens_flash_argb[6] = { 0x08ffffffu, 0x16ffffffu, 0x32ffffffu,
 												0x32ffffffu, 0x16ffffffu, 0x16ffffffu };
 
-static void fl_lens_add_source(const XwaRemasterFlightView* flight_view, const float anchor_local[3],
-							   uint32_t argb) {
-	if (s.lens_src_count >= FL_MAX_LENS_SOURCES) {
+/* Adds a flare source to `view`, if the source is on that view's screen. */
+static void fl_lens_add_source(int view, const float anchor_local[3], uint32_t argb) {
+	const XwaRemasterFlightView* flight_view = &s.views[view];
+	if (s.lens_src_count[view] >= FL_MAX_LENS_SOURCES) {
 		return; /* classic queue capacity */
 	}
 	float sx, sy;
@@ -4214,7 +4854,7 @@ static void fl_lens_add_source(const XwaRemasterFlightView* flight_view, const f
 		sy >= viewport.y + viewport.height) {
 		return;
 	}
-	FlLensSource* src = &s.lens_src[s.lens_src_count++];
+	FlLensSource* src = &s.lens_src[view][s.lens_src_count[view]++];
 	memcpy(src->anchor_local, anchor_local, sizeof src->anchor_local);
 	src->sx = sx;
 	src->sy = sy;
@@ -4225,66 +4865,67 @@ static void fl_lens_add_source(const XwaRemasterFlightView* flight_view, const f
  * infinity like backdrop suns. Their unit directions are scaled to the
  * backdrop Q20 magnitude so the anchor's depth reference also lands at the
  * far plane. */
-static void fl_derive_authored_lens_sources(const AeronPreparedEnvironment* environment,
-											const XwaRemasterFlightView* flight_view) {
-	for (uint32_t i = 0; i < environment->light_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
+static void fl_derive_authored_lens_sources(const AeronPreparedEnvironment* environment, int view) {
+	const float* crows = s.view_crows[view];
+	const float* camera_local = s.views[view].camera.pos;
+	for (uint32_t i = 0; i < environment->light_count && s.lens_src_count[view] < FL_MAX_LENS_SOURCES; i++) {
 		const AeronEnvironmentLight* light = &environment->lights[i];
 		if (!light->lens_flare) {
 			continue;
 		}
 		float v[3];
-		fl_world_to_view(s.crows, light->direction_world[0], light->direction_world[1],
+		fl_world_to_view(crows, light->direction_world[0], light->direction_world[1],
 						 light->direction_world[2], v);
 		if (v[2] <= 0.0f) {
 			continue;
 		}
 		const float far_scale = 1048576.0f;
-		const float anchor[3] = { s.camera_local[0] + light->direction_world[0] * far_scale,
-								  s.camera_local[1] + light->direction_world[1] * far_scale,
-								  s.camera_local[2] + light->direction_world[2] * far_scale };
-		fl_lens_add_source(flight_view, anchor, 0xffffffffu);
+		const float anchor[3] = { camera_local[0] + light->direction_world[0] * far_scale,
+								  camera_local[1] + light->direction_world[1] * far_scale,
+								  camera_local[2] + light->direction_world[2] * far_scale };
+		fl_lens_add_source(view, anchor, 0xffffffffu);
 	}
 }
 
-static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* assets,
-								  const XwaRemasterFlightView* flight_view,
-								  const AeronPreparedEnvironment* authored) {
-	s.lens_src_count = 0;
-	s.lens_ok = 0;
+/* Finds the lens-flare sources of view `view`. */
+static void fl_derive_view_lens_sources(const XwaSnapshot* snap, int view,
+										const AeronPreparedEnvironment* authored) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
+	const float* crows = s.view_crows[view];
+	const float* camera_local = s.views[view].camera.pos;
+	uint32_t* count = &s.lens_src_count[view];
 
 	/* The procedural flare (fl_submit_sun_flare) replaces the suns' trains. */
 	const int sun_trains = !snap->suns.procedural_flare;
 	if (authored && sun_trains) {
-		fl_derive_authored_lens_sources(authored, flight_view);
+		fl_derive_authored_lens_sources(authored, view);
 	}
 	/* Backdrop suns: direction sources at infinity (raw Q20 world
 	 * dirs; projection is magnitude-independent, the anchor's large
 	 * magnitude lands the depth reference at the far plane). An authored
 	 * sky replaces them. */
-	for (uint32_t i = 0;
-		 sun_trains && !authored && i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
+	for (uint32_t i = 0; sun_trains && !authored && i < snap->backdrop_count && *count < FL_MAX_LENS_SOURCES;
+		 i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
 		if (b->object_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
 			b->object_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST) {
 			continue;
 		}
 		float v[3];
-		fl_world_to_view(s.crows, b->world_dir[0], b->world_dir[1], b->world_dir[2], v);
+		fl_world_to_view(crows, b->world_dir[0], b->world_dir[1], b->world_dir[2], v);
 		if (v[2] <= 0.0f) {
 			continue; /* classic viewDir z > 0 gate */
 		}
-		const float anchor[3] = { s.camera_local[0] + b->world_dir[0], s.camera_local[1] + b->world_dir[1],
-								  s.camera_local[2] + b->world_dir[2] };
+		const float anchor[3] = { camera_local[0] + b->world_dir[0], camera_local[1] + b->world_dir[1],
+								  camera_local[2] + b->world_dir[2] };
 		/* Classic passes -1: DrawModelTexture stomps the level tint
 		 * with it -> opaque white (the sprite as authored). */
-		fl_lens_add_source(flight_view, anchor, 0xffffffffu);
+		fl_lens_add_source(view, anchor, 0xffffffffu);
 	}
 
 	/* Explosion flashes: the render walk's case-13 window (current-region
 	 * MAIN slots only — transient sparks never queue flares). */
-	for (uint32_t k = 0;
-		 k < snap->flight_list_count[XWA_SNAP_LIST_EXPLOSION] && s.lens_src_count < FL_MAX_LENS_SOURCES;
+	for (uint32_t k = 0; k < snap->flight_list_count[XWA_SNAP_LIST_EXPLOSION] && *count < FL_MAX_LENS_SOURCES;
 		 k++) {
 		const XwaFlightObject* f = &snap->flight_objects[snap->flight_lists[XWA_SNAP_LIST_EXPLOSION][k]];
 		if (!fl_object_in_render_region(f, cam->region) || f->slot_class != XWA_SNAP_SLOT_MAIN ||
@@ -4302,16 +4943,28 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 		float v[3];
 		float delta_world[3];
 		AeronWorld_DeltaI32(f->world_pos, cam->world_pos, delta_world);
-		fl_world_to_view(s.crows, delta_world[0], delta_world[1], delta_world[2], v);
+		fl_world_to_view(crows, delta_world[0], delta_world[1], delta_world[2], v);
 		if (v[2] <= 0.0f || v[2] >= 16384.0f) {
 			continue; /* classic viewZ < 0x4000 */
 		}
 		float local[3];
 		fl_object_local(f, local);
-		fl_lens_add_source(flight_view, local, fl_lens_flash_argb[flare_frame]);
+		fl_lens_add_source(view, local, fl_lens_flash_argb[flare_frame]);
 	}
+}
 
-	if (s.lens_src_count == 0) {
+/* Finds the lens-flare sources of each view, and resolves the flares'
+ * images. With `enabled` 0, the frame has no flares. */
+static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* assets, int enabled,
+								  const AeronPreparedEnvironment* authored) {
+	memset(s.lens_src_count, 0, sizeof s.lens_src_count);
+	s.lens_ok = 0;
+	uint32_t total = 0;
+	for (int view = 0; enabled && view < s.view_count; view++) {
+		fl_derive_view_lens_sources(snap, view, authored);
+		total += s.lens_src_count[view];
+	}
+	if (total == 0) {
 		return;
 	}
 	/* Ring sprite frames + classic dims (atlas uploads before the
@@ -4320,7 +4973,7 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 		int w = 0, h = 0, maxb = 0;
 		if (!XwaSnapshotExport_ModelTexFrame(XWA_SNAP_TYPE_LIGHTING_1000, fl_lens_frame[r], &w, &h, &maxb) ||
 			!XwaRemasterAssets_FlightAtlasFrame(assets, 1000, fl_lens_frame[r] - 1, &s.lens_ref[r])) {
-			s.lens_src_count = 0;
+			memset(s.lens_src_count, 0, sizeof s.lens_src_count);
 			return;
 		}
 		s.lens_dim[r][0] = w;
@@ -4333,10 +4986,13 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
  * sources (the classic flush order). Quads sit at a fixed shallow
  * view depth — the LENS pass has no depth test; occlusion comes from
  * the anchor's depth-buffer visibility. */
-static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlightView* flight_view) {
-	if (!s.lens_ok || s.lens_src_count == 0) {
+static void fl_submit_view_lens_flares(const XwaSnapshot* snap, int view) {
+	if (s.lens_src_count[view] == 0) {
 		return;
 	}
+	const XwaRemasterFlightView* flight_view = &s.views[view];
+	const FlQuadTarget target = { s.scene, s.view_crows[view], flight_view->camera.pos,
+								  s.view_count > 1 ? 1u << view : 0u };
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	/* The lens depth is arbitrary (no depth test; position/size scale
 	 * linearly with it, so the screen result is depth-invariant). Keep a
@@ -4344,13 +5000,16 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
 	const float zl = 4096.0f;
 	/* The classic reflection center is the raw viewport center (NOT
 	 * the projection center): vp_center_x, and vp_center_y measured in
-	 * the queue's bottom-origin space == vp_h - vp_center_y here. */
+	 * the queue's bottom-origin space == vp_h - vp_center_y here. A rig's
+	 * view has no classic viewport: its flares reflect around its centre. */
 	const float source_w = cam->vp_w ? (float)cam->vp_w : (cam->screen_w ? (float)cam->screen_w : 640.0f);
 	const float source_h = cam->vp_h ? (float)cam->vp_h : (cam->screen_h ? (float)cam->screen_h : 480.0f);
-	const float ccx = flight_view->viewport.x + flight_view->viewport.width * 0.5f +
-					  (cam->vp_center_x - source_w * 0.5f) * flight_view->classic_pixel_scale;
-	const float ccy = flight_view->viewport.y + flight_view->viewport.height * 0.5f +
-					  (source_h - cam->vp_center_y - source_h * 0.5f) * flight_view->classic_pixel_scale;
+	float ccx = flight_view->viewport.x + flight_view->viewport.width * 0.5f;
+	float ccy = flight_view->viewport.y + flight_view->viewport.height * 0.5f;
+	if (!flight_view->rig_view) {
+		ccx += (cam->vp_center_x - source_w * 0.5f) * flight_view->classic_pixel_scale;
+		ccy += (source_h - cam->vp_center_y - source_h * 0.5f) * flight_view->classic_pixel_scale;
+	}
 
 	for (int r = 0; r < FL_LENS_RINGS; r++) {
 		const float projection = cam->proj_scale > 0.0f ? cam->proj_scale : 512.0f;
@@ -4359,8 +5018,8 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
 			(float)s.lens_dim[r][0] * k * (1.0f / 512.0f) * flight_view->projection_pixel_scale;
 		const float half_h_px =
 			(float)s.lens_dim[r][1] * k * (1.0f / 512.0f) * flight_view->projection_pixel_scale;
-		for (uint32_t si = 0; si < s.lens_src_count; si++) {
-			const FlLensSource* src = &s.lens_src[si];
+		for (uint32_t si = 0; si < s.lens_src_count[view]; si++) {
+			const FlLensSource* src = &s.lens_src[view][si];
 			const float dx = src->sx - ccx;
 			const float dy = src->sy - ccy;
 			float qx, qy;
@@ -4419,9 +5078,16 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
 			corners[3][0] = cx + hw;
 			corners[3][1] = cy - hh;
 			corners[3][2] = zl;
-			fl_submit_view_quad(AERON_SCENE_BILLBOARD_STAGE_LENS, corners, fl_default_uvs, &s.lens_ref[r],
-								src->argb, src->anchor_local);
+			fl_submit_view_quad_to(&target, AERON_SCENE_BILLBOARD_STAGE_LENS, corners, fl_default_uvs,
+								   &s.lens_ref[r], src->argb, src->anchor_local, 0.0f, NULL, 1.0f);
 		}
+	}
+}
+
+/* Submits the flare trains of each view. A view only draws its own. */
+static void fl_submit_lens_flares(const XwaSnapshot* snap) {
+	for (int view = 0; s.lens_ok && view < s.view_count; view++) {
+		fl_submit_view_lens_flares(snap, view);
 	}
 }
 
@@ -4444,10 +5110,10 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  * They and the models' lights share one pool, ranked into the scene's
  * capacity (fl_submit_point_lights). */
 
-/* Start the frame's light pool for `view`: its frustum planes (as the
- * scene's culling, without the far plane; dot(xyz, p) + w is the signed
- * distance, positive inside) and camera position. */
-static void fl_begin_point_lights(const XwaRemasterFlightView* view) {
+/* Start the frame's light pool for the frame's views: the frustum planes of
+ * each view (as the scene's culling, without the far plane; dot(xyz, p) + w
+ * is the signed distance, positive inside) and the centre view's position. */
+static void fl_begin_point_lights(void) {
 	s.pl_cand_count = 0;
 	s.pl_cand_dropped = 0;
 	s.pl_invalid_count = 0;
@@ -4455,28 +5121,31 @@ static void fl_begin_point_lights(const XwaRemasterFlightView* view) {
 	s.pl_model_count = 0;
 	memset(s.pl_culled, 0, sizeof s.pl_culled);
 	memset(s.pl_dropped, 0, sizeof s.pl_dropped);
-	const float* m = view->view_proj;
-	for (int k = 0; k < 4; k++) {
-		const float w = m[12 + k];
-		s.pl_frustum[0][k] = w + m[0 + k]; /* x >= -w */
-		s.pl_frustum[1][k] = w - m[0 + k]; /* x <= w */
-		s.pl_frustum[2][k] = w + m[4 + k]; /* y >= -w */
-		s.pl_frustum[3][k] = w - m[4 + k]; /* y <= w */
-		s.pl_frustum[4][k] = w - m[8 + k]; /* near (reverse Z): z <= w */
-	}
-	for (int p = 0; p < 5; p++) {
-		const float length =
-			sqrtf(s.pl_frustum[p][0] * s.pl_frustum[p][0] + s.pl_frustum[p][1] * s.pl_frustum[p][1] +
-				  s.pl_frustum[p][2] * s.pl_frustum[p][2]);
-		const float inverse = length > 0.0f ? 1.0f / length : 0.0f;
+	s.pl_view_count = s.view_count;
+	for (int view = 0; view < s.view_count; view++) {
+		float (*frustum)[4] = s.pl_frustum[view];
+		const float* m = s.views[view].view_proj;
 		for (int k = 0; k < 4; k++) {
-			s.pl_frustum[p][k] *= inverse;
+			const float w = m[12 + k];
+			frustum[0][k] = w + m[0 + k]; /* x >= -w */
+			frustum[1][k] = w - m[0 + k]; /* x <= w */
+			frustum[2][k] = w + m[4 + k]; /* y >= -w */
+			frustum[3][k] = w - m[4 + k]; /* y <= w */
+			frustum[4][k] = w - m[8 + k]; /* near (reverse Z): z <= w */
+		}
+		for (int p = 0; p < 5; p++) {
+			const float length = sqrtf(frustum[p][0] * frustum[p][0] + frustum[p][1] * frustum[p][1] +
+									   frustum[p][2] * frustum[p][2]);
+			const float inverse = length > 0.0f ? 1.0f / length : 0.0f;
+			for (int k = 0; k < 4; k++) {
+				frustum[p][k] *= inverse;
+			}
 		}
 	}
-	memcpy(s.pl_eye, view->camera.pos, sizeof s.pl_eye);
+	memcpy(s.pl_eye, s.center_view.camera.pos, sizeof s.pl_eye);
 }
 
-/* Add a scene light to the pool unless what it lights misses the view: the
+/* Add a scene light to the pool unless what it lights misses every view: the
  * sphere of its range around it (plus a tube's half length), or a spot
  * light's cone (AeronScene_LightBounds), which can reach past the range
  * along its axis. Its score is its peak intensity over the squared
@@ -4490,14 +5159,21 @@ static void fl_pool_add(const AeronSceneLight* light, int model, int keep) {
 	const float reach = light->radius + half_length;
 	float bound[3], bound_radius;
 	AeronScene_LightBounds(light, bound, &bound_radius);
-	for (int p = 0; p < 5; p++) {
-		const float* plane = s.pl_frustum[p];
-		if (plane[0] * light->pos[0] + plane[1] * light->pos[1] + plane[2] * light->pos[2] + plane[3] <
-				-reach ||
-			plane[0] * bound[0] + plane[1] * bound[1] + plane[2] * bound[2] + plane[3] < -bound_radius) {
-			s.pl_culled[model]++;
-			return;
+	int seen = 0;
+	for (int view = 0; view < s.pl_view_count && !seen; view++) {
+		seen = 1;
+		for (int p = 0; p < 5 && seen; p++) {
+			const float* plane = s.pl_frustum[view][p];
+			if (plane[0] * light->pos[0] + plane[1] * light->pos[1] + plane[2] * light->pos[2] + plane[3] <
+					-reach ||
+				plane[0] * bound[0] + plane[1] * bound[1] + plane[2] * bound[2] + plane[3] < -bound_radius) {
+				seen = 0;
+			}
 		}
+	}
+	if (!seen) {
+		s.pl_culled[model]++;
+		return;
 	}
 	float score = INFINITY;
 	if (!keep) {
@@ -4960,8 +5636,7 @@ static void fl_finalize_point_lights(void) {
  * closest to the camera first, up to the scene's limit. The instance of
  * each owner object uses its own set. Other instances use the first set
  * whose bounds they overlap, so the closest set wins where sets meet. */
-static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
-								const XwaRemasterFlightView* view) {
+static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	AeronProbeSet* sets[AERON_SCENE_MAX_PROBE_SETS];
 	float distances[AERON_SCENE_MAX_PROBE_SETS];
@@ -5023,7 +5698,8 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 		s.probe_set_object[s.probe_set_count++] = s.probe_set_object[k];
 	}
 	if (s.probe_set_count && s_show_probes) {
-		XwaRemasterProbeOutlines_Prepare(cmd, s.scene, view, s.crows, s.probe_sets, s.probe_set_count);
+		XwaRemasterProbeOutlines_Prepare(cmd, s.scene, s.views, (const float (*)[9])s.view_crows,
+										 s.view_count, s.probe_sets, s.probe_set_count);
 	}
 }
 
@@ -5055,13 +5731,13 @@ static uint8_t fl_probe_set_owner(uint32_t i) {
  * the scene takes it at 683 lm/W (AERON_SCENE_LUMENS_PER_WATT).
  * `skip_baked` leaves out the lights baked into the model's probes, while
  * its probe set is placed. `variant` is the instance's variant index: a
- * light that names variants shines only with them. Lights in the instance's
- * `hidden_tag_groups` are left out. With `one_light`, only the first light
- * that shines is added. Projectiles use it: a battle can have hundreds of
- * them, so each one gets a single light. */
+ * light that names variants shines only with them. Lights in
+ * `off_tag_groups`, the instance's hidden and dark tag groups, are left out. With `one_light`, only the first
+ * light that shines is added. Projectiles use it: a battle can have hundreds of them, so each one gets a
+ * single light. */
 static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
-								const AeronSceneMeshTable* table, uint32_t variant,
-								uint32_t hidden_tag_groups, int keep, int skip_baked, int one_light) {
+								const AeronSceneMeshTable* table, uint32_t variant, uint32_t off_tag_groups,
+								int keep, int skip_baked, int one_light) {
 	if (!s.plight.enabled || !s.plight.model_lights) {
 		return;
 	}
@@ -5072,7 +5748,7 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 			continue;
 		}
 		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, variant,
-								 hidden_tag_groups, s.plight.model_light_scale / AERON_SCENE_LUMENS_PER_WATT,
+								 off_tag_groups, s.plight.model_light_scale / AERON_SCENE_LUMENS_PER_WATT,
 								 exposure, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
@@ -5183,7 +5859,20 @@ static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
 													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
 													.debug_view = s.plight.cluster_debug,
+													.merge_spot_lights = s.plight.merge_spot_lights,
 												});
+}
+
+/* Queues the engine glows of a model for each build view. */
+static void fl_submit_engine_glows(const AeronSceneMesh* mesh, const float model[16],
+								   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
+								   const uint32_t* hidden_mask, float scale) {
+	for (uint32_t b = 0; b < s.build_count; b++) {
+		const FlBuildView* build = &s.build[b];
+		XwaRemasterShip_SubmitEngineGlows(s.scene, mesh, model, AERON_OPT_UNITS_PER_METER, table,
+										  knockout_mask, hidden_mask, scale, build->crows,
+										  build->view.camera.pos, build->view_mask, &s.glow_ref);
+	}
 }
 
 /* Submit the derived set as OVERLAY billboards (corner build shared
@@ -5204,9 +5893,9 @@ static void fl_submit_billboards(void) {
 			corners[c][1] = b->center[1] + sw * ax[1] + sh * ay[1];
 			corners[c][2] = b->center[2];
 		}
-		fl_submit_view_quad_ex(AERON_SCENE_BILLBOARD_STAGE_OVERLAY, corners, fl_default_uvs, &b->ref, b->argb,
-							   NULL, b->depth_bias, b->has_prev ? b->prev_corners : NULL,
-							   b->emissive_strength);
+		fl_submit_view_quad_ex(&s.build[b->build], AERON_SCENE_BILLBOARD_STAGE_OVERLAY, corners,
+							   fl_default_uvs, &b->ref, b->argb, NULL, b->depth_bias,
+							   b->has_prev ? b->prev_corners : NULL, b->emissive_strength);
 	}
 }
 
@@ -5590,7 +6279,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 
 	if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_SCENE_OBJECT) {
 		const uint32_t old_count = s.bb_count;
-		fl_derive_object_billboard(f, snapshot_index, context->assets, NULL, NULL);
+		fl_derive_object_billboard(&s.build[0], f, snapshot_index, context->assets, NULL);
 		if (s.bb_count != old_count)
 			return 1;
 	}
@@ -5611,6 +6300,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	memcpy(instance.prev_transform, model_matrix, sizeof model_matrix);
 	instance.variant = f->node_switch;
 	instance.hidden_tag_groups = XwaRemasterShip_HiddenTagGroups(prepared.mesh, f);
+	instance.dark_tag_groups = XwaRemasterShip_DarkTagGroups(prepared.mesh, f);
 	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.mesh_table = prepared.table;
 	instance.prev_mesh_table = prepared.table;
@@ -5627,12 +6317,10 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 		XwaRemasterGlowMarks_SubmitObject(s.scene, context->cmd, context->assets, s.snap, f, prepared.mesh,
 										  model_matrix, prepared.table, 1.0f, 1.0f, 1);
 		if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT)
-			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
+			fl_derive_wreck_flames(&s.build[0], f, snapshot_index, context->assets, NULL);
 		if (s.glow_ok) {
-			XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix, AERON_OPT_UNITS_PER_METER,
-											  prepared.table, f->eg_knockout_mask, f->eg_hidden_mask,
-											  XwaRemasterShip_EngineGlowScale(f), s.crows, s.camera_local,
-											  &s.glow_ref);
+			fl_submit_engine_glows(prepared.mesh, model_matrix, prepared.table, f->eg_knockout_mask,
+								   f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(f));
 		}
 	}
 	return 1;
@@ -5679,8 +6367,10 @@ static int fl_hyper_normalize_axis(float axis[3]) {
 	return 1;
 }
 
-static void fl_hyper_build_tunnel_view(const AeronSceneCamera* camera, const float player_bw[9],
-									   int player_found, XwaRemasterHyperspaceTunnelView* out) {
+/* `crows` are the world-to-eye rows of `camera`. */
+static void fl_hyper_build_tunnel_view(const AeronSceneCamera* camera, const float crows[9],
+									   const float player_bw[9], int player_found,
+									   XwaRemasterHyperspaceTunnelView* out) {
 	memset(out, 0, sizeof *out);
 	out->right[0] = 1.0f;
 	out->up[1] = -1.0f;
@@ -5697,9 +6387,9 @@ static void fl_hyper_build_tunnel_view(const AeronSceneCamera* camera, const flo
 	 * ship-backward, and up. Negate its longitudinal row so signed tunnel
 	 * motion follows the craft's travel direction. */
 	float right[3], up[3], forward[3];
-	fl_world_to_view(s.crows, player_bw[0], player_bw[1], player_bw[2], right);
-	fl_world_to_view(s.crows, player_bw[6], player_bw[7], player_bw[8], up);
-	fl_world_to_view(s.crows, -player_bw[3], -player_bw[4], -player_bw[5], forward);
+	fl_world_to_view(crows, player_bw[0], player_bw[1], player_bw[2], right);
+	fl_world_to_view(crows, player_bw[6], player_bw[7], player_bw[8], up);
+	fl_world_to_view(crows, -player_bw[3], -player_bw[4], -player_bw[5], forward);
 	if (!fl_hyper_normalize_axis(forward)) {
 		return;
 	}
@@ -5726,6 +6416,40 @@ static void fl_hyper_build_tunnel_view(const AeronSceneCamera* camera, const flo
 /* Hyperspace uses the same state-derived cockpit transform and articulation
  * as ordinary flight, but mirrors its own classic gate: cockpitVisible alone
  * selects the cockpit inside the special-mode branch. */
+/* Builds the hyperspace view of the centre view, which
+ * XwaRemasterHyperspace_Prepare takes, and of each view of the frame. */
+static void fl_hyper_build_views(const float player_bw[9], int player_found,
+								 XwaRemasterHyperspaceTunnelView* center) {
+	fl_hyper_build_tunnel_view(&s.center_view.camera, s.crows, player_bw, player_found, center);
+	for (int i = 0; i < s.view_count; i++) {
+		fl_hyper_build_tunnel_view(&s.views[i].camera, s.view_crows[i], player_bw, player_found,
+								   &s.hyperspace_views[i]);
+	}
+}
+
+/* Draws the gloves of the VR hands. They are only drawn with the cockpit, in
+ * a view that follows the head. `cockpit_shadows` gives them the cockpit's
+ * shadow flags: they are then lit by the cockpit's lights and share its
+ * shadow map, so they must be added after the cockpit. */
+static void fl_submit_vr_hands(int cockpit_shadows) {
+	if (!s.rig_active || !s.rig.tracked) {
+		return;
+	}
+	for (int hand = 0; hand < 2; hand++) {
+		AeronSceneMeshInstance inst;
+		if (!XwaRemasterVrHands_Instance(hand, s.seat_crows, s.seat_view.camera.pos, &inst)) {
+			continue;
+		}
+		inst.cull_mode = AERON_CULL_BACK;
+		if (cockpit_shadows) {
+			inst.shadow_flags = AERON_SCENE_INSTANCE_USE_RECEIVER_LOCAL_SHADOW |
+								AERON_SCENE_INSTANCE_CAST_RECEIVER_LOCAL_ONLY |
+								AERON_SCENE_INSTANCE_SHADOW_DOUBLE_SIDED;
+		}
+		AeronScene_AddMeshInstance(s.scene, &inst);
+	}
+}
+
 static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAssets* assets,
 										 const XwaSnapshot* snap, const XwaFlightCamera* cam,
 										 const float anchor_bw[9], int anchor_found,
@@ -5744,14 +6468,16 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		w[a] =
 			-(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f + cam->sway[a]);
 	}
-	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
+	/* The cockpit is placed from the seat, as in ordinary flight. */
+	const float* seat_local = s.seat_view.camera.pos;
+	fl_world_to_view(s.seat_crows, w[0], w[1], w[2], delta);
 	float pw[3];
 	for (int j = 0; j < 3; j++) {
-		pw[j] = s.camera_local[j] + s.crows[0 * 3 + j] * delta[0] + s.crows[1 * 3 + j] * delta[1] +
-				s.crows[2 * 3 + j] * delta[2];
+		pw[j] = seat_local[j] + s.seat_crows[0 * 3 + j] * delta[0] + s.seat_crows[1 * 3 + j] * delta[1] +
+				s.seat_crows[2 * 3 + j] * delta[2];
 	}
 	if (snap->cockpit.inverted) {
-		fl_apply_inverted_cockpit_pivot(bw, &snap->cockpit, cam->sway, s.camera_local, pw);
+		fl_apply_inverted_cockpit_pivot(bw, &snap->cockpit, cam->sway, seat_local, pw);
 	}
 	float m[16];
 	fl_model_matrix(bw, pw, m);
@@ -5773,6 +6499,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_pool.used++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
+	fl_submit_vr_hands(0);
 	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 	/* No blast marks on the cockpit: the game sizes a warhead's mark from the
 	 * whole craft, so it would cover most of the cockpit and the view. */
@@ -5783,10 +6510,8 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 										  s.cockpit_hit_flash_emissive_strength, 0);
 	}
 	if (s.glow_ok && player_f) {
-		XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
-										  inst.mesh_table, player_f->eg_knockout_mask,
-										  player_f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(player_f),
-										  s.crows, s.camera_local, &s.glow_ref);
+		fl_submit_engine_glows(cockpit_mesh, m, inst.mesh_table, player_f->eg_knockout_mask,
+							   player_f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(player_f));
 	}
 }
 
@@ -5813,34 +6538,41 @@ static int fl_ensure_direct_present(void) {
 }
 
 int XwaRemasterFlight_CanDirectPresent(int target_w, int target_h) {
-	return Aeron_CanRenderDirectToSwapchain(target_w, target_h) && fl_ensure_direct_present();
+	return !s.rig_active && Aeron_CanRenderDirectToSwapchain(target_w, target_h) &&
+		   fl_ensure_direct_present();
 }
 
-/* Draws the scene with its bloom and exposure over the whole target, with
- * `chain` and its current debug view. */
-static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain* chain, int target_w,
-								  int target_h) {
-	const AeronRectI full_target = { 0, 0, target_w, target_h };
-	Aeron_SetViewport(pass, &full_target);
-	Aeron_SetScissor(pass, &full_target);
+/* Draws the scene with its bloom and exposure into `rect` of the pass's
+ * target, with `chain` and its current debug view. */
+/* What the full-screen passes draw for the view that the scene rendered
+ * last: the visible-area mesh of a headset's eye, so they skip the corners
+ * that the lens never shows. NULL, the whole image, without a headset. */
+static const AeronSceneFullscreenMesh* fl_view_fullscreen_mesh(void) {
+	return s.view_targets_set && s.view_areas_set ? AeronScene_FullscreenMesh(s.scene) : NULL;
+}
+
+/* `mesh` is what the tone map draws: NULL for the whole rectangle, or
+ * fl_view_fullscreen_mesh. */
+static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain* chain,
+								  const AeronRectI* rect, const AeronSceneFullscreenMesh* mesh) {
+	Aeron_SetViewport(pass, rect);
+	Aeron_SetScissor(pass, rect);
 	static const float present_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	/* The flight scene's exposure, on the GPU: metered from this frame. The
 	 * map keeps the CPU value. */
 	AeronTexture* const exposure_tex = s.map_present ? NULL : AeronScene_ExposureTexture(s.scene);
-	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
-								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
-								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
-								s.rt_h,
-								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+	/* A flat view in a headset is the upper left part of the scene. */
+	const float flat_source[4] = { 0.0f, 0.0f, s.rt_w > 0 ? (float)s.flat_w / (float)s.rt_w : 1.0f,
+								   s.rt_h > 0 ? (float)s.flat_h / (float)s.rt_h : 1.0f };
+	AeronScenePresentChain_Draw(
+		chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
+		s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
+		exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w, s.rt_h,
+		/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0, mesh, s.flat_cropped ? flat_source : NULL);
 }
 
-/* Shared tone-map + semantic-HUD draw sequence. The target can be the FP16
- * composition fallback or Aeron's borrowed swapchain target. */
-static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							AeronScenePresentChain* chain, int target_w, int target_h) {
-	if (!cmd || !pass || !target || !chain || !s.present_scene_tex || !s.present_sampler) {
-		return;
-	}
+/* Sets the chain's debug view from the flight settings. */
+static void fl_set_present_debug(AeronScenePresentChain* chain) {
 	/* The weight view needs the meter, which the map doesn't run. */
 	AeronScenePresentDebug debug = { .view = (AeronScenePresentDebugView)s.present_debug_view };
 	if (debug.view == AERON_SCENE_PRESENT_METER_WEIGHT &&
@@ -5848,10 +6580,15 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 		debug.view = AERON_SCENE_PRESENT_IMAGE;
 	}
 	AeronScenePresentChain_SetDebug(chain, &debug);
-	fl_draw_present_scene(pass, chain, target_w, target_h);
-	if (s.suppress_hud) {
-		return;
-	}
+}
+
+/* Draws the 2D HUD into `pass`, flat. `target` has the size that the HUD was
+ * prepared for. `readout_scene` is the scene whose depth hides the target
+ * readout behind near geometry, or NULL to draw the whole readout. In a headset
+ * this doesn't draw the markers (hud.h). fl_draw_headset_hud draws them on
+ * planes. */
+static void fl_draw_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+						int target_w, int target_h, AeronScene3D* readout_scene) {
 	/* With the Dynamic Cockpit active the HUD's lists already leave out
 	 * what the cockpit's screens show (XwaRemasterDc_AddSprite). */
 	if (!s.map_present) {
@@ -5866,7 +6603,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
 		Aeron_GpuDebugMarker(cmd, "HUD target readout");
-		XwaRemasterHudReadout_Render(cmd, pass, target, target_w, target_h, s.scene);
+		XwaRemasterHudReadout_Render(cmd, pass, target, target_w, target_h, readout_scene);
 	}
 	Aeron_GpuDebugMarker(cmd, "HUD CMD");
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
@@ -5879,8 +6616,331 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	}
 }
 
+/* Shared tone-map + semantic-HUD draw sequence. The target can be the FP16
+ * composition fallback or Aeron's borrowed swapchain target. */
+static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							AeronScenePresentChain* chain, int target_w, int target_h) {
+	if (!cmd || !pass || !target || !chain || !s.present_scene_tex || !s.present_sampler) {
+		return;
+	}
+	fl_set_present_debug(chain);
+	const AeronRectI full_target = { 0, 0, target_w, target_h };
+	fl_draw_present_scene(pass, chain, &full_target, NULL);
+	if (!s.suppress_hud) {
+		fl_draw_hud(cmd, pass, target, target_w, target_h, s.scene);
+	}
+}
+
+/* Renders the 2D HUD into hud_rt, and prepares the list that draws it into
+ * `rect` of a target of `target_w` x `target_h` pixels. */
+static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int target_w, int target_h) {
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = s.hud_rt,
+		.clear_color = 1,
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+		.command_buffer = cmd,
+		.debug_label = "OpenXWA flight HUD",
+	});
+	if (!pass) {
+		return 0;
+	}
+	/* The readout isn't hidden by depth here: the scene's depth belongs to
+	 * the view that was rendered last. */
+	fl_draw_hud(cmd, pass, s.hud_rt, s.flat_w, s.flat_h, NULL);
+	Aeron_EndRenderPass(pass);
+	AeronDrawList_Begin(s.hud_composite, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_AddSprite(s.hud_composite, &(AeronDrawList2DSprite) {
+												 .texture = Aeron_RenderTargetGetTexture(s.hud_rt),
+												 .src_u1 = 1.0f,
+												 .src_v1 = 1.0f,
+												 .dst_x = (float)rect.x,
+												 .dst_y = (float)rect.y,
+												 .dst_w = (float)rect.width,
+												 .dst_h = (float)rect.height,
+												 .tint = { 1.0f, 1.0f, 1.0f, 1.0f },
+												 .blend = AERON_BLIT2D_BLEND_PMA,
+												 .filter = AERON_BLIT2D_FILTER_NEAREST,
+											 });
+	return AeronDrawList_Prepare(s.hud_composite, cmd);
+}
+
+/* Draws a headset's HUD, without the markers, into the panel's image. */
+static int fl_render_headset_hud(AeronCommandBuffer* cmd) {
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = s.hud_panel_rt,
+		.clear_color = 1,
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+		.command_buffer = cmd,
+		.debug_label = "OpenXWA flight HUD panel",
+	});
+	if (!pass) {
+		return 0;
+	}
+	fl_draw_hud(cmd, pass, s.hud_panel_rt, s.vr_hud_width_px, s.vr_hud_height_px, NULL);
+	Aeron_EndRenderPass(pass);
+	s.headset_hud_drawn = 1;
+	return 1;
+}
+
+/* Returns the pipeline that draws a HUD image into an eye image of
+ * `format` (shaders/hud_reproject.frag.hlsl). */
+static AeronGraphicsPipeline* fl_hud_reproject_pipeline(AeronTextureFormat format) {
+	if (s.hud_reproject_pipeline && s.hud_reproject_format == format) {
+		return s.hud_reproject_pipeline;
+	}
+	if (!s.hud_reproject_vs) {
+		s.hud_reproject_vs = Aeron_CreateShader(
+			&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
+	}
+	if (!s.hud_reproject_fs) {
+		s.hud_reproject_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hud_reproject.frag",
+																	 .stage = AERON_SHADER_STAGE_FRAGMENT,
+																	 .sampler_count = 1,
+																	 .uniform_buffer_count = 1 });
+	}
+	if (s.hud_reproject_pipeline) {
+		Aeron_DestroyGraphicsPipeline(s.hud_reproject_pipeline);
+		s.hud_reproject_pipeline = NULL;
+	}
+	s.hud_reproject_format = AERON_TEXTURE_FORMAT_UNKNOWN;
+	if (!s.hud_reproject_vs || !s.hud_reproject_fs) {
+		return NULL;
+	}
+	/* The HUD images have premultiplied alpha. */
+	const AeronColorTargetStateDesc target = {
+		.format = format,
+		.blend = {
+			.enabled = 1,
+			.src_color = AERON_BLEND_ONE,
+			.dst_color = AERON_BLEND_ONE_MINUS_SRC_ALPHA,
+			.color_op = AERON_BLEND_OP_ADD,
+			.src_alpha = AERON_BLEND_ONE,
+			.dst_alpha = AERON_BLEND_ONE_MINUS_SRC_ALPHA,
+			.alpha_op = AERON_BLEND_OP_ADD,
+		},
+	};
+	s.hud_reproject_pipeline = Aeron_CreateGraphicsPipeline(&(AeronGraphicsPipelineDesc) {
+		.vertex_shader = s.hud_reproject_vs,
+		.fragment_shader = s.hud_reproject_fs,
+		.primitive_type = AERON_PRIMITIVE_TRIANGLES,
+		.cull_mode = AERON_CULL_NONE,
+		.depth = { .depth_test = 0, .depth_write = 0, .compare = AERON_COMPARE_ALWAYS },
+		.color_target_count = 1,
+		.color_targets = &target,
+		.sample_count = AERON_SAMPLE_COUNT_1,
+	});
+	if (s.hud_reproject_pipeline) {
+		s.hud_reproject_format = format;
+	}
+	return s.hud_reproject_pipeline;
+}
+
+/* Draws one HUD image into the eye image of the open pass, with the matrix
+ * that takes an eye pixel to a point of the HUD image. */
+static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipeline,
+							  AeronRenderTarget* image, const float matrix[9], const AeronRectI* rect) {
+	const struct {
+		float row_x[4];
+		float row_y[4];
+		float row_w[4];
+		float params[4];
+		float origin[4];
+	} uniform = {
+		{ matrix[0], matrix[1], matrix[2], 0.0f },
+		{ matrix[3], matrix[4], matrix[5], 0.0f },
+		{ matrix[6], matrix[7], matrix[8], 0.0f },
+		{ 2.0f / (float)rect->width, 2.0f / (float)rect->height, 1.0f, 0.0f },
+		{ (float)rect->x, (float)rect->y, 0.0f, 0.0f },
+	};
+	Aeron_BindGraphicsPipeline(pass, pipeline);
+	Aeron_BindTextureSampler(pass, AERON_SHADER_STAGE_FRAGMENT, 0, Aeron_RenderTargetGetTexture(image),
+							 s.present_sampler);
+	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, &uniform, sizeof uniform);
+	Aeron_Draw(pass, 3, 0);
+}
+
+/* Draws the headset HUD over the image of `view`, in the open pass. The pass's
+ * viewport is the view's rectangle `rect` in `target`. The markers are drawn on
+ * their planes, then the rest of the HUD on its panel. The panel is in front of
+ * the seat's eye point and faces it. At scale 1 it covers the HUD's view
+ * exactly as seen from the seat, so the HUD keeps its classic layout, and both
+ * eyes see it at the panel's distance. */
+static int fl_draw_headset_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							   int view, const AeronRectI* rect) {
+	AeronGraphicsPipeline* pipeline =
+		fl_hud_reproject_pipeline(Aeron_TextureGetFormat(Aeron_RenderTargetGetTexture(target)));
+	if (!pipeline) {
+		return 0;
+	}
+	float view_rows[12];
+	XwaHudPlanes_ViewRows(s.views[view].view_proj, view_rows);
+	XwaRemasterHud_RenderMarkerPlanes(cmd, pass, target, view_rows);
+	XwaRemasterCockpitButtons_RenderMarkers(cmd, pass, target, view_rows);
+	float matrix[9];
+	const AeronSceneCamera* seat = &s.hud_view.camera;
+	float rows[9], center[3], half_right[3], half_up[3];
+	fl_quat_to_mat3(seat->ori, rows);
+	const float distance = s.vr_hud_panel_distance_m * s.head_units_per_meter;
+	const float panel_scale = s.vr_hud_panel_scale > 0.0f ? s.vr_hud_panel_scale : 1.0f;
+	const float half_w = distance * tanf(seat->h_half_rad) * panel_scale;
+	const float half_h = distance * tanf(seat->v_half_rad) * panel_scale;
+	for (int axis = 0; axis < 3; axis++) {
+		/* The rows are the view's right, down and forward axes. */
+		center[axis] = seat->pos[axis] + rows[6 + axis] * distance;
+		half_right[axis] = rows[axis] * half_w;
+		half_up[axis] = -rows[3 + axis] * half_h;
+	}
+	if (XwaHudReproject_Panel(s.views[view].view_proj, center, half_right, half_up, matrix)) {
+		fl_draw_hud_image(pass, pipeline, s.hud_panel_rt, matrix, rect);
+	}
+	return 1;
+}
+
+/* Returns the chain that tone maps into a view's own target, which has
+ * `format`. */
+static AeronScenePresentChain* fl_view_target_chain(AeronTextureFormat format) {
+	if (s.present_views && s.present_views_format == format) {
+		return s.present_views;
+	}
+	if (s.present_views) {
+		AeronScenePresentChain_Destroy(s.present_views);
+	}
+	s.present_views = AeronScenePresentChain_Create(format);
+	s.present_views_format = s.present_views ? format : AERON_TEXTURE_FORMAT_UNKNOWN;
+	return s.present_views;
+}
+
+/* Returns the largest rectangle with the shape of a view of `view_w` x
+ * `view_h` pixels that fits in the middle of a target of `target_w` x
+ * `target_h` pixels. */
+static AeronRectI fl_fit_view_rect(int view_w, int view_h, int target_w, int target_h) {
+	AeronRectI rect = { 0, 0, target_w, target_h };
+	if (view_w <= 0 || view_h <= 0) {
+		return rect;
+	}
+	if ((int64_t)target_w * view_h > (int64_t)target_h * view_w) {
+		rect.width = (int)((int64_t)target_h * view_w / view_h);
+	} else {
+		rect.height = (int)((int64_t)target_w * view_h / view_w);
+	}
+	rect.x = (target_w - rect.width) / 2;
+	rect.y = (target_h - rect.height) / 2;
+	return rect;
+}
+
+/* Tone maps the image to present for `view`, and draws the HUD over the
+ * primary view. The image goes into the view's rectangle of present_rt;
+ * `first` then clears the target, for the first view of the frame. With
+ * `own_target`, a headset's view goes into its own target instead. The
+ * flat view of a headset's map fills present_rt, which the virtual screen
+ * shows. */
+static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int own_target) {
+	if (!cmd || !s.present || !s.present_rt || !s.hud_rt || !s.present_scene_tex) {
+		return 0;
+	}
+	AeronRenderTarget* target = s.present_rt;
+	AeronScenePresentChain* chain = s.present;
+	AeronRectI rect = s.rig.views[view].rect;
+	int target_w = s.out_w;
+	int target_h = s.out_h;
+	if (own_target) {
+		target = s.view_targets[view];
+		chain = fl_view_target_chain(Aeron_TextureGetFormat(Aeron_RenderTargetGetTexture(target)));
+		rect = (AeronRectI) { 0, 0, s.rt_w, s.rt_h };
+		target_w = s.rt_w;
+		target_h = s.rt_h;
+		first = 1;
+		if (!chain) {
+			return 0;
+		}
+	} else if (s.view_targets_set) {
+		rect = fl_fit_view_rect(s.flat_w, s.flat_h, s.out_w, s.out_h);
+	}
+	/* The headset HUD is drawn in every eye: the markers on planes and the rest
+	 * on the panel. Otherwise the HUD is drawn flat over the primary view. */
+	const int headset_hud = s.headset_hud && !s.suppress_hud;
+	const int hud = !headset_hud && view == s.rig.primary && !s.suppress_hud && !s.compose_before_tonemap;
+	if (headset_hud && !s.headset_hud_drawn && !fl_render_headset_hud(cmd)) {
+		return 0;
+	}
+	if (hud && !fl_render_rig_hud(cmd, rect, target_w, target_h)) {
+		return 0;
+	}
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = target,
+		.clear_color = first,
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, own_target ? 1.0f : 0.0f },
+		.command_buffer = cmd,
+		.debug_label = "OpenXWA flight view tonemap + bloom",
+	});
+	if (!pass) {
+		return 0;
+	}
+	if (s.compose_before_tonemap) {
+		AeronScenePresentChain_SetDebug(
+			chain, &(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
+	} else {
+		fl_set_present_debug(chain);
+	}
+	fl_draw_present_scene(pass, chain, &rect, own_target ? fl_view_fullscreen_mesh() : NULL);
+	if (hud) {
+		const AeronRectI full_target = { 0, 0, target_w, target_h };
+		Aeron_SetViewport(pass, &full_target);
+		Aeron_SetScissor(pass, &full_target);
+		AeronDrawList_RenderIntoPass(s.hud_composite, cmd, pass, target);
+	}
+	if (s.surround_markers && !own_target && !s.suppress_hud && !s.compose_before_tonemap) {
+		/* The markers, in this screen's part of the target. */
+		float view_rows[12];
+		XwaHudPlanes_ViewRows(s.views[view].view_proj, view_rows);
+		Aeron_SetViewport(pass, &rect);
+		Aeron_SetScissor(pass, &rect);
+		XwaRemasterHud_RenderMarkerPlanes(cmd, pass, target, view_rows);
+	}
+	if (headset_hud && !fl_draw_headset_hud(cmd, pass, target, view, &rect)) {
+		Aeron_EndRenderPass(pass);
+		return 0;
+	}
+	Aeron_EndRenderPass(pass);
+	if (!own_target) {
+		s.rig_composed = 1;
+	}
+	return 1;
+}
+
+
+/* The headset mirror: tone maps the view that was rendered last into the
+ * middle of the window. Aeron calls it while it draws the window, so the
+ * scene's image and its bloom are still the last view's. */
+static void fl_mirror_callback(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							   int target_w, int target_h, void* userdata) {
+	(void)cmd;
+	(void)target;
+	(void)userdata;
+	if (!s.view_targets_rendered || !s.present_direct || !s.present_scene_tex || !s.present_sampler) {
+		return;
+	}
+	const AeronRectI rect = fl_fit_view_rect(s.rt_w, s.rt_h, target_w, target_h);
+	fl_set_present_debug(s.present_direct);
+	fl_draw_present_scene(pass, s.present_direct, &rect, NULL);
+}
+
+int XwaRemasterFlight_SubmitViewMirror(void) {
+	if (!s.view_targets_rendered || !fl_ensure_direct_present()) {
+		return 0;
+	}
+	return Aeron_XrSubmitMirror(&(AeronSwapchainRenderLayerDesc) {
+		.callback = fl_mirror_callback,
+		.debug_label = "OpenXWA headset mirror",
+	});
+}
+
 AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int direct_present) {
 	s.direct_ready = 0;
+	if (s.rig_active) {
+		/* The views were tone mapped as they were rendered. */
+		return s.rig_composed && s.present_rt ? Aeron_RenderTargetGetTexture(s.present_rt) : NULL;
+	}
 	if (!s.present_scene_tex || !s.present_sampler) {
 		return NULL;
 	}
@@ -5911,8 +6971,11 @@ AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int
 
 AeronRenderTarget* XwaRemasterFlight_ComposedTarget(void) { return s.present_rt; }
 
+void XwaRemasterFlight_SetComposeBeforeTonemap(int enabled) { s.compose_before_tonemap = enabled != 0; }
+
 int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd) {
-	if (!cmd || !s.present || !s.present_rt || !s.present_scene_tex || !s.present_sampler) {
+	/* With a rig, the scene's image is the last view's only. */
+	if (!cmd || s.rig_active || !s.present || !s.present_rt || !s.present_scene_tex || !s.present_sampler) {
 		return 0;
 	}
 	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
@@ -5927,7 +6990,8 @@ int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd) {
 	}
 	AeronScenePresentChain_SetDebug(s.present,
 									&(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
-	fl_draw_present_scene(pass, s.present, s.rt_w, s.rt_h);
+	const AeronRectI full_target = { 0, 0, s.rt_w, s.rt_h };
+	fl_draw_present_scene(pass, s.present, &full_target, NULL);
 	Aeron_EndRenderPass(pass);
 	return 1;
 }
@@ -5962,6 +7026,8 @@ void XwaRemasterFlight_InvalidateHistory(void) {
 	s.mb_velocity_span_us = 0;
 	s.mb_enabled = 0;
 	s.mb_prev_snap = NULL;
+	s.rig_previous_valid = 0;
+	s.rendered_tick_valid = 0;
 	fl_request_fsr_reset(FL_FSR_RESET_RENDER_RESUMED);
 }
 
@@ -5972,35 +7038,78 @@ static int fl_bloom_extra(AeronRenderPass* pass, int target_w, int target_h, voi
 	return AeronScene_DrawEmissionBloom(s.scene, pass, target_w, target_h);
 }
 
-/* Both ordinary flight and the dedicated hyperspace scene arrive here with
- * AeronScene_Render complete. Bloom remains in the scene command buffer; the
- * final draws are either deferred to Aeron_Present or recorded into present_rt. */
-static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
+/* Sets the image to present from the scene's last rendered view, or from the
+ * image that replaces it, and makes its bloom. Bloom remains in the scene
+ * command buffer. */
+static int fl_prepare_present_image(AeronCommandBuffer* cmd, const AeronSceneFullscreenMesh* mesh) {
 	/* Add the projectiles' bloom only when the scene's own image is shown,
 	 * not when another image, such as the hyperspace warp, replaces it. */
 	const int own_scene = s.present_scene_override == NULL;
-	s.present_scene_tex = s.present_scene_override ? s.present_scene_override
-												   : Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
+	s.present_scene_tex = s.present_scene_override
+							  ? s.present_scene_override
+							  : Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
 	s.present_scene_override = NULL;
 	s.present_bloom_tex = NULL;
 	if (!s.present_scene_tex) {
 		s.direct_ready = 0;
-		return NULL;
+		return 0;
 	}
 	if (!s.map_present && s.bloom && AeronSceneBloom_Intensity() > 0.0f) {
-		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h,
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h, mesh,
 								   own_scene ? fl_bloom_extra : NULL, NULL)) {
 			Aeron_CommandBufferSetFailure(cmd, "Flight bloom recording failed");
-			return NULL;
+			return 0;
 		}
 		AeronRenderTarget* bloom_rt = AeronSceneBloom_ColorRt(s.bloom);
 		s.present_bloom_tex = bloom_rt ? Aeron_RenderTargetGetTexture(bloom_rt) : NULL;
 		if (!s.present_bloom_tex) {
 			Aeron_CommandBufferSetFailure(cmd, "Flight bloom produced no output");
-			return NULL;
+			return 0;
 		}
 	}
+	return 1;
+}
+
+/* Both ordinary flight and the dedicated hyperspace scene arrive here with
+ * AeronScene_Render complete: one rendered view. The final draws are either
+ * deferred to Aeron_Present or recorded into present_rt. With a rig, the
+ * view is shown in the primary view's rectangle. */
+static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
+	if (!fl_prepare_present_image(cmd, NULL)) {
+		return NULL;
+	}
+	if (s.rig_active) {
+		return fl_compose_rig_view(cmd, s.rig.primary, 1, 0) ? Aeron_RenderTargetGetTexture(s.present_rt)
+															 : NULL;
+	}
 	return XwaRemasterFlight_ResolvePresentation(cmd, direct_present);
+}
+
+/* Renders the frame's views one after the other, and tone maps each into
+ * its rectangle of present_rt, or into its own target for a headset. The
+ * scene's targets hold one view at a time, so a view is presented before
+ * the next one is rendered. */
+static AeronTexture* fl_render_rig_views(AeronCommandBuffer* cmd) {
+	/* A capture reads present_rt, so its frame is composed there. */
+	const int own_targets = s.view_targets_set && !s.compose_before_tonemap;
+	int ok = AeronScene_PrepareFrame(s.scene, cmd);
+	for (int k = 0; ok && k < s.view_count; k++) {
+		/* The primary view first: it meters the exposure the others use. */
+		const int view = k == 0 ? s.primary_view : (k <= s.primary_view ? k - 1 : k);
+		ok = AeronScene_RenderView(s.scene, cmd, view) &&
+			 (!s.hyperspace_in_world || fl_render_world_hyperspace(cmd, view)) &&
+			 fl_prepare_present_image(cmd, fl_view_fullscreen_mesh()) &&
+			 fl_compose_rig_view(cmd, view, k == 0, own_targets);
+	}
+	ok = ok && AeronScene_EndFrame(s.scene, cmd);
+	if (!ok) {
+		return NULL;
+	}
+	/* The next frame's motion vectors start from these views. */
+	s.rig_previous = s.rig;
+	s.rig_previous_valid = 1;
+	s.view_targets_rendered = own_targets;
+	return Aeron_RenderTargetGetTexture(s.present_rt);
 }
 
 static void fl_set_temporal(uint64_t host_time_us, int scene_supported) {
@@ -6074,6 +7183,10 @@ fl_hyperspace_camera_for(const XwaRemasterHyperspaceMoment* moment) {
 /* Returns 1 when the Camera Shake option (camera_shake) is on. */
 static int fl_hyperspace_camera_allowed(void) {
 	XwaModernCameraShakeOptions options;
+	/* A headset's views follow the head only. */
+	if (s.view_targets_set) {
+		return 0;
+	}
 	XwaModernCameraShakeOptions_Get(&options);
 	return options.enabled != 0;
 }
@@ -6381,26 +7494,38 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 	float anchor_bw[9], player_bw[9], player_local[3];
 	int anchor_found, player_found;
 	const XwaFlightObject* player_f;
-	fl_hyper_find_poses(snap, &snap->flight_camera, anchor_bw, &anchor_found, &player_f, player_bw, player_local,
-						&player_found);
+	fl_hyper_find_poses(snap, &snap->flight_camera, anchor_bw, &anchor_found, &player_f, player_bw,
+						player_local, &player_found);
 	XwaRemasterHyperspaceTunnelView tunnel_view;
-	fl_hyper_build_tunnel_view(&flight_view->camera, player_bw, player_found, &tunnel_view);
+	fl_hyper_build_views(player_bw, player_found, &tunnel_view);
 	/* The keep distance reaches past the far side of the player's craft and,
 	 * in cockpit views, of the cockpit model, so they stay in place. */
 	float keep_distance = FL_HYPERSPACE_KEEP_DISTANCE_M * AERON_OPT_UNITS_PER_METER;
 	if (player_found && player_f) {
-		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(player_f->object_type));
+		const AeronSceneMesh* mesh =
+			XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(player_f->object_type));
 		keep_distance = fmaxf(keep_distance, fl_max_camera_distance_to_model(mesh, player_local));
 	}
 	if (fl_cockpit_drawn(snap, &snap->flight_camera) && cockpit_anchor) {
 		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(snap->cockpit.model_name);
 		float m[16];
-		if (mesh && fl_cockpit_model_matrix(&snap->cockpit, snap->flight_camera.sway, cockpit_anchor, s.crows,
-											s.camera_local, m)) {
+		if (mesh && fl_cockpit_model_matrix(&snap->cockpit, snap->flight_camera.sway, cockpit_anchor,
+											s.seat_crows, s.seat_view.camera.pos, m)) {
 			const float origin[3] = { m[3], m[7], m[11] };
 			keep_distance = fmaxf(keep_distance, fl_max_camera_distance_to_model(mesh, origin));
 		}
 	}
+	/* The distances are measured from the centre view. Another view can be
+	 * farther from the far side of a model, by at most its distance from the
+	 * centre view. */
+	float eye_offset = 0.0f;
+	for (int i = 0; i < s.view_count; i++) {
+		const float* eye = s.views[i].camera.pos;
+		const float d[3] = { eye[0] - s.camera_local[0], eye[1] - s.camera_local[1],
+							 eye[2] - s.camera_local[2] };
+		eye_offset = fmaxf(eye_offset, sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]));
+	}
+	keep_distance += eye_offset;
 	int render_w = 0, render_h = 0;
 	AeronScene_RenderDims(s.scene, &render_w, &render_h);
 	if (render_w <= 0 || render_h <= 0) {
@@ -6408,8 +7533,8 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 		render_h = s.rt_h;
 	}
 	fl_hyperspace_apply_look(&s.hyperspace_world_moment);
-	if (!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, &s.hyperspace_world_moment,
-									   &tunnel_view, 1)) {
+	if (!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h,
+									   &s.hyperspace_world_moment, &tunnel_view, 1)) {
 		return 0;
 	}
 	s.hyperspace_near_z = flight_view->camera.near_z > 0.0f ? flight_view->camera.near_z : 0.001f;
@@ -6421,24 +7546,31 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 }
 
 /* The matrix from the hyperspace view space (x right, y down, z forward) to
- * a cube: the camera's view-to-world, then `world_to_cube`. */
-static void fl_view_to_cube(const float world_to_cube[9], float out[9]) {
+ * a cube. `crows` are the view's world-to-eye rows: the matrix goes from the
+ * view to the world, then applies `world_to_cube`. */
+static void fl_view_to_cube(const float world_to_cube[9], const float crows[9], float out[9]) {
 	for (int r = 0; r < 3; r++) {
 		for (int c = 0; c < 3; c++) {
-			out[r * 3 + c] = world_to_cube[r * 3 + 0] * s.crows[c * 3 + 0] +
-							 world_to_cube[r * 3 + 1] * s.crows[c * 3 + 1] +
-							 world_to_cube[r * 3 + 2] * s.crows[c * 3 + 2];
+			out[r * 3 + c] = world_to_cube[r * 3 + 0] * crows[c * 3 + 0] +
+							 world_to_cube[r * 3 + 1] * crows[c * 3 + 1] +
+							 world_to_cube[r * 3 + 2] * crows[c * 3 + 2];
 		}
 	}
 }
 
-/* Draws the jump's entry or exit over the finished scene (the scene warp),
- * and has the result presented instead of the scene. */
-static int fl_render_world_hyperspace(AeronCommandBuffer* cmd) {
+/* Draws the jump's entry or exit (the scene warp) over the scene's image of
+ * `view`, which must be the view the scene rendered last. The result is
+ * presented instead of the scene's image. */
+static int fl_render_world_hyperspace(AeronCommandBuffer* cmd, int view) {
 	int render_w = 0, render_h = 0, output_w = 0, output_h = 0;
 	AeronScene_RenderDims(s.scene, &render_w, &render_h);
 	AeronScene_RtDims(s.scene, &output_w, &output_h);
+	if (s.view_count > 1) {
+		XwaRemasterHyperspace_SetView(s.hyperspace, &s.hyperspace_views[view]);
+	}
 	XwaRemasterHyperspaceWarpInput input = s.hyperspace_sky;
+	fl_view_to_cube(s.hyperspace_sky_world_to_cube, s.view_crows[view], input.sky_view_to_cube);
+	fl_view_to_cube(s.hyperspace_overlay_world_to_cube, s.view_crows[view], input.overlay_view_to_cube);
 	input.scene = Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
 	input.depth = Aeron_DepthTargetGetTexture(AeronScene_DepthRt(s.scene));
 	input.output_w = output_w;
@@ -6533,16 +7665,20 @@ static int fl_preview_hyperspace_moment(const XwaSnapshot* snap, uint64_t host_t
 }
 
 static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
-										  XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
-										  uint64_t host_time_us, int direct_present,
-										  const XwaRemasterHyperspaceMoment* moment) {
+										  XwaRemasterAssets* assets, uint64_t host_time_us,
+										  int direct_present, const XwaRemasterHyperspaceMoment* moment) {
 	float anchor_bw[9], player_bw[9], player_local[3];
 	int anchor_found, player_found;
 	const XwaFlightObject* player_f;
 	fl_hyper_find_poses(snap, &snap->flight_camera, anchor_bw, &anchor_found, &player_f, player_bw,
 						player_local, &player_found);
 	XwaRemasterHyperspaceTunnelView tunnel_view;
-	fl_hyper_build_tunnel_view(&flight_view->camera, player_bw, player_found, &tunnel_view);
+	fl_hyper_build_views(player_bw, player_found, &tunnel_view);
+	const int several_views = s.view_count > 1;
+	/* The tunnel has no motion vectors, so the views get no previous
+	 * cameras. */
+	s.mb_enabled = 0;
+	s.mb_prev_snap = NULL;
 
 	int render_w = 0, render_h = 0;
 	AeronScene_RenderDims(s.scene, &render_w, &render_h);
@@ -6553,8 +7689,8 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	if (s.hyperspace) {
 		fl_hyperspace_apply_look(moment);
 	}
-	if (!s.hyperspace || !XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, moment,
-														&tunnel_view, 0)) {
+	if (!s.hyperspace || !XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h,
+														moment, &tunnel_view, 0)) {
 		return NULL;
 	}
 	s.exposure_hold = XwaRemasterHyperspace_HoldsExposure(s.hyperspace);
@@ -6566,7 +7702,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	s.table_pool.used = 0;
 	s.anim_pool.used = 0;
 	fl_prepare_energy_states(snap);
-	fl_begin_point_lights(flight_view);
+	fl_begin_point_lights();
 	s.snap = snap;
 
 	/* The tunnel is drawn by a game hook without motion vectors. Disable
@@ -6574,7 +7710,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * before returning to ordinary flight. */
 	fl_set_temporal(host_time_us, 0);
 	fl_set_animation_time(snap);
-	if (!fl_begin_scene(&flight_view->camera)) {
+	if (!fl_begin_scene(&s.center_view.camera) || !fl_set_scene_views(several_views)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace scene initialization failed");
 		s.snap = NULL;
 		return NULL;
@@ -6635,21 +7771,21 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	}
 	const XwaShipEnvironmentMap* environment_map =
 		lighting_ready && hyperspace_lighting.environment.texture ? &hyperspace_lighting.environment : NULL;
-	XwaRemasterShip_SetPbrEnv(s.scene, directional_lights, directional_light_count, -1, NULL, s.camera_local,
+	XwaRemasterShip_SetPbrEnv(s.scene, directional_lights, directional_light_count, -1, NULL,
 							  ao_on ? &ao : NULL, &ambient, environment_map, -1.0f);
 	fl_submit_hyperspace_cockpit(cmd, assets, snap, &snap->flight_camera, anchor_bw, anchor_found, player_f);
 	fl_submit_point_lights();
 
-	if (!AeronScene_Render(s.scene, cmd)) {
-		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
-		s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
-		s.snap = NULL;
-		return NULL;
-	}
+	AeronTexture* rig_frame = NULL;
+	const int rendered =
+		several_views ? (rig_frame = fl_render_rig_views(cmd)) != NULL : AeronScene_Render(s.scene, cmd);
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
 	s.snap = NULL;
-	return fl_present(cmd, direct_present);
+	if (!rendered) {
+		return NULL;
+	}
+	return several_views ? rig_frame : fl_present(cmd, direct_present);
 }
 
 /* Whether the region's environment draws a sky with `backdrops: keep`. */
@@ -6791,28 +7927,34 @@ static void fl_note_hyperspace_sky(const AeronPreparedEnvironment* sky_environme
 								   const FlSceneLighting* lighting) {
 	XwaRemasterHyperspaceWarpInput* sky = &s.hyperspace_sky;
 	memset(sky, 0, sizeof *sky);
-	const AeronScenePbrEnvironment* captured =
-		lighting->captured && lighting->captured_environment.specular ? &lighting->captured_environment : NULL;
+	memset(s.hyperspace_sky_world_to_cube, 0, sizeof s.hyperspace_sky_world_to_cube);
+	memset(s.hyperspace_overlay_world_to_cube, 0, sizeof s.hyperspace_overlay_world_to_cube);
+	const AeronScenePbrEnvironment* captured = lighting->captured && lighting->captured_environment.specular
+												   ? &lighting->captured_environment
+												   : NULL;
 	AeronPreparedEnvironment scaled;
 	const AeronPreparedEnvironment* environment =
 		sky_environment ? XwaRemasterEnvironment_ScaleIntensity(sky_environment, &scaled) : NULL;
 	if (captured && (keep_backdrops || !environment)) {
 		sky->sky_cube = captured->specular;
 		sky->sky_sampler = captured->sampler;
-		fl_view_to_cube(captured->world_to_local, sky->sky_view_to_cube);
+		memcpy(s.hyperspace_sky_world_to_cube, captured->world_to_local,
+			   sizeof s.hyperspace_sky_world_to_cube);
 		sky->sky_scale = 1.0f;
 		sky->sky_max_level = 0;
 	} else if (environment) {
 		sky->sky_cube = environment->radiance;
 		sky->sky_sampler = environment->sampler;
-		fl_view_to_cube(environment->world_to_cube, sky->sky_view_to_cube);
+		memcpy(s.hyperspace_sky_world_to_cube, environment->world_to_cube,
+			   sizeof s.hyperspace_sky_world_to_cube);
 		sky->sky_scale = environment->settings.intensity;
 		sky->sky_max_level = Aeron_TextureGetMipCount(environment->radiance) - 1;
 	}
 	if (sky->sky_cube && environment && environment->overlay) {
 		sky->overlay_cube = environment->overlay;
 		sky->overlay_sampler = environment->sampler;
-		fl_view_to_cube(environment->overlay_world_to_cube, sky->overlay_view_to_cube);
+		memcpy(s.hyperspace_overlay_world_to_cube, environment->overlay_world_to_cube,
+			   sizeof s.hyperspace_overlay_world_to_cube);
 		sky->overlay_scale = environment->settings.intensity;
 		sky->overlay_max_level = Aeron_TextureGetMipCount(environment->overlay) - 1;
 	}
@@ -7118,10 +8260,9 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 	fl_set_temporal(host_time_us, 0);
 
-	XwaRemasterEffectView effect_view;
-	XwaRemasterEffectView_Main(&effect_view, view, s.crows);
-	XwaRemasterParticles_Prepare(s.particles, cmd, snap, NULL, assets, &effect_view, NULL);
-	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
+	const XwaRemasterEffectView* effect_view = &s.build[0].effect_view;
+	XwaRemasterParticles_Prepare(s.particles[0], cmd, snap, NULL, assets, effect_view, NULL);
+	XwaRemasterTrails_Prepare(s.trails[0], cmd, snap, assets, effect_view);
 
 	fl_set_animation_time(snap);
 	if (!fl_begin_scene(&view->camera)) {
@@ -7137,14 +8278,14 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	/* The map's overlays use the classic palette colours. The present pass
 	 * multiplies the scene by the map's fixed exposure, so they are drawn
 	 * at 1 / exposure to keep those colours. */
-	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.crows,
+	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.rt_w, s.rt_h, s.crows,
 									  1.0f / XwaRemasterFlight_Exposure(), fl_map_submit_object,
 									  &submit_context)) {
 		s.snap = NULL;
 		return NULL;
 	}
-	XwaRemasterParticles_SubmitRegion(s.particles, s.scene, snap, snap->flight_camera.region);
-	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, snap->flight_camera.region);
+	XwaRemasterParticles_SubmitRegion(s.particles[0], s.scene, snap, snap->flight_camera.region);
+	XwaRemasterTrails_SubmitRegion(s.trails[0], s.scene, snap->flight_camera.region);
 	fl_submit_billboards();
 	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
 	const uint32_t light_count =
@@ -7158,8 +8299,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 			faces[f][c] = fmaxf(faces[f][c], s.map_ambient_min[c]);
 		}
 	}
-	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, s.camera_local, NULL, &ambient, NULL,
-							  -1.0f);
+	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, NULL, &ambient, NULL, -1.0f);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
 		return NULL;
@@ -7284,6 +8424,164 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
 	return count;
 }
 
+/* Returns the view that the 2D HUD is laid out for: where its boxes, its
+ * arrows and its reticle point at the world. It is the view the HUD is drawn
+ * over: the primary view. */
+static const XwaRemasterFlightView* fl_build_hud_view(void) { return &s.views[s.primary_view]; }
+
+/* Builds the view that a headset's HUD is laid out for, and the planes that its
+ * markers are drawn on (hud_planes.h).
+ *
+ * The view is fixed to the seat and doesn't turn with the head. `seat` is the
+ * game camera's view. The view has the HUD's size, and its height covers the
+ * game camera's vertical field of view, like a window. So the HUD's parts have
+ * the same angular size as on a screen. The wider view that a narrow window
+ * gets (presentation.cockpit_fov_min_aspect) isn't used, because the HUD's
+ * image isn't a window. The view is centred on the seat's axis, so it doesn't
+ * include the game's shift of the horizon. */
+static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCamera* cam,
+															  const XwaRemasterFlightView* seat,
+															  const float* view_rotation,
+															  const AeronViewRig* rig) {
+	XwaRemasterFlightView classic;
+	if (!fl_build_view_at_origin(cam, cam->world_pos, s.vr_hud_width_px, s.vr_hud_height_px, view_rotation,
+								 &classic) ||
+		!(classic.projection_pixel_scale > 0.0f)) {
+		return NULL;
+	}
+	const float widen = classic.classic_pixel_scale / classic.projection_pixel_scale;
+	const float tan_v = tanf(classic.camera.v_half_rad) / widen;
+	const float tan_h = tan_v * (float)s.vr_hud_width_px / (float)s.vr_hud_height_px;
+	const float h = atanf(tan_h);
+	const float v = atanf(tan_v);
+	const AeronViewFov fov = { -h, h, v, -v };
+	const AeronViewPose pose = { .orientation = { 0.0f, 0.0f, 0.0f, 1.0f } };
+	fl_build_rig_view(cam, seat, &pose, &fov, s.vr_hud_width_px, s.vr_hud_height_px, &s.hud_view);
+	/* The HUD's own projection isn't the game's: the reticle is placed
+	 * from the craft's nose, as in a view that turns with the head. */
+	s.hud_view.head_tracked = 1;
+
+	XwaRemasterHudPlanes* planes = &s.hud_planes;
+	memset(planes, 0, sizeof *planes);
+	planes->focal_px = 0.5f * (float)s.vr_hud_height_px / tan_v;
+	planes->center_x = 0.5f * (float)s.vr_hud_width_px;
+	planes->center_y = 0.5f * (float)s.vr_hud_height_px;
+	planes->reticle_scale = s.vr_hud_reticle_scale;
+	const AeronViewFov eye_fov = rig->views[0].fov;
+	const float eye_span = tanf(eye_fov.angle_up) - tanf(eye_fov.angle_down);
+	planes->eye_pixel_scale = eye_span > 0.0f ? (float)rig->height / eye_span / planes->focal_px : 1.0f;
+	/* The seat's plane: it maps a pixel of the seat's view to a direction. The
+	 * rows are the view's right, down and forward axes. */
+	float rows[9];
+	fl_quat_to_mat3(s.hud_view.camera.ori, rows);
+	for (int axis = 0; axis < 3; axis++) {
+		planes->seat_plane[axis * 3 + 0] = rows[axis] / planes->focal_px;
+		planes->seat_plane[axis * 3 + 1] = rows[3 + axis] / planes->focal_px;
+		planes->seat_plane[axis * 3 + 2] =
+			rows[6 + axis] -
+			(planes->center_x * rows[axis] + planes->center_y * rows[3 + axis]) / planes->focal_px;
+	}
+	/* The head is the rig's centre. Its view covers both eyes, with the same
+	 * pixels per angle as the HUD image. */
+	const AeronViewFov head_fov = fl_headset_world_fov(rig);
+	const int head_w =
+		(int)ceilf(planes->focal_px * (tanf(head_fov.angle_right) - tanf(head_fov.angle_left)));
+	const int head_h = (int)ceilf(planes->focal_px * (tanf(head_fov.angle_up) - tanf(head_fov.angle_down)));
+	fl_build_rig_view(cam, seat, &rig->center, &head_fov, head_w, head_h, &s.hud_head_view);
+	s.hud_head_view.head_tracked = 1;
+	s.hud_head_view.arrow_rect = fl_headset_shared_rect(rig, &s.hud_head_view);
+	s.hud_head_view.arrow_position = s.vr_hud_arrow_position;
+	s.hud_head_view.arrow_view = s.vr_hud_arrow_view;
+	memcpy(planes->head_pos, s.hud_head_view.camera.pos, sizeof planes->head_pos);
+	fl_quat_to_mat3(s.hud_head_view.camera.ori, planes->head_rows);
+	planes->head_view = &s.hud_head_view;
+	const float axis[3] = { 0.0f, 0.0f, 1.0f };
+	if (!XwaRemasterFlight_ProjectView(&s.hud_head_view, axis, &planes->head_axis_x, &planes->head_axis_y)) {
+		return NULL;
+	}
+	s.hud_view.hud_planes = planes;
+	return &s.hud_view;
+}
+
+/* Builds the planes that the HUD's markers are drawn on for the surround
+ * screens of `rig` (hud_planes.h), and gives them to the primary view, which
+ * the HUD is laid out for. The planes' image is that view's, so a marker on
+ * the centre screen covers the pixels it has in a flat HUD. */
+static const XwaRemasterFlightView* fl_build_surround_hud_view(const AeronViewRig* rig) {
+	if (rig->count > XWA_HUD_PLANES_MAX_SCREENS || rig->width <= 0 || rig->height <= 0) {
+		return NULL;
+	}
+	XwaRemasterHudPlanes* planes = &s.hud_planes;
+	memset(planes, 0, sizeof *planes);
+	for (int i = 0; i < rig->count; i++) {
+		const AeronViewFov* fov = &rig->views[i].fov;
+		XwaRemasterHudScreen* screen = &planes->screens[i];
+		fl_quat_to_mat3(s.views[i].camera.ori, screen->rows);
+		/* The rows are right, down and forward, so up is negative. */
+		screen->tan_left = tanf(fov->angle_left);
+		screen->tan_right = tanf(fov->angle_right);
+		screen->tan_top = -tanf(fov->angle_up);
+		screen->tan_bottom = -tanf(fov->angle_down);
+		const float span_x = screen->tan_right - screen->tan_left;
+		const float span_y = screen->tan_bottom - screen->tan_top;
+		if (!(span_x > 0.0f) || !(span_y > 0.0f)) {
+			return NULL;
+		}
+		screen->focal_x_px = (float)rig->width / span_x;
+		screen->focal_y_px = (float)rig->height / span_y;
+	}
+	planes->screen_count = rig->count;
+	XwaRemasterFlightView* view = &s.views[s.primary_view];
+	const XwaRemasterHudScreen* center = &planes->screens[s.primary_view];
+	planes->focal_px = center->focal_y_px;
+	planes->center_x = -center->tan_left * center->focal_x_px;
+	planes->center_y = -center->tan_top * center->focal_y_px;
+	planes->reticle_scale = 1.0f;
+	planes->eye_pixel_scale = 1.0f;
+	/* The centre screen's plane, at infinity: a pixel of the primary view to
+	 * its direction. */
+	for (int axis = 0; axis < 3; axis++) {
+		planes->seat_plane[axis * 3 + 0] = center->rows[axis] / center->focal_x_px;
+		planes->seat_plane[axis * 3 + 1] = center->rows[3 + axis] / center->focal_y_px;
+		planes->seat_plane[axis * 3 + 2] = center->rows[6 + axis] -
+										   planes->center_x * planes->seat_plane[axis * 3 + 0] -
+										   planes->center_y * planes->seat_plane[axis * 3 + 1];
+	}
+	memcpy(planes->head_pos, view->camera.pos, sizeof planes->head_pos);
+	memcpy(planes->head_rows, center->rows, sizeof planes->head_rows);
+	planes->head_view = view;
+	planes->head_axis_x = planes->center_x;
+	planes->head_axis_y = planes->center_y;
+	view->hud_planes = planes;
+	return view;
+}
+
+/* Gives the scene the frame's views, right after the scene began. Without
+ * `several`, the scene keeps its one view: the camera it began with. */
+static int fl_set_scene_views(int several) {
+	if (!several) {
+		return 1;
+	}
+	AeronSceneViewDesc descs[AERON_MAX_VIEWS];
+	memset(descs, 0, sizeof descs);
+	for (int i = 0; i < s.view_count; i++) {
+		descs[i].camera = s.views[i].camera;
+		if (s.mb_enabled) {
+			descs[i].prev_view_proj = s.previous_views[i].view_proj;
+			descs[i].prev_ori = s.previous_views[i].camera.ori;
+		}
+		if (s.view_areas_set && s.view_targets_set) {
+			descs[i].hidden_area_xy = s.view_hidden_areas[i].xy;
+			descs[i].hidden_area_vertex_count = s.view_hidden_areas[i].vertex_count;
+			descs[i].hidden_area_generation = s.view_hidden_areas[i].generation;
+			descs[i].visible_area_xy = s.view_visible_areas[i].xy;
+			descs[i].visible_area_vertex_count = s.view_visible_areas[i].vertex_count;
+			descs[i].visible_area_generation = s.view_visible_areas[i].generation;
+		}
+	}
+	return AeronScene_SetViews(s.scene, descs, s.view_count, s.primary_view);
+}
+
 AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
 									   XwaRemasterAssets* assets, int target_w, int target_h,
 									   int direct_present) {
@@ -7344,23 +8642,66 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		}
 	}
 
+	/* The game camera's view. With a rig it is the rig's origin: the seat.
+	 * The map is the flat view. */
 	XwaRemasterFlightView flight_view;
-	if (!fl_build_view_at_origin(cam, cam->world_pos, s.rt_w, s.rt_h, view_rotated ? view_rotation : NULL,
+	const int view_w = cam->map_mode ? s.flat_w : s.rt_w;
+	const int view_h = cam->map_mode ? s.flat_h : s.rt_h;
+	s.flat_cropped = view_w != s.rt_w || view_h != s.rt_h;
+	if (!fl_build_view_at_origin(cam, cam->world_pos, view_w, view_h, view_rotated ? view_rotation : NULL,
 								 &flight_view)) {
 		return NULL;
 	}
 	memcpy(s.origin_world, flight_view.origin_world, sizeof s.origin_world);
-	memcpy(s.camera_local, flight_view.camera.pos, sizeof s.camera_local);
+	/* The map is drawn as one view, with the game camera. */
+	const int tunnel = hyperspace && hyperspace_moment.phase == XWA_HYPERSPACE_TUNNEL;
+	const AeronViewRig* rig = s.rig_active && !cam->map_mode ? &s.rig : NULL;
+	fl_set_frame_views(cam, &flight_view, rig);
+	s.rig_composed = 0;
+	s.view_targets_rendered = 0;
+	/* A tracked rig renders a snapshot again when the head moved before the
+	 * next game tick. Nothing moved in the world then. */
+	const int snapshot_repeated =
+		rig && rig->tracked && s.rendered_tick_valid && s.rendered_tick == snap->tick_index;
+	s.rendered_tick = snap->tick_index;
+	s.rendered_tick_valid = 1;
+	/* The headset HUD is laid out for the seat's own view (hud.h). Its markers
+	 * go on planes and the rest on a panel. The map uses the usual flat HUD, at
+	 * the view's size. */
+	const XwaRemasterFlightView* hud_view = NULL;
+	s.headset_hud = rig && rig->tracked && s.hud_panel_rt && !s.compose_before_tonemap;
+	s.headset_hud_drawn = 0;
+	if (s.headset_hud) {
+		hud_view = fl_build_headset_hud_view(cam, &flight_view, view_rotated ? view_rotation : NULL, rig);
+		s.headset_hud = hud_view != NULL;
+	}
+	/* On surround screens the HUD is laid out for the primary view. Its
+	 * markers go on planes in every screen, and the rest is flat. */
+	s.surround_markers = 0;
+	if (!hud_view && rig && !rig->tracked && rig->count > 1 && !s.compose_before_tonemap) {
+		hud_view = fl_build_surround_hud_view(rig);
+		s.surround_markers = hud_view != NULL;
+	}
+	if (!hud_view) {
+		hud_view = fl_build_hud_view();
+	}
+	const int hud_w = s.headset_hud ? s.vr_hud_width_px : view_w;
+	const int hud_h = s.headset_hud ? s.vr_hud_height_px : view_h;
+	XwaRemasterHud_SetSeparateMarkers(s.headset_hud || s.surround_markers, s.surround_markers);
 	/* Dynamic Cockpit: decided before the HUD prepares its lists (which
 	 * route through it), captured after. */
 	XwaRemasterDc_BeginFrame(snap,
 							 !cam->map_mode && fl_cockpit_drawn(snap, cam)
 								 ? XwaRemasterShip_MeshForName(snap->cockpit.model_name)
 								 : NULL,
-							 s.rt_w, s.rt_h);
-	XwaRemasterHud_PrepareFrame(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
-	XwaRemasterDc_Prepare(cmd, snap, s.rt_w, s.rt_h);
-	fl_quat_to_mat3(flight_view.camera.ori, s.crows);
+							 hud_w, hud_h);
+	XwaRemasterHud_PrepareFrame(cmd, snap, assets, hud_view, hud_w, hud_h);
+	/* The dots and labels of the cockpit buttons are drawn with the HUD's
+	 * markers, on planes in each eye's image. */
+	XwaRemasterCockpitButtons_PrepareMarkers(cmd, assets,
+											 s.headset_hud && hud_view ? hud_view->hud_planes : NULL,
+											 s.seat_crows, s.seat_view.camera.pos, hud_w, hud_h);
+	XwaRemasterDc_Prepare(cmd, snap, hud_w, hud_h);
 	if (cam->map_mode) {
 		s.suppress_hud = 0;
 		return fl_render_map(cmd, snap, assets, &flight_view, host_time_us, direct_present);
@@ -7375,10 +8716,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* The tunnel has its own scene. The entry and the exit are drawn over the
 	 * normal flight scene, so it stays on screen until the white-out covers
 	 * it and comes back as the white fades. */
-	if (hyperspace && hyperspace_moment.phase == XWA_HYPERSPACE_TUNNEL) {
+	if (tunnel) {
 		s.suppress_hud = !cam->hyperspace_phase;
-		return fl_render_hyperspace(cmd, snap, assets, &flight_view, host_time_us, direct_present,
-									&hyperspace_moment);
+		return fl_render_hyperspace(cmd, snap, assets, host_time_us, direct_present, &hyperspace_moment);
 	}
 	if (hyperspace) {
 		s.hyperspace_world_moment = hyperspace_moment;
@@ -7400,7 +8740,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * garbage smear, so prev falls back to curr (zero velocity, held
 	 * buffer invalidated via NULL prev_view_proj). */
 	XwaRemasterFlightView previous_flight_view;
-	const int mb_on = s.mb_quality > 0 || s.fsr_mode != AERON_TEMPORAL_OFF;
+	/* A headset has no motion blur: the eyes follow what they look at. */
+	const int mb_on =
+		!s.view_targets_set && (s.mb_quality > 0 || (!rig && s.fsr_mode != AERON_TEMPORAL_OFF));
 	s.mb_enabled = 0;
 	int mb_regen = 0;
 	int paused = 0;
@@ -7441,7 +8783,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	s.mb_prev_snap = s.mb_enabled ? prev : NULL;
 	float previous_crows[9];
 	const XwaFlightCamera* billboard_history_cam = NULL;
-	const float* billboard_history_crows = NULL;
 	const XwaFlightObject* previous_cockpit_anchor = NULL;
 	int cockpit_history_valid = 0;
 	if (s.mb_enabled) {
@@ -7450,7 +8791,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * faced. Object-only blur keeps both endpoints in the current
 		 * camera-facing basis so camera rotation does not leak into velocity. */
 		billboard_history_cam = s.mb_camera_blur ? &prev->flight_camera : cam;
-		billboard_history_crows = s.mb_camera_blur ? previous_crows : s.crows;
+		fl_set_frame_history(&prev->flight_camera, &previous_flight_view, rig, s.mb_camera_blur);
 		previous_cockpit_anchor = fl_cockpit_anchor(prev, &prev->flight_camera);
 		cockpit_history_valid = cockpit_anchor && previous_cockpit_anchor && fl_cockpit_drawn(snap, cam) &&
 								fl_cockpit_drawn(prev, &prev->flight_camera) &&
@@ -7497,7 +8838,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * open); point-light candidates start with the accessor-law
 	 * sources (glow lights and cockpit lights append during/after the
 	 * walk). */
-	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
+	fl_derive_billboards(snap, assets, billboard_history_cam);
 	/* An environment with a sky replaces all of these together: its sky,
 	 * suns, lights and flares replace the starfield, the recovered
 	 * backdrop sprites, the directional lights derived from backdrops and
@@ -7516,30 +8857,21 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (keep_backdrops) {
 		fl_log_kept_backdrops(snap, assets, s.environment.backdrops);
 	}
-	fl_derive_lens_flares(snap, assets, &flight_view, replacing_sky);
-	fl_begin_point_lights(&flight_view);
+	/* Each view has its own lens flares, laid out around its centre. A
+	 * headset has none: the two eyes' flares would not fuse. */
+	const int lens_flares = !rig || !rig->tracked;
+	fl_derive_lens_flares(snap, assets, lens_flares, replacing_sky);
+	fl_begin_point_lights();
 	fl_derive_point_lights(snap);
-	s.bd_count = replacing_sky ? 0
-							   : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0,
-													 keep_backdrops ? s.environment.backdrops : NULL,
-													 s.bd_quads, FL_MAX_BACKDROP_QUADS);
-	XwaRemasterEffectView effect_view;
-	XwaRemasterEffectView_Main(&effect_view, &flight_view, s.crows);
-	XwaRemasterEffectView previous_effect_view;
-	const XwaRemasterEffectView* particle_history_view = NULL;
-	if (s.mb_enabled) {
-		if (s.mb_camera_blur) {
-			XwaRemasterEffectView_Main(&previous_effect_view, &previous_flight_view, previous_crows);
-			particle_history_view = &previous_effect_view;
-		} else {
-			/* Previous particle state reconstructed in the current facing
-			 * basis leaves only particle/object motion in the velocity stamp. */
-			particle_history_view = &effect_view;
-		}
+	for (uint32_t b = 0; b < s.build_count; b++) {
+		const FlBuildView* build = &s.build[b];
+		/* With camera blur the history is the previous camera's. Without it,
+		 * it is the current camera, which leaves only the particles' own
+		 * motion in the velocity stamp. */
+		XwaRemasterParticles_Prepare(s.particles[b], cmd, snap, s.mb_prev_snap, assets, &build->effect_view,
+									 s.mb_enabled ? &build->history_effect_view : NULL);
+		XwaRemasterTrails_Prepare(s.trails[b], cmd, snap, assets, &build->effect_view);
 	}
-	XwaRemasterParticles_Prepare(s.particles, cmd, snap, s.mb_prev_snap, assets, &effect_view,
-								 particle_history_view);
-	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
 	/* Engine glows sample LightingEffects group 1000 frame 1 (classic
 	 * FeDiskIo_SelectTextureFrame(1000, 1, 256)) — frame index 0 in the
 	 * baked atlas. */
@@ -7583,11 +8915,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		fl_request_fsr_reset(motion_reset_reasons ? motion_reset_reasons
 												  : FL_FSR_RESET_MOTION_CONTEXT_UNKNOWN);
 	}
-	fl_set_temporal(host_time_us, 1);
+	fl_set_temporal(host_time_us, rig == NULL);
 	fl_set_animation_time(snap);
 	/* Before the scene begins: it sets the exposure hold. */
-	s.hyperspace_in_world = fl_prepare_world_hyperspace(cmd, snap, &flight_view, cockpit_anchor);
-	if (!fl_begin_scene(&flight_view.camera)) {
+	s.hyperspace_in_world = fl_prepare_world_hyperspace(cmd, snap, &s.center_view, cockpit_anchor);
+	if (!fl_begin_scene(&s.center_view.camera) || !fl_set_scene_views(rig != NULL)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight scene initialization failed");
 		s.snap = NULL;
 		return NULL;
@@ -7647,7 +8979,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * footprint at any render resolution. */
 		const float classic_h =
 			cam->vp_h > 0 ? (float)cam->vp_h : (cam->screen_h > 0 ? (float)cam->screen_h : 480.0f);
-		const float upscale = (s.rt_h > 0 && classic_h > 0.0f) ? (float)s.rt_h / classic_h : 1.0f;
+		/* A rig's views aren't the classic view at another size, so they take
+		 * the size of a classic pixel from their own projection. */
+		const float upscale = rig ? s.center_view.classic_pixel_scale
+								  : ((s.rt_h > 0 && classic_h > 0.0f) ? (float)s.rt_h / classic_h : 1.0f);
 		const XwaRemasterSkyStarsParams stars = {
 			.exposure = s.sky_exposure,
 			.brightness = s.star_brightness,
@@ -7668,19 +9003,31 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, fl_draw_before_opaque, NULL);
 	}
 
-
 	/* Backdrops — classic draws them first with depth compare and write
 	 * both OFF (states 0x612/0x2612); the SKY stage's far-depth GE test
 	 * against the cleared / prepass buffer reproduces that (behind all
 	 * geometry, visible elsewhere). */
 	const float backdrop_radiance = XwaRemaster_ClassicRadiance();
-	for (uint32_t i = 0; i < s.bd_count; i++) {
-		if (snap->suns.procedural_sun && s.bd_quads[i].sun >= 0) {
-			fl_submit_star_quad(&s.bd_quads[i], snap, backdrop_radiance * snap->suns.brightness);
-			continue;
+	/* The backdrops are derived for each build view in turn. The primary
+	 * view's build view comes last, so that its quads stay in bd_quads for
+	 * the sun flare. */
+	const uint32_t last_build = s.build_count > 1 ? (uint32_t)s.primary_view : 0;
+	s.bd_count = 0;
+	for (uint32_t k = 0; !replacing_sky && k < s.build_count; k++) {
+		const uint32_t b = k + 1 == s.build_count ? last_build : (k < last_build ? k : k + 1);
+		const FlBuildView* build = &s.build[b];
+		s.bd_count = fl_derive_backdrops(snap, build->crows, assets, FL_BACKDROPS_ALL, 0,
+										 keep_backdrops ? s.environment.backdrops : NULL, s.bd_quads,
+										 FL_MAX_BACKDROP_QUADS);
+		for (uint32_t i = 0; i < s.bd_count; i++) {
+			if (snap->suns.procedural_sun && s.bd_quads[i].sun >= 0) {
+				fl_submit_star_quad(build, &s.bd_quads[i], snap, backdrop_radiance * snap->suns.brightness);
+				continue;
+			}
+			fl_submit_view_quad_ex(build, AERON_SCENE_BILLBOARD_STAGE_SKY, s.bd_quads[i].corners,
+								   s.bd_quads[i].uvs, &s.bd_quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL,
+								   backdrop_radiance);
 		}
-		fl_submit_view_quad_ex(AERON_SCENE_BILLBOARD_STAGE_SKY, s.bd_quads[i].corners, s.bd_quads[i].uvs,
-							   &s.bd_quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL, backdrop_radiance);
 	}
 	/* Post stack: SSAO per the render config + motion blur (both
 	 * activate the scene's depth/normal(+velocity) prepass + forward
@@ -7690,7 +9037,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * is a whole simulation-snapshot displacement, so normalize it to
 	 * XWA's original 32 ms logical frame before applying the shutter
 	 * fraction. This preserves the calibrated step-8 appearance. */
-	const int mb_allow = !paused || s.mb_pause_keep_blur;
+	const int mb_allow = (!paused || s.mb_pause_keep_blur) && !snapshot_repeated;
 	const float mb_shutter = mb_allow ? fl_mb_logical_frame_shutter() : 0.0f;
 	AeronScene_SetPost(s.scene, &(AeronScenePostDesc) {
 									.ssao_quality = s.ssao.ssao_quality,
@@ -7708,8 +9055,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									.mb_camera_blur = s.mb_camera_blur,
 									.mb_velocity_viz = s.mb_velocity_viz,
 								});
-	AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL, s.mb_enabled ? s.mb_prev_ori : NULL,
-								mb_regen);
+	if (rig) {
+		/* The views carry their own previous cameras (fl_set_scene_views),
+		 * and their velocity is made again on every frame. */
+		AeronScene_SetMotionContext(s.scene, NULL, NULL, 1);
+	} else {
+		AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL,
+									s.mb_enabled ? s.mb_prev_ori : NULL, mb_regen);
+	}
 
 	/* The lit PBR env is submitted AFTER the instance walk (frame
 	 * uniforms are copied at submit and bound inside Render) so the
@@ -7725,7 +9078,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	s.table_pool.used = 0;
 	s.anim_pool.used = 0;
 	fl_prepare_energy_states(snap);
-	fl_place_probe_sets(cmd, snap, &flight_view);
+	fl_place_probe_sets(cmd, snap);
 
 	/* Derive every object transform from the STATE channel: cached rows
 	 * when the mobile object's cache is fresh, the Euler compose
@@ -7827,6 +9180,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		memcpy(inst.transform, model_matrix, sizeof model_matrix);
 		inst.variant = f->node_switch;
 		inst.hidden_tag_groups = XwaRemasterShip_HiddenTagGroups(prepared.mesh, f);
+		inst.dark_tag_groups = XwaRemasterShip_DarkTagGroups(prepared.mesh, f);
 		inst.probe_set_owner = fl_probe_set_owner(i);
 		XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 		if (scene_lighting.hangar_override && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx) {
@@ -7883,21 +9237,20 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * shines, for the colour it shows, instead of the stock light
 			 * (fl_derive_point_lights). */
 			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
-								inst.hidden_tag_groups, 0, 0, 1);
+								inst.hidden_tag_groups | inst.dark_tag_groups, 0, 0, 1);
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
-								inst.hidden_tag_groups, 0, inst.probe_set_owner != 0, 0);
+								inst.hidden_tag_groups | inst.dark_tag_groups, 0, inst.probe_set_owner != 0,
+								0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength,
 											  s.glow_mark_emissive_strength, 1);
 			/* State-derived engine glows for this craft (classic scale
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
-				XwaRemasterShip_SubmitEngineGlows(
-					s.scene, prepared.mesh, model_matrix, AERON_OPT_UNITS_PER_METER, inst.mesh_table,
-					f->eg_knockout_mask, f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(f), s.crows,
-					s.camera_local, &s.glow_ref);
+				fl_submit_engine_glows(prepared.mesh, model_matrix, inst.mesh_table, f->eg_knockout_mask,
+									   f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(f));
 			}
 			/* Capital engine glows double as point lights (the classic
 			 * modelIndex branch: raw dims over 2000 only). */
@@ -7945,7 +9298,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const XwaShipAmbientCube* scene_ambient = scene_lighting.ambient;
 	XwaShipAmbientCube hyperspace_ambient;
 	XwaRemasterHyperspaceLighting hyperspace_lighting;
-	if (s.hyperspace_in_world && XwaRemasterHyperspace_GetPreparedLighting(s.hyperspace, &hyperspace_lighting)) {
+	if (s.hyperspace_in_world &&
+		XwaRemasterHyperspace_GetPreparedLighting(s.hyperspace, &hyperspace_lighting)) {
 		if (scene_ambient) {
 			hyperspace_ambient = *scene_ambient;
 		} else {
@@ -7955,8 +9309,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		scene_ambient = &hyperspace_ambient;
 	}
 	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count,
-							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL, scene_ambient,
-							  NULL, hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
+							  scene_lighting.key_index, NULL, ao_on ? &ao : NULL, scene_ambient, NULL,
+							  hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
 	if (scene_lighting.captured) {
 		AeronScene_SetPbrEnvironment(s.scene, &scene_lighting.captured_environment);
 	} else if (scene_lighting.environment) {
@@ -7977,7 +9331,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronSceneMesh* cockpit_mesh = XwaRemasterShip_MeshForName(snap->cockpit.model_name);
 		if (cockpit_mesh) {
 			float m[16];
-			fl_cockpit_model_matrix(&snap->cockpit, cam->sway, cockpit_anchor, s.crows, s.camera_local, m);
+			/* The cockpit is placed from the seat, so that it stays where it
+			 * is when the head moves. */
+			fl_cockpit_model_matrix(&snap->cockpit, cam->sway, cockpit_anchor, s.seat_crows,
+									s.seat_view.camera.pos, m);
 			AeronSceneMeshInstance inst;
 			memset(&inst, 0, sizeof inst);
 			inst.mesh = cockpit_mesh;
@@ -8031,6 +9388,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
+			/* Before the hands are added: a hand that points at a panel
+			 * shows its pointing model. */
+			if (s.rig_active && s.rig.tracked) {
+				XwaRemasterCockpitButtons_Update(&inst, s.seat_crows, s.seat_view.camera.pos);
+			}
+			fl_submit_vr_hands(1);
 			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 			/* No blast marks on the cockpit (see fl_submit_hyperspace_cockpit). */
 			if (player_f && fl_is_player_craft(snap, player_f->slot, player_f->signature) &&
@@ -8044,10 +9407,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * when internal + cockpit visible), scale/knockouts from
 			 * the PLAYER craft's state. */
 			if (s.glow_ok && player_f) {
-				XwaRemasterShip_SubmitEngineGlows(
-					s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER, inst.mesh_table,
-					player_f->eg_knockout_mask, player_f->eg_hidden_mask,
-					XwaRemasterShip_EngineGlowScale(player_f), s.crows, s.camera_local, &s.glow_ref);
+				fl_submit_engine_glows(cockpit_mesh, m, inst.mesh_table, player_f->eg_knockout_mask,
+									   player_f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(player_f));
 			}
 		}
 	}
@@ -8056,18 +9417,25 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 
 	/* Classic effects order: particles, persistent warhead trails, then
 	 * queued scene billboards. */
-	XwaRemasterParticles_SubmitRegion(s.particles, s.scene, snap, cam->region);
-	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, cam->region);
+	for (uint32_t b = 0; b < s.build_count; b++) {
+		XwaRemasterParticles_SubmitRegion(s.particles[b], s.scene, snap, cam->region);
+		XwaRemasterTrails_SubmitRegion(s.trails[b], s.scene, cam->region);
+	}
 
 	/* State-derived explosion/debris/spark sprites and wreck flames
 	 * (OVERLAY stage, back-to-front; engine glows submit per instance
 	 * above, in the classic per-object order). */
 	fl_submit_billboards();
-	XwaRemasterSpeedEffect_Submit(s.speed_effect, s.scene, snap, &effect_view);
+	for (uint32_t b = 0; b < s.build_count; b++) {
+		XwaRemasterSpeedEffect_Submit(s.speed_effect, s.scene, snap, &s.build[b].effect_view);
+	}
 	/* Lens-flare trains (LENS stage — the scene draws them after its
-	 * color passes with GPU anchor occlusion, before bloom). */
-	fl_submit_lens_flares(snap, &flight_view);
-	fl_submit_sun_flare(snap, &scene_lighting);
+	 * color passes with GPU anchor occlusion, before bloom), and the
+	 * procedural flare, which the scene lays out in each view. */
+	if (lens_flares) {
+		fl_submit_lens_flares(snap);
+		fl_submit_sun_flare(snap, &scene_lighting);
+	}
 
 	/* Only the flight view: the map shows ships small on purpose. */
 	const float px_per_1080 = (float)s.rt_h / 1080.0f;
@@ -8078,10 +9446,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	AeronScene_SetLodTint(s.scene, s.lod_tint);
 	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
 	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
-	AeronScene_SetEmissionLight(s.scene,
-								s.projectiles.bloom_from_scene ? s.projectiles.bloom_scale : s.projectiles.emission_scale,
-								s.projectiles.bloom_scale);
-	const int rendered = AeronScene_Render(s.scene, cmd);
+	AeronScene_SetEmissionLight(
+		s.scene, s.projectiles.bloom_from_scene ? s.projectiles.bloom_scale : s.projectiles.emission_scale,
+		s.projectiles.bloom_scale);
+	AeronTexture* rig_frame = NULL;
+	const int rendered =
+		rig ? (rig_frame = fl_render_rig_views(cmd)) != NULL : AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
 	AeronScene_SetShadowCasterMinSize(s.scene, 0.0f);
 	AeronScene_SetLodMaxError(s.scene, 0.0f);
@@ -8097,7 +9467,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (!rendered) {
 		return NULL;
 	}
-	if (hyperspace_in_world && !fl_render_world_hyperspace(cmd)) {
+	if (rig) {
+		return rig_frame;
+	}
+	if (hyperspace_in_world && !fl_render_world_hyperspace(cmd, 0)) {
 		return NULL;
 	}
 	return fl_present(cmd, direct_present);
@@ -8119,10 +9492,11 @@ void XwaRemasterFlight_Shutdown(void) {
 	s.sky_stars = NULL;
 	XwaRemasterSpeedEffect_Destroy(s.speed_effect);
 	s.speed_effect = NULL;
-	XwaRemasterParticles_Destroy(s.particles);
-	s.particles = NULL;
-	XwaRemasterTrails_Destroy(s.trails);
-	s.trails = NULL;
+	for (int i = 0; i < AERON_MAX_VIEWS; i++) {
+		XwaRemasterParticles_Destroy(s.particles[i]);
+		XwaRemasterTrails_Destroy(s.trails[i]);
+	}
+	AeronDrawList_Destroy(s.hud_composite);
 	XwaRemasterGlowMarks_Shutdown();
 	if (s.present_sampler) {
 		Aeron_DestroySampler(s.present_sampler);
@@ -8136,6 +9510,18 @@ void XwaRemasterFlight_Shutdown(void) {
 	}
 	if (s.present_direct) {
 		AeronScenePresentChain_Destroy(s.present_direct);
+	}
+	if (s.present_views) {
+		AeronScenePresentChain_Destroy(s.present_views);
+	}
+	if (s.hud_reproject_pipeline) {
+		Aeron_DestroyGraphicsPipeline(s.hud_reproject_pipeline);
+	}
+	if (s.hud_reproject_fs) {
+		Aeron_DestroyShader(s.hud_reproject_fs);
+	}
+	if (s.hud_reproject_vs) {
+		Aeron_DestroyShader(s.hud_reproject_vs);
 	}
 	memset(&s, 0, sizeof s);
 }

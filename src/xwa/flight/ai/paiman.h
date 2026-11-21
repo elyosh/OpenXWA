@@ -7,14 +7,14 @@
 extern "C" {
 #endif
 
-extern const int16_t g_formationDivisor[34];
+extern int16_t g_formationDivisor[34];
 extern const uint16_t g_aiTurnAwayStateDelayBySkill[4];
 extern const uint16_t g_orderThrottleToCraftThrottleSpeed[11];
 extern const uint16_t g_aiAvoidAttackerDelaySecondsByGroupAI[8];
 extern const uint16_t g_aiAvoidAttackerDelayFracQ16ByGroupAI[6];
-extern const int16_t g_formPosX[34][6];
-extern const int16_t g_formPosY[34][6];
-extern const int16_t g_formPosZ[34][6];
+extern int16_t g_formPosX[34][6];
+extern int16_t g_formPosY[34][6];
+extern int16_t g_formPosZ[34][6];
 
 void paiman_initmaneuver(void);
 int paiman_initturninsidemaneuver(void);

@@ -38,6 +38,7 @@
 #ifdef XWA_MODERN
 #include "aeron/log.h"
 #include "xwa_runtime/audio/mission_sounds.h"
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_definitions.h"
@@ -6389,7 +6390,11 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	}
 	if (((uint16_t)existingObjIdx == 0xFFFF)) {
 		groupAiSaved = g_spawnGroupAI;
+#ifdef XWA_MODERN
+		g_curCraft->skillValue = XwaRankTables_SkillValue(g_spawnGroupAI);
+#else
 		g_curCraft->skillValue = g_aiSkillValueQ16ByLevel[g_spawnGroupAI];
+#endif
 	}
 
 	// Laser/cannon group setup.
@@ -6453,7 +6458,13 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			}
 
 			// Laser convergence level.
+#ifdef XWA_MODERN
+			switch (XwaMissionSettings_NoPlayerLaserConvergence()
+						? 0
+						: g_modelDefs[modelIndex].laserConvergeMode) {
+#else
 			switch (g_modelDefs[modelIndex].laserConvergeMode) {
+#endif
 				case 0:
 					convergeLevel = 0;
 					break;
@@ -6517,7 +6528,12 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			// Warhead launcher setup.
 			g_curCraft->warheadLauncherCount = 0;
 			if (g_modelDefs[modelIndex].warheadLauncherType[1]) {
+#ifdef XWA_MODERN
+				g_curCraft->warheadSlotTypeIds[0] =
+					XwaMissionSettings_TwoLauncherAdvancedMissiles() ? OBJ_WarheadAdvancedMissile : 287;
+#else
 				g_curCraft->warheadSlotTypeIds[0] = 287;
+#endif
 				g_curCraft->warheadSlotTypeIds[1] =
 					g_warheadTypeIds[g_missionFlightGroups[g_currentFlightGroupIdx].fg.warhead];
 			} else {
@@ -7028,7 +7044,11 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->aiController.targetXYAngle = 0;
 			g_curCraft->aiController.waypointIndex = 0;
 			g_curCraft->aiController.savedPlanId = 0;
+#ifdef XWA_MODERN
+			g_curCraft->aiController.thinkInterval = XwaRankTables_ThinkInterval(groupAiSaved);
+#else
 			g_curCraft->aiController.thinkInterval = g_aiThinkIntervalByGroupAI[groupAiSaved];
+#endif
 			{
 				int randomSeed = GameRand() ^ 0xBEEF;
 				g_curCraft->aiController.savedRandSeed = (int16_t)randomSeed;
@@ -8036,7 +8056,12 @@ uint16_t Mission_Init(char* fileName) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (g_flightDifficulty != 1 && g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 36 &&
+		!XwaMissionSettings_NoDifficultyRankChanges()) {
+#else
 	if (g_flightDifficulty != 1 && g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 36) {
+#endif
 		int playerIff;
 
 		playerIff = (uint16_t)g_players[0].playerIff;
@@ -8873,8 +8898,13 @@ void Mission_CreditDestructionDamageContributors(uint16_t sourceObjIdx, uint16_t
 			}
 
 			if (creditedOwnerIdx == -1) {
+#ifdef XWA_MODERN
+				creditedPilotRating =
+					XwaRankTables_DefaultPilotRating(g_missionFlightGroups[flightGroupIdx].fg.groupAI);
+#else
 				creditedPilotRating =
 					g_defaultPilotRatingByAiLevel[g_missionFlightGroups[flightGroupIdx].fg.groupAI];
+#endif
 			} else {
 				creditedPilotRating = g_players[creditedOwnerIdx].pilotRating;
 			}
@@ -9497,14 +9527,14 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 				}
 				g_players[ownerPlayerIdx].missionStats.missionScore += XwaWeaponStats_Value(
 					ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType]);
+					g_projectileScoreByType[g_objectTable[projectileObjIdx].objectType - OBJ_LaserRebel]);
 			}
 			if (awardWarheadPoints) {
 				g_missionFlightRuntimeState
-					.teamScores[TEAM_SCORE_MISSION]
-							   [g_missionFlightGroups[flightGroupIdx].fg.team] += XwaWeaponStats_Value(
-					ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType]);
+					.teamScores[TEAM_SCORE_MISSION][g_missionFlightGroups[flightGroupIdx].fg.team] +=
+					XwaWeaponStats_Value(
+						ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
+						g_projectileScoreByType[g_objectTable[projectileObjIdx].objectType - OBJ_LaserRebel]);
 			}
 #else
 			if (projectileObjIdx < playerProjectileSlotEnd && ownerPlayerIdx != -1) {
@@ -9513,12 +9543,12 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 					return;
 				}
 				g_players[ownerPlayerIdx].missionStats.missionScore +=
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType];
+					g_projectileScoreByObjectType_BiasedBase[g_objectTable[projectileObjIdx].objectType];
 			}
 			if (awardWarheadPoints) {
 				g_missionFlightRuntimeState
 					.teamScores[TEAM_SCORE_MISSION][g_missionFlightGroups[flightGroupIdx].fg.team] +=
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType];
+					g_projectileScoreByObjectType_BiasedBase[g_objectTable[projectileObjIdx].objectType];
 			}
 #endif
 			break;
@@ -10046,7 +10076,7 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 				rounds = (uint8_t)MATH2_fraction(rounds, g_warheadAmmoCounts[3]);
 				if (rounds == 0)
 					rounds = 1;
-				loadoutPointValue += g_warheadProjectilePointValue[1] * rounds;
+				loadoutPointValue += g_projectileScoreByType[OBJ_WarheadMissile - OBJ_LaserRebel] * rounds;
 			}
 
 			if (((g_modelDefs[modelIndex].warheadLauncherType[1] != 0 && launcherIdx == 1) ||
@@ -10056,10 +10086,17 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 				rounds2 = (uint8_t)MATH2_fraction(rounds2, g_warheadAmmoCounts[warheadType]);
 				if (rounds2 == 0)
 					rounds2 = 1;
-				loadoutPointValue +=
-					(g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx] -
-					 g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx] + 1) *
-					g_warheadProjectilePointValueByObjectType[g_warheadTypeIds[warheadType]] * rounds2;
+#ifdef XWA_MODERN
+				loadoutPointValue += (g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx] -
+									  g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx] + 1) *
+									 g_projectileScoreByType[g_warheadTypeIds[warheadType] - OBJ_LaserRebel] *
+									 rounds2;
+#else
+				loadoutPointValue += (g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx] -
+									  g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx] + 1) *
+									 g_projectileScoreByObjectType_BiasedBase[g_warheadTypeIds[warheadType]] *
+									 rounds2;
+#endif
 			}
 		}
 
@@ -10111,7 +10148,11 @@ unsigned int Mission_ComputeCraftPointValue(int objIdx) {
 		warheadCount =
 			craft->warheadData[g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx]].count +
 			craft->warheadData[g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx]].count;
-		points += g_warheadProjectilePointValueByObjectType[projectileType] * warheadCount;
+#ifdef XWA_MODERN
+		points += g_projectileScoreByType[projectileType - OBJ_LaserRebel] * warheadCount;
+#else
+		points += g_projectileScoreByObjectType_BiasedBase[projectileType] * warheadCount;
+#endif
 	}
 
 	return points + g_beamTypePointValue[craft->beamTypeId] + g_countermeasureTypePointValue[craft->cmTypeId];

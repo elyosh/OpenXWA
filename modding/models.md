@@ -418,7 +418,8 @@ its look. Without `variants`, the light shines with every look. The
 [materials page](materials.md#skins-and-markings) describes looks.
 
 **Tags.** The `surfaces` setting of the [craft page](craft.md) can hide
-the lights and materials with a tag while the craft is disabled or slow.
+the lights and materials with a tag while the craft is disabled or slow,
+or turn their light off while the craft is disabled.
 See [material and light tags](reference/states_and_tags.md#material-and-light-tags).
 A model's materials and lights use at most 32 different tags.
 

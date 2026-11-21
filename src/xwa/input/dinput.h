@@ -16,23 +16,23 @@ extern "C" {
  * populated by DInput_PollMouseState. */
 
 extern unsigned char g_dinputKeyboardState[256];
-extern int           g_dinputShiftDown;
-extern int           g_dinputCtrlDown;
-extern int           g_dinputAltDown;
-extern void*         hwnd;
+extern int g_dinputShiftDown;
+extern int g_dinputCtrlDown;
+extern int g_dinputAltDown;
+extern void* hwnd;
 extern IDirectInputDeviceA* g_dinputKeyboardDevice;
 
 /* Immediate mouse state, filled by DInput_PollMouseState via GetDeviceState. */
 extern DIMOUSESTATE g_dinputMouseState;
 
-char     DInput_Init(void);
-void     DInput_Shutdown(void);
-int      DInput_ReadKeyboardState(void);
-int      DInput_DrainKeyboardEvents(void);
+char DInput_Init(void);
+void DInput_Shutdown(void);
+int DInput_ReadKeyboardState(void);
+int DInput_DrainKeyboardEvents(void);
 uint16_t DInput_GetKey(void);
-int      DInput_HasKeyReady(void);
-int      DInput_UpdateKeyboardModifierState(void);
-void     DInput_PollMouseState(void);
+int DInput_HasKeyReady(void);
+int DInput_UpdateKeyboardModifierState(void);
+void DInput_PollMouseState(void);
 
 #ifdef __cplusplus
 }

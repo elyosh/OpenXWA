@@ -18,6 +18,11 @@ enum {
 	XWA_MODERN_RUMBLE_STRENGTH_MAX = 8,
 };
 
+#define XWA_MODERN_VR_STICK_RANGE_MIN 0.5f
+#define XWA_MODERN_VR_STICK_RANGE_MAX 2.0f
+#define XWA_MODERN_VR_BUTTON_RAY_MIN_M 0.05f
+#define XWA_MODERN_VR_BUTTON_RAY_MAX_M 5.0f
+
 /* Position: mouse displacement sets a held virtual-stick deflection.
  * Rate: per-frame mouse velocity is the deflection (the TIE Fighter
  * scheme). */
@@ -25,6 +30,16 @@ typedef enum XwaModernMouseMode {
 	XWA_MODERN_MOUSE_MODE_POSITION = 0,
 	XWA_MODERN_MOUSE_MODE_RATE,
 } XwaModernMouseMode;
+
+/* The virtual stick of the VR controllers: while the squeeze is held, the
+ * hand's movement steers the craft. Tilt reads the hand's rotation, and
+ * Slide its movement to the sides and forward. */
+typedef enum XwaModernVrStickMode {
+	XWA_MODERN_VR_STICK_OFF = 0,
+	XWA_MODERN_VR_STICK_TILT,
+	XWA_MODERN_VR_STICK_SLIDE,
+	XWA_MODERN_VR_STICK_MODE_COUNT,
+} XwaModernVrStickMode;
 
 /* The input section of config.yaml: mouse flight, rumble, the saved
  * controller models and the keyboard bindings. */
@@ -38,6 +53,29 @@ typedef struct XwaModernInputOptions {
 	int mouse_invert_y;
 	int rumble_enabled;
 	int rumble_strength;
+	/* Draw gloves in the cockpit where the VR controllers are. */
+	int vr_show_hands;
+	/* Use the mod's gloves when it has some, and not the game's own. */
+	int vr_mod_hands;
+	/* Use the mod's virtual keyboard when it has one, and not the game's
+	 * own. */
+	int vr_mod_keyboard;
+	/* In the menus, draw the headset's own model of each controller where
+	 * it has one, and not the hands. */
+	int vr_menu_controllers;
+	XwaModernVrStickMode vr_stick;
+	/* The hand that holds the virtual stick: 0 is the left one, 1 the right
+	 * one. */
+	int vr_stick_hand;
+	/* The other hand's squeeze holds a virtual throttle, while the virtual
+	 * stick is on. */
+	int vr_throttle;
+	/* Multiplies the hand travel that gives the stick's full deflection. */
+	float vr_stick_range;
+	/* A VR hand can point at the cockpit's buttons and press them, and how
+	 * far from the fingertip a button can be, in metres. */
+	int vr_cockpit_buttons;
+	float vr_button_ray_m;
 	XwaControllerOptions controllers;
 	/* Sorted with XwaKeyboardMapping_Sort. */
 	XwaKeyboardBindings keyboard;
@@ -47,10 +85,11 @@ typedef void (*XwaModernInputOptionsApplyFn)(const XwaModernInputOptions* option
 typedef int (*XwaModernInputOptionsPersistFn)(const XwaModernInputOptions* options, char* error,
 											  size_t error_size);
 
-/* `gamepad_defaults` is the profile that new gamepad models get
- * (input.gamepad_defaults in the shipped file). */
+/* `controller_defaults` holds the profiles that new gamepad and VR hand
+ * models get (input.gamepad_defaults, input.vr_left_defaults and
+ * input.vr_right_defaults in the shipped file). */
 void XwaModernInputOptions_Configure(const XwaModernInputOptions* defaults,
-									 const XwaControllerProfile* gamepad_defaults,
+									 const XwaControllerDefaults* controller_defaults,
 									 const XwaModernInputOptions* options, XwaModernInputOptionsApplyFn apply,
 									 XwaModernInputOptionsPersistFn persist);
 int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* error, size_t error_size);
@@ -58,7 +97,7 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernInputOptions* b);
 void XwaModernInputOptions_Get(XwaModernInputOptions* out);
 void XwaModernInputOptions_GetDefaults(XwaModernInputOptions* out);
-const XwaControllerProfile* XwaModernInputOptions_GamepadDefaults(void);
+const XwaControllerDefaults* XwaModernInputOptions_ControllerDefaults(void);
 int XwaModernInputOptions_Set(const XwaModernInputOptions* options);
 /* The options must be saved even if they don't change, such as after the
  * configuration upgrade. */

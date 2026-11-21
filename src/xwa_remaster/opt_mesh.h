@@ -13,9 +13,8 @@ bool XwaRemasterOptMesh_Init(AeronVfs* vfs, char* error, size_t error_size);
    texels glow at `emissive_strength`. When `projectile_strength` is above 0,
    the whole model glows at that strength instead, the way the original game
    draws projectiles. */
-bool XwaRemasterOptMesh_Build(AeronVfs* vfs, const char* basename,
-							  float smooth_angle_degrees, float emissive_strength,
-							  float projectile_strength,
-							  AeronFlightModel* out, char* error, size_t error_size);
+bool XwaRemasterOptMesh_Build(AeronVfs* vfs, const char* basename, float smooth_angle_degrees,
+							  float emissive_strength, float projectile_strength, AeronFlightModel* out,
+							  char* error, size_t error_size);
 
 #endif

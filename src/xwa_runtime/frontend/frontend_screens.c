@@ -110,8 +110,8 @@ static int g_screenRunIndex = -1; /* the stack index that ran last */
 /* The update function that ran last. It can switch the stack entry to the
    next screen. */
 static FrontendScreenUpdateFn g_screenRunUpdate;
-static int g_drawnLayout = -1; /* from NoteDrawn, until the tick ends */
-static unsigned g_screenFrames;   /* the frontend frames run so far */
+static int g_drawnLayout = -1;  /* from NoteDrawn, until the tick ends */
+static unsigned g_screenFrames; /* the frontend frames run so far */
 static XwaScreenId g_screenLogged = SCREEN_NONE;
 static int g_screenLoggedLayout = -1;
 /* The layout that the background image sets, or -1. It is up to date while
@@ -254,9 +254,9 @@ static int screens_listed_layout(XwaScreenId screen) {
  * below them. */
 static int screens_stack_layout(int index, XwaScreenId* shown) {
 	for (; index >= 0; index--) {
-		const XwaScreenId screen = screens_find(index == g_screenRunIndex && g_screenRunUpdate
-													? g_screenRunUpdate
-													: g_screenStates[index].updateFn);
+		const XwaScreenId screen =
+			screens_find(index == g_screenRunIndex && g_screenRunUpdate ? g_screenRunUpdate
+																		: g_screenStates[index].updateFn);
 		int layout;
 
 		if (screen == SCREEN_NONE) {

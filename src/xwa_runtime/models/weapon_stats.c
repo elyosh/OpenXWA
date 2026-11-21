@@ -34,6 +34,13 @@ enum {
 	WEAPON_STATS_NAME_MAX = 48,
 	WEAPON_STATS_RANKS = 6,
 	WEAPON_STATS_DIFFICULTIES = 3,
+	/* The factor sets: all, player, one for each rank, then one for each rank
+	   of a player's craft. */
+	WEAPON_STATS_FACTORS_ALL = 0,
+	WEAPON_STATS_FACTORS_PLAYER = 1,
+	WEAPON_STATS_FACTORS_RANK = 2,
+	WEAPON_STATS_FACTORS_PLAYER_RANK = WEAPON_STATS_FACTORS_RANK + WEAPON_STATS_RANKS,
+	WEAPON_STATS_FACTOR_SETS = WEAPON_STATS_FACTORS_PLAYER_RANK + WEAPON_STATS_RANKS,
 };
 
 /* The groups of the `weapons` section that have profiles. */
@@ -71,6 +78,19 @@ static const char* const s_stats[XWA_WEAPON_STATS] = {
 	"high_power_charge",
 	"side",
 	"side_model",
+};
+
+/* The key of each stat in a factor set. A stat without a key has no factor. */
+static const char* const s_factorStats[XWA_WEAPON_STATS] = {
+	[XWA_WEAPON_STAT_SCORE] = "score",
+	[XWA_WEAPON_STAT_SPEED] = "speed",
+	[XWA_WEAPON_STAT_POWER] = "power",
+	[XWA_WEAPON_STAT_POWER_SPEED_PERCENT] = "power_speed_percent",
+	[XWA_WEAPON_STAT_FIRE_RATE] = "fire_rate",
+	[XWA_WEAPON_STAT_FIRE_RATIO] = "fire_ratio",
+	[XWA_WEAPON_STAT_RANGE] = "range",
+	[XWA_WEAPON_STAT_DECHARGE_RATE] = "decharge_rate",
+	[XWA_WEAPON_STAT_RECHARGE_RATE] = "recharge_rate",
 };
 
 static const char* const s_sideNames[3] = { "rebel", "imperial", "none" };
@@ -127,10 +147,18 @@ typedef struct WeaponStatsProfile {
 	int8_t linking[XWA_WEAPON_LINKING_RULES];      /* -1: not set */
 } WeaponStatsProfile;
 
+/* One set of `factors` in a model file. */
+typedef struct WeaponStatsFactors {
+	int present;
+	float value[XWA_WEAPON_STATS]; /* 1 for a stat that the set doesn't list */
+} WeaponStatsFactors;
+
 typedef struct WeaponStatsSet {
 	WeaponStatsProfile* profiles;
 	int profileCount;
 	int hasHardpointKinds;
+	int hasFactors;
+	WeaponStatsFactors factors[WEAPON_STATS_FACTOR_SETS];
 	/* The kind of each hardpoint type, or WEAPON_STATS_STOCK_KIND to keep the
 	   stock kind. */
 	uint8_t hardpointKinds[WEAPON_STATS_HARDPOINT_TYPES];
@@ -523,6 +551,82 @@ static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node,
 	return 1;
 }
 
+/* Returns the factor set of `key`: all, player, a rank name, or player_ and a
+   rank name. Returns -1 for another key. */
+static int WeaponStats_FactorSet(const char* key) {
+	const int player = strncmp(key, "player_", 7) == 0;
+	int rank;
+
+	if (strcmp(key, "all") == 0) {
+		return WEAPON_STATS_FACTORS_ALL;
+	}
+	if (strcmp(key, "player") == 0) {
+		return WEAPON_STATS_FACTORS_PLAYER;
+	}
+	rank = XwaNames_Find(&g_xwaRankNames, player ? key + 7 : key);
+	if (rank < 0) {
+		return -1;
+	}
+	return (player ? WEAPON_STATS_FACTORS_PLAYER_RANK : WEAPON_STATS_FACTORS_RANK) + rank;
+}
+
+/* Reads the `factors` map of a model's `weapons` group into `set`. */
+static void WeaponStats_ReadFactorSets(const char* path, const AeronConfigNode* node, WeaponStatsSet* set) {
+	size_t index;
+
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.models", "%s: weapons.factors isn't a map. It is ignored", path);
+		return;
+	}
+	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
+		const char* key = AeronConfigNode_MapKeyAt(node, index);
+		const AeronConfigNode* entry = AeronConfigNode_MapValueAt(node, index);
+		const int at = WeaponStats_FactorSet(key);
+		WeaponStatsFactors* factors;
+		size_t stat;
+
+		if (at < 0 || AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
+			Aeron_LogWarn("xwa.models",
+						  "%s:%d: weapons.factors.%s isn't a factor set. Use all, player, a rank or "
+						  "player_<rank>, with a map of factors. It is ignored",
+						  path, AeronConfigNode_Line(entry), key);
+			continue;
+		}
+		factors = &set->factors[at];
+		factors->present = 1;
+		set->hasFactors = 1;
+		for (stat = 0; stat < XWA_WEAPON_STATS; ++stat) {
+			factors->value[stat] = 1.0f;
+		}
+		for (stat = 0; stat < AeronConfigNode_MapCount(entry); ++stat) {
+			const char* statKey = AeronConfigNode_MapKeyAt(entry, stat);
+			const AeronConfigNode* value = AeronConfigNode_MapValueAt(entry, stat);
+			int found;
+
+			for (found = 0; found < XWA_WEAPON_STATS; ++found) {
+				if (s_factorStats[found] != NULL && strcmp(statKey, s_factorStats[found]) == 0) {
+					break;
+				}
+			}
+			if (found == XWA_WEAPON_STATS) {
+				Aeron_LogWarn("xwa.models",
+							  "%s:%d: weapons.factors.%s.%s isn't a stat with a factor. It is ignored", path,
+							  AeronConfigNode_Line(value), key, statKey);
+			} else if (AeronConfigNode_Type(value) != AERON_CONFIG_INT &&
+					   AeronConfigNode_Type(value) != AERON_CONFIG_FLOAT) {
+				Aeron_LogWarn("xwa.models", "%s:%d: weapons.factors.%s.%s must be a number. It is ignored",
+							  path, AeronConfigNode_Line(value), key, statKey);
+			} else {
+				/* The importer writes enough digits to get the exact float32
+				   value back. */
+				factors->value[found] = AeronConfigNode_Type(value) == AERON_CONFIG_INT
+											? (float)AeronConfigNode_Int(value, 0)
+											: (float)AeronConfigNode_Float(value, 0.0);
+			}
+		}
+	}
+}
+
 void XwaWeaponStats_Init(void) {
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
@@ -590,6 +694,9 @@ void XwaWeaponStats_ReadModelSettings(unsigned int objectType, const char* path,
 		return;
 	}
 	WeaponStats_ReadSet(path, group, &s_models[objectType]);
+	if (AeronConfigNode_MapGet(group, "factors") != NULL) {
+		WeaponStats_ReadFactorSets(path, AeronConfigNode_MapGet(group, "factors"), &s_models[objectType]);
+	}
 }
 
 void XwaWeaponStats_ClearFlightGroups(void) {
@@ -629,7 +736,8 @@ int XwaWeaponStats_ReadFlightGroup(const char* path, const char* fgKey, int fgId
 static const WeaponStatsSet* WeaponStats_Model(unsigned int objectType) {
 	XwaModelSettings_Ensure(objectType);
 	return objectType < OBJ_Count &&
-				   (s_models[objectType].profileCount != 0 || s_models[objectType].hasHardpointKinds)
+				   (s_models[objectType].profileCount != 0 || s_models[objectType].hasHardpointKinds ||
+					s_models[objectType].hasFactors)
 			   ? &s_models[objectType]
 			   : NULL;
 }
@@ -693,8 +801,10 @@ static int WeaponStats_Cast(XwaWeaponStat stat, int32_t value) {
 	}
 }
 
+/* Writes the value that a profile gives `stat` into `out`. Returns 0 when no
+   profile sets it. */
 static int WeaponStats_Lookup(unsigned int objectType, int fgIdx, int player, unsigned int weapon,
-							  XwaWeaponStat stat, int stock) {
+							  XwaWeaponStat stat, int* out) {
 	const WeaponStatsProfile* profiles[2];
 	int forms[4];
 	int formCount = 0;
@@ -702,11 +812,11 @@ static int WeaponStats_Lookup(unsigned int objectType, int fgIdx, int player, un
 
 	if (weapon < WEAPON_STATS_FIRST_WEAPON || weapon >= WEAPON_STATS_FIRST_WEAPON + WEAPON_STATS_WEAPONS ||
 		stat >= XWA_WEAPON_STATS) {
-		return stock;
+		return 0;
 	}
 	WeaponStats_Profiles(objectType, fgIdx, WEAPON_STATS_GROUP_STATS, &profiles[0], &profiles[1]);
 	if (profiles[0] == NULL && profiles[1] == NULL) {
-		return stock;
+		return 0;
 	}
 	/* The forms for the player and for the difficulty come first. */
 	if (player) {
@@ -730,26 +840,104 @@ static int WeaponStats_Lookup(unsigned int objectType, int fgIdx, int player, un
 			}
 			values = &profiles[at]->weapons[weapon - WEAPON_STATS_FIRST_WEAPON][forms[form]];
 			if (values->set & (1u << stat)) {
-				return WeaponStats_Cast(stat, values->value[stat]);
+				*out = WeaponStats_Cast(stat, values->value[stat]);
+				return 1;
 			}
 		}
 	}
-	return stock;
+	return 0;
+}
+
+/* Returns the first factor set that the model of `object` has, or NULL: for
+   a player's craft, player_<rank> then player; then <rank>; then all. A craft
+   without a flight group, or with a rank past the last one, has no rank. */
+static const WeaponStatsFactors* WeaponStats_Factors(const ObjectRecord* object) {
+	const WeaponStatsSet* set = WeaponStats_Model(object->objectType);
+	const unsigned int fgIdx = object->flightGroupIdx;
+	const int player = object->playerOwnerIdx != -1;
+	int rank = -1;
+	int candidates[4];
+	int count = 0;
+	int at;
+
+	if (set == NULL || !set->hasFactors) {
+		return NULL;
+	}
+	if (fgIdx < WEAPON_STATS_FLIGHT_GROUPS && g_missionFlightGroups[fgIdx].fg.groupAI < WEAPON_STATS_RANKS) {
+		rank = g_missionFlightGroups[fgIdx].fg.groupAI;
+	}
+	if (player && rank >= 0) {
+		candidates[count++] = WEAPON_STATS_FACTORS_PLAYER_RANK + rank;
+	}
+	if (player) {
+		candidates[count++] = WEAPON_STATS_FACTORS_PLAYER;
+	}
+	if (rank >= 0) {
+		candidates[count++] = WEAPON_STATS_FACTORS_RANK + rank;
+	}
+	candidates[count++] = WEAPON_STATS_FACTORS_ALL;
+	for (at = 0; at < count; ++at) {
+		if (set->factors[candidates[at]].present) {
+			return &set->factors[candidates[at]];
+		}
+	}
+	return NULL;
+}
+
+/* Returns `value` times `factor`, multiplied in float32 and truncated. Score
+   and speed are then cut to 16 bits. */
+static int WeaponStats_Scale(XwaWeaponStat stat, int value, float factor) {
+	const float scaled = (float)value * factor;
+
+	return stat == XWA_WEAPON_STAT_SCORE || stat == XWA_WEAPON_STAT_SPEED ? (int16_t)(int)scaled
+																		  : (int)scaled;
 }
 
 int XwaWeaponStats_Value(int srcObjIdx, unsigned int weapon, XwaWeaponStat stat, int stock) {
 	const ObjectRecord* object;
+	const WeaponStatsFactors* factors;
+	/* An unset fire ratio or range counts as -1, and the factor multiplies
+	   that -1 too. A result other than -1 then replaces the stock value. */
+	const int marked = stat == XWA_WEAPON_STAT_FIRE_RATIO || stat == XWA_WEAPON_STAT_RANGE;
+	int value;
+	int set;
 
 	if (srcObjIdx < 0) {
 		return stock;
 	}
 	object = &g_objectTable[srcObjIdx];
-	return WeaponStats_Lookup(object->objectType, object->flightGroupIdx, object->playerOwnerIdx != -1,
-							  weapon, stat, stock);
+	set = WeaponStats_Lookup(object->objectType, object->flightGroupIdx, object->playerOwnerIdx != -1, weapon,
+							 stat, &value);
+	if (!set) {
+		value = marked ? -1 : stock;
+	}
+	/* The callers of the charge rates apply their percents first, then the
+	   factor. */
+	if (stat < XWA_WEAPON_STATS && stat != XWA_WEAPON_STAT_DECHARGE_RATE &&
+		stat != XWA_WEAPON_STAT_RECHARGE_RATE && s_factorStats[stat] != NULL &&
+		(factors = WeaponStats_Factors(object)) != NULL) {
+		value = WeaponStats_Scale(stat, value, factors->value[stat]);
+	}
+	return !set && marked && value == -1 ? stock : value;
 }
 
 int XwaWeaponStats_TypeValue(unsigned int objectType, unsigned int weapon, XwaWeaponStat stat, int stock) {
-	return WeaponStats_Lookup(objectType, -1, 0, weapon, stat, stock);
+	int value;
+
+	return WeaponStats_Lookup(objectType, -1, 0, weapon, stat, &value) ? value : stock;
+}
+
+int XwaWeaponStats_HasFactors(int objIdx) {
+	return objIdx >= 0 && WeaponStats_Factors(&g_objectTable[objIdx]) != NULL;
+}
+
+int XwaWeaponStats_ChargeFactor(int objIdx, XwaWeaponStat stat, int rate) {
+	const WeaponStatsFactors* factors;
+
+	if (objIdx < 0 || (factors = WeaponStats_Factors(&g_objectTable[objIdx])) == NULL) {
+		return rate;
+	}
+	return WeaponStats_Scale(stat, rate, factors->value[stat]);
 }
 
 uint16_t XwaWeaponStats_WarheadCapacity(unsigned int objIdx, int warheadType, uint16_t capacity,

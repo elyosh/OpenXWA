@@ -19,6 +19,7 @@
 typedef struct SurfaceRule {
 	char tag[AERON_FLIGHT_TAG_MAX];
 	uint8_t hiddenWhenDisabled;
+	uint8_t darkWhenDisabled;
 	/* 0: no limit. */
 	int32_t minSpeedPercent;
 	int32_t minSpeedMglt;
@@ -83,21 +84,26 @@ void XwaSurfaces_ReadModelSettings(unsigned int objectType, const char* path, co
 		const char* tag = AeronConfigNode_MapKeyAt(group, index);
 		const AeronConfigNode* entry = AeronConfigNode_MapValueAt(group, index);
 		const AeronConfigNode* disabled = AeronConfigNode_MapGet(entry, "hidden_when_disabled");
+		const AeronConfigNode* dark = AeronConfigNode_MapGet(entry, "dark_when_disabled");
 		SurfaceRule rule;
 
 		if (!Aeron_FlightTagValid(tag) || AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
 			Aeron_LogWarn("xwa.models", "%s: surfaces.%s needs a tag and a map. It is ignored", path, tag);
 			continue;
 		}
-		if (disabled != NULL && AeronConfigNode_Type(disabled) != AERON_CONFIG_BOOL) {
-			Aeron_LogWarn("xwa.models",
-						  "%s: surfaces.%s.hidden_when_disabled needs true or false. The rule is ignored",
-						  path, tag);
+		if ((disabled != NULL && AeronConfigNode_Type(disabled) != AERON_CONFIG_BOOL) ||
+			(dark != NULL && AeronConfigNode_Type(dark) != AERON_CONFIG_BOOL)) {
+			Aeron_LogWarn("xwa.models", "%s: surfaces.%s.%s needs true or false. The rule is ignored", path,
+						  tag,
+						  disabled != NULL && AeronConfigNode_Type(disabled) != AERON_CONFIG_BOOL
+							  ? "hidden_when_disabled"
+							  : "dark_when_disabled");
 			continue;
 		}
 		memset(&rule, 0, sizeof rule);
 		strcpy(rule.tag, tag);
 		rule.hiddenWhenDisabled = (uint8_t)(AeronConfigNode_Bool(disabled, 0) != 0);
+		rule.darkWhenDisabled = (uint8_t)(AeronConfigNode_Bool(dark, 0) != 0);
 		if (!Surfaces_ReadLimit(path, tag, entry, "min_speed_percent", INT32_MAX, &rule.minSpeedPercent) ||
 			!Surfaces_ReadLimit(path, tag, entry, "min_speed_mglt", SURFACES_MAX_MGLT, &rule.minSpeedMglt) ||
 			!Surfaces_ReadLimit(path, tag, entry, "min_throttle_percent", 100, &rule.minThrottlePercent) ||
@@ -151,6 +157,24 @@ uint32_t XwaSurfaces_HiddenMask(unsigned int objectType, const CraftData* craft,
 	for (index = 0; index < type->count; ++index) {
 		/* The speed is read as a signed 16-bit value, as in engine_glows.c. */
 		if (Surfaces_RuleHides(&type->rules[index], craft, (int16_t)speed)) {
+			mask |= 1u << index;
+		}
+	}
+	return mask;
+}
+
+uint32_t XwaSurfaces_DarkMask(unsigned int objectType, const CraftData* craft) {
+	const SurfaceType* type;
+	uint32_t mask = 0;
+	uint16_t index;
+
+	if (objectType >= OBJ_Count || craft == NULL || craft->workingSubsystems != 0) {
+		return 0;
+	}
+	XwaModelSettings_Ensure(objectType);
+	type = &s_types[objectType];
+	for (index = 0; index < type->count; ++index) {
+		if (type->rules[index].darkWhenDisabled) {
 			mask |= 1u << index;
 		}
 	}

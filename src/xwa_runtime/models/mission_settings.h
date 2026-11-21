@@ -98,6 +98,77 @@ int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void);
 int XwaMissionSettings_WeaponRackCountFromRecord(void);
 int XwaMissionSettings_OverlappingFlyBySounds(void);
 int XwaMissionSettings_HangarDroidPartsFromModel(void);
+/* The ejection rules. They change FlightObject_SpawnEscapePodOrPilot,
+   except skirmish_ejections, which changes Skirmish_GenerateMission:
+	 - no_pilot_ejections: no pilot ejects from a fighter;
+	 - no_escape_pod_ejections: no escape pod ejects from a transport,
+	   starship or platform;
+	 - ejected_craft_team_9: pods and pilots are on team 9 instead of the
+	   team of the craft they come from;
+	 - ejected_craft_skip_setup: pods don't get their AI plan (plan 45), and
+	   pilots keep the random speed and direction that every ejected craft
+	   starts with, instead of a speed of 80 and a direction based on their
+	   craft's;
+	 - skirmish_ejections: the craft of a skirmish mission can eject. */
+int XwaMissionSettings_NoPilotEjections(void);
+int XwaMissionSettings_NoEscapePodEjections(void);
+int XwaMissionSettings_EjectedCraftTeam9(void);
+int XwaMissionSettings_EjectedCraftSkipSetup(void);
+int XwaMissionSettings_SkirmishEjections(void);
+/* An AI warhead marks its target as attacked by the shooter's team when it
+   hits, as any weapon does, and no longer when paifight_fightershootorder
+   launches it. */
+int XwaMissionSettings_AiWarheadsAttackOnHit(void);
+/* A craft's turrets stop firing when one jamming beam is on it, instead of
+   three. Each beam adds 0xFFFF to the craft's jamming value, and
+   laser_firewarheadlauncher stops the turrets from 0xFFFF instead of
+   0x28000. */
+int XwaMissionSettings_OneJammingBeamStopsTurrets(void);
+/* Mission_InitFlightGroupObjectSlot loads advanced missiles instead of
+   missiles in the first launcher of a craft with two launcher types. The
+   launcher still gets the missile count. */
+int XwaMissionSettings_TwoLauncherAdvancedMissiles(void);
+/* FlightObject_UpdateSpecialBehavior leaves a rotary gun turret without a
+   target as it is: it doesn't turn it, and doesn't call GameRand for it. */
+int XwaMissionSettings_NoTurretIdleSpin(void);
+/* paifight_fightershootorder doesn't fire both warheads of a launcher at once for a
+   damaged top-tier AI craft. Only Death Star missions still do. */
+int XwaMissionSettings_NoTopAiDualWarheads(void);
+/* paifight_gunnerselfdefenseorder doesn't aim turrets at the warheads locked
+   on their own craft. */
+int XwaMissionSettings_NoTurretWarheadSelfDefense(void);
+/* paifight_FindNearestAttackerOfMatchingTarget doesn't look for the warheads
+   locked on the craft that a gun turret's order protects. */
+int XwaMissionSettings_NoTurretWarheadEscortDefense(void);
+/* collide_ApplyProximityDamageFalloff does nothing: explosions don't damage
+   or push the objects around them. */
+int XwaMissionSettings_NoExplosionSplashDamage(void);
+/* collide_collisions doesn't check the engine wash of players. */
+int XwaMissionSettings_NoEngineWash(void);
+/* An AI fighter charges its shields to 2 times its shield strength (100%)
+   instead of 4 times (200%). */
+int XwaMissionSettings_AiShieldsChargeToFull(void);
+/* paifight_TargetHasAttackCapacity uses the limit for several candidates
+   when the target is a player, also when the order matches only one
+   object. */
+int XwaMissionSettings_PlayerAttackerLimitByDifficulty(void);
+/* A player's turn rates don't depend on the throttle. */
+int XwaMissionSettings_NoThrottleTurnRate(void);
+/* A player's turn rates don't depend on the laser and shield energy
+   settings. */
+int XwaMissionSettings_NoEnergyTurnRate(void);
+/* paifight_fightershootorder doesn't set the laser convergence level of an
+   attacking AI craft. */
+int XwaMissionSettings_NoAiLaserConvergence(void);
+/* Every craft starts with laser convergence level 0, and the player's
+   convergence key says that convergence isn't available. */
+int XwaMissionSettings_NoPlayerLaserConvergence(void);
+/* The difficulty doesn't change the AI ranks of the flight groups when
+   Mission_Init loads a mission. */
+int XwaMissionSettings_NoDifficultyRankChanges(void);
+/* An AI craft arriving from hyperspace without a set arrival speed uses
+   XwaCraftHyperspace_AiArrivalStopsBeforePoint instead of the stock test. */
+int XwaMissionSettings_AiArrivalStopsBeforePoint(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

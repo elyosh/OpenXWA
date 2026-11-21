@@ -8,6 +8,7 @@ themselves use the atlas format of [the images page](images.md).
 ```text
 frontend/
   frontend.yaml       design size, paint settings and screen layouts
+  vr_keyboard.yaml    the virtual keyboard of VR
   frontres/           menu images and videos that replace them
   animations.yaml     room animations
   animations/         the videos and sounds of room animations
@@ -575,6 +576,100 @@ ffmpeg -i movie.mov -c:v libx264 -pix_fmt yuv420p -c:a aac Battle1.mp4
 # A video with alpha, from numbered PNG files
 ffmpeg -framerate 24 -i door_%04d.png -c:v libvpx-vp9 -pix_fmt yuva420p -an techdoor.webm
 ```
+
+## VR keyboard
+
+In VR, a player with only the motion controllers types text on a virtual
+keyboard: a pilot's name, a film's name, a path in the options window. The
+keyboard is a flat panel in front of the player, below the screen. Each hand
+points at it, and the trigger presses the key under the hand's beam.
+
+`frontend/vr_keyboard.yaml` replaces the game's keyboard. Without it, the
+game uses its own layout. The player can also keep the game's keyboard by
+turning **Use the Mod's Keyboard** off in the Controllers options. A layout
+is either rows of keys that the game draws, or a picture with a rectangle
+for each key.
+
+A layout that the game draws:
+
+```yaml
+width_m: 0.42
+font_size: 16
+colors:
+  key: [74, 90, 190]
+  action: [176, 52, 74]
+  confirm: [56, 140, 96]
+  dark: [36, 72, 100]
+  text: [255, 255, 255]
+  hover: [255, 255, 255, 60]
+rows:
+  - - {key: Escape, label: ESC, color: action}
+    - {key: "1", char: "1", shifted: "!"}
+    - {key: Backspace, label: BACK, w: 2, color: action}
+  - - {key: Left Shift, label: SHIFT, w: 2, color: dark}
+    - {key: A, char: a, shifted: A}
+    - {key: Return, label: ENTER, w: 3, color: confirm}
+```
+
+| Key | Meaning |
+|-|-|
+| `width_m` | The keyboard's width in the headset, in metres, from 0.1 to 1.5. 0.4 when left out. |
+| `font_size` | The flight font for the labels: 16, 12 or 10. 16 when left out. |
+| `colors` | The colours, as `[red, green, blue]` or `[red, green, blue, alpha]` from 0 to 255: `key`, `action`, `confirm` and `dark` are key colours, `text` is the labels' colour, and `hover` is drawn over the key that a hand points at. |
+| `rows` | The rows of keys, from top to bottom. Each row is a list of keys, from left to right. |
+
+A key:
+
+| Key | Meaning |
+|-|-|
+| `key` | Required. The name of the keyboard key, as in the key bindings of `config.yaml`: `A`, `1`, `Return`, `Escape`, `Left Shift`, `Left`. |
+| `char` | The character that the key types. A key without it types nothing, such as an arrow. |
+| `shifted` | The character that the key types with Shift. The same as `char` when left out. |
+| `label` | The text drawn on the key. Without it, a key shows the character that the next press types, or its name. |
+| `w` | The key's width, in keys, from 0.25 to 20. 1 when left out. |
+| `color` | `key`, `action`, `confirm` or `dark`. `key` when left out. |
+
+- The keyboard is as wide as its widest row. A shorter row leaves a gap on
+  its right.
+- `Left Shift`, `Left Ctrl` and `Left Alt` are sticky: one press holds the
+  key for the next key, a second press locks it, and a third releases it.
+- Backspace, Delete and the arrows repeat while the trigger is held.
+- A key should type the character that a US keyboard types for it. The chat
+  in flight reads key codes and uses the original game's US table, so a
+  key with another character would type one thing in the menus and another
+  in the chat. A layout can move the keys around.
+- A keyboard has up to 128 keys.
+
+A layout with a picture has `image`, `image_size` and `keys` in place of
+`rows`:
+
+```yaml
+image: vr_keyboard.png
+image_size: [1056, 509]
+width_m: 0.3
+keys:
+  - {key: "Escape", rect: [15, 60, 86, 114]}
+  - {key: "A", char: "a", shifted: "A", rect: [103, 269, 174, 343]}
+```
+
+| Key | Meaning |
+|-|-|
+| `image` | A PNG file in `frontend/`. It is drawn in place of the keys. |
+| `image_size` | The size that the rectangles are measured in, as `[width, height]` in pixels. |
+| `keys` | The keys. Each has `key`, `char` and `shifted` as above, and `rect`: `[x0, y0, x1, y1]` in the picture's pixels, from its top left corner. |
+
+Only the `hover` colour is used with a picture: it is drawn over the key
+that a hand points at, and over a key that is held.
+
+The keyboard opens by itself when the player creates a pilot, names a film,
+or edits a text field in the classic options or in the options window. For
+the other text fields, the player opens it with the `toggle_vr_keyboard`
+action, which can be bound to a controller button and used on a
+[cockpit button](materials.md#cockpit-buttons).
+
+The importer converts the keyboard of an XWAU mod (the picture and the
+rectangles of `Active_Cockpit.cfg`) into a layout with a picture. The keys
+that move XWAU's keyboard or the player's head aren't converted.
 
 ## Cutscene and medal lists
 

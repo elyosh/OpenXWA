@@ -2,10 +2,9 @@
 
 # Signs, notarizes and staples a DMG that build-package.sh already built with
 # an ad-hoc signature. The release workflow runs it in its signing job, and a
-# maintainer can run it on a Mac. It extracts OpenXWA and the mod importer,
-# signs them with a Developer ID identity, notarizes and staples both
-# applications and the rebuilt DMG, and can replace the DMG on a GitHub
-# release.
+# maintainer can run it on a Mac. It extracts OpenXWA, signs it with a
+# Developer ID identity, notarizes and staples it and the rebuilt DMG, and can
+# replace the DMG on a GitHub release.
 #
 # Usage:
 #   sign-package.sh <input-dmg> [output-dmg]
@@ -52,7 +51,6 @@ mounted=0
 
 # Globals consumed by the shared helpers.
 application="${work_root}/OpenXWA.app"
-importer="${work_root}/OpenXWA Mod Importer.app"
 artifact_dir="$(dirname "${output_dmg}")"
 dmg="${output_dmg}"
 dmg_volume_name="OpenXWA"
@@ -82,9 +80,6 @@ extract_application() {
     fi
 
     ditto "${mount_point}/OpenXWA.app" "${application}"
-    if [[ -d "${mount_point}/OpenXWA Mod Importer.app" ]]; then
-        ditto "${mount_point}/OpenXWA Mod Importer.app" "${importer}"
-    fi
     if [[ -d "${mount_point}/OpenXWA.dSYM" ]]; then
         ditto "${mount_point}/OpenXWA.dSYM" "${work_root}/OpenXWA.dSYM"
         dsym_bundle="${work_root}/OpenXWA.dSYM"
@@ -121,10 +116,6 @@ main() {
     extract_application
     sign_bundle "${application}"
     notarize_application "${application}"
-    if [[ -d "${importer}" ]]; then
-        sign_bundle "${importer}"
-        notarize_application "${importer}"
-    fi
     create_dmg
     notarize_dmg
 

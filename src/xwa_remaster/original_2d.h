@@ -15,14 +15,15 @@ typedef enum XwaRemasterOriginal2dLoadStatus {
 XwaRemasterOriginal2d* XwaRemasterOriginal2d_Create(AeronVfs* vfs);
 void XwaRemasterOriginal2d_Destroy(XwaRemasterOriginal2d* reader);
 
-XwaRemasterOriginal2dLoadStatus
-XwaRemasterOriginal2d_LoadFrontend(XwaRemasterOriginal2d* reader, const char* source_path,
-								   Xwa2dFrameSet* out, char* error, size_t error_size);
-XwaRemasterOriginal2dLoadStatus
-XwaRemasterOriginal2d_LoadDatGroup(XwaRemasterOriginal2d* reader, int group, Xwa2dFrameSet* out,
-								   char* error, size_t error_size);
-XwaRemasterOriginal2dLoadStatus
-XwaRemasterOriginal2d_LoadFrontendFont(XwaRemasterOriginal2d* reader, int point_size,
-									   Xwa2dFontAtlas* out, char* error, size_t error_size);
+XwaRemasterOriginal2dLoadStatus XwaRemasterOriginal2d_LoadFrontend(XwaRemasterOriginal2d* reader,
+																   const char* source_path,
+																   Xwa2dFrameSet* out, char* error,
+																   size_t error_size);
+XwaRemasterOriginal2dLoadStatus XwaRemasterOriginal2d_LoadDatGroup(XwaRemasterOriginal2d* reader, int group,
+																   Xwa2dFrameSet* out, char* error,
+																   size_t error_size);
+XwaRemasterOriginal2dLoadStatus XwaRemasterOriginal2d_LoadFrontendFont(XwaRemasterOriginal2d* reader,
+																	   int point_size, Xwa2dFontAtlas* out,
+																	   char* error, size_t error_size);
 
 #endif

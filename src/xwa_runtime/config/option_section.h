@@ -27,7 +27,8 @@ typedef enum XwaOptionKind {
 	XWA_OPTION_KIND_NUMBER,
 	/* Three floats of 0 or more. */
 	XWA_OPTION_KIND_COLOR,
-	/* One of the words in `choices`, stored as its index in an int. */
+	/* One of the words in `choices`, stored as its index in an int. A word
+	   that looks like a number, such as 5.1, can be written without quotes. */
 	XWA_OPTION_KIND_CHOICE,
 } XwaOptionKind;
 

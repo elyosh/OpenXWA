@@ -1,9 +1,12 @@
 #include "options/options_window.h"
 
+#include "options/audio_page.h"
 #include "options/controller_page.h"
 #include "options/keyboard_page.h"
+#include "options/mods_page.h"
 #include "options/mouse_page.h"
 #include "options/video_page.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/option_section.h"
@@ -17,18 +20,29 @@ typedef void (*XwaOptionsPageFn)(AeronUiContext* ui, const AeronInputSnapshot* i
 
 enum {
 	OPTIONS_PAGE_VIDEO,
+	OPTIONS_PAGE_AUDIO,
 	OPTIONS_PAGE_CONTROLLER,
 	OPTIONS_PAGE_KEYBOARD,
 	OPTIONS_PAGE_MOUSE,
+	OPTIONS_PAGE_MODS,
 	OPTIONS_PAGE_COUNT
 };
+
+/* A message for the player in a small window with an OK button. */
+typedef struct XwaOptionsNotice {
+	const char* title;
+	char text[640];
+} XwaOptionsNotice;
+
+enum { OPTIONS_NOTICE_MAX = 2 };
 
 static struct {
 	AeronUiContext* ui;
 	XwaOptionsPageFn pages[OPTIONS_PAGE_COUNT];
 	bool open, close_requested, close_forced, captures_controller, ready;
-	/* The notice shown once after the controller settings were reset. */
-	bool notice_open;
+	/* The notices that wait for the player. The first one is shown. */
+	XwaOptionsNotice notices[OPTIONS_NOTICE_MAX];
+	int notice_count;
 	int page;
 	char error[1024];
 	XwaControllerSettings controller;
@@ -44,24 +58,33 @@ static void XwaOptionsWindow_DrawKeyboard(AeronUiContext* ui, const AeronInputSn
 	XwaKeyboardSettings_Draw(&g_window.keyboard, ui);
 }
 
+static void XwaOptionsWindow_DrawMods(AeronUiContext* ui, const AeronInputSnapshot* input) {
+	(void)ui;
+	(void)input;
+	XwaModsPage_Draw();
+}
+
 bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	memset(&g_window, 0, sizeof g_window);
 	g_window.ui = XwaAppUi_Context(ui);
 	g_window.pages[OPTIONS_PAGE_VIDEO] = XwaVideoPage_Draw;
+	g_window.pages[OPTIONS_PAGE_AUDIO] = XwaAudioPage_Draw;
 	g_window.pages[OPTIONS_PAGE_CONTROLLER] = XwaOptionsWindow_DrawController;
 	g_window.pages[OPTIONS_PAGE_KEYBOARD] = XwaOptionsWindow_DrawKeyboard;
 	g_window.pages[OPTIONS_PAGE_MOUSE] = XwaMousePage_Draw;
+	g_window.pages[OPTIONS_PAGE_MODS] = XwaOptionsWindow_DrawMods;
 	g_window.ready = g_window.ui != NULL;
 	if (!g_window.ready && error && capacity)
 		snprintf(error, capacity, "the options window has no UI context");
 	return g_window.ready;
 }
 
-/* Saves the options that apply at once: the mouse and video options and the
-   camera and HUD switches. */
+/* Saves the options that apply at once: the mouse, video and audio options
+   and the camera and HUD switches. */
 static bool XwaOptionsWindow_FlushApplied(char* error, size_t capacity) {
 	if (!XwaModernInputOptions_FlushWithError(error, capacity) ||
-		!XwaModernVideoOptions_FlushWithError(error, capacity))
+		!XwaModernVideoOptions_FlushWithError(error, capacity) ||
+		!XwaModernAudioOptions_FlushWithError(error, capacity))
 		return false;
 	if (!XwaOptionSection_FlushAll()) {
 		snprintf(error, capacity, "Could not save the camera and HUD switches. See the log for details.");
@@ -75,8 +98,11 @@ float XwaOptionsWindow_ScrollHeight(void) {
 	/* Leaves room below the scroll area for the tab's bottom edge, the
 	   separator, the Close button and the gaps between them. */
 	float footer = 4.0f + 9.0f + theme->row_height + 3.0f * theme->item_spacing;
+	const char* busy = XwaModsPage_BusyMessage();
 	if (g_window.error[0])
 		footer += AeronUi_MeasureHelpHeight(g_window.ui, g_window.error, 0.0f) + theme->item_spacing;
+	if (busy)
+		footer += AeronUi_MeasureHelpHeight(g_window.ui, busy, 0.0f) + theme->item_spacing;
 	float height = AeronUi_AvailableHeight(g_window.ui) - footer;
 	return height > 0.0f ? height : 1.0f;
 }
@@ -96,6 +122,7 @@ void XwaOptionsWindow_FlushForExit(void) {
 }
 
 void XwaOptionsWindow_Shutdown(void) {
+	XwaModsPage_Shutdown();
 	XwaKeyboardSettings_CancelCapture(&g_window.keyboard, g_window.ui);
 	if (g_window.ui)
 		AeronUi_CancelControllerCapture(g_window.ui);
@@ -110,6 +137,8 @@ bool XwaOptionsWindow_CapturesKeyboard(void) {
 	return g_window.open && AeronUi_KeyboardCaptureActive(g_window.ui);
 }
 
+bool XwaOptionsWindow_EditsText(void) { return g_window.open && AeronUi_TextEditActive(g_window.ui); }
+
 bool XwaOptionsWindow_CapturesController(void) { return g_window.open && g_window.captures_controller; }
 
 void XwaOptionsWindow_Show(void) {
@@ -123,11 +152,14 @@ void XwaOptionsWindow_Show(void) {
 		XwaInput_SetCaptured(true);
 		XwaPort_SetOptionsWindowOpen(1);
 		Aeron_SetHostCursorVisible(1);
+		if (g_window.page == OPTIONS_PAGE_MODS)
+			XwaModsPage_Open();
 	}
 }
 
+/* The window stays open while the Mods tab imports or deletes a mod. */
 void XwaOptionsWindow_RequestClose(void) {
-	if (g_window.open)
+	if (g_window.open && !XwaModsPage_Busy())
 		g_window.close_requested = true;
 }
 
@@ -138,7 +170,7 @@ void XwaOptionsWindow_CompleteClose(void) {
 	XwaControllerSettings_CancelCapture(&g_window.controller, g_window.ui);
 	AeronUi_CancelControllerCapture(g_window.ui);
 	g_window.open = g_window.close_requested = g_window.close_forced = g_window.captures_controller = false;
-	XwaPort_SetOptionsWindowOpen(g_window.notice_open);
+	XwaPort_SetOptionsWindowOpen(g_window.notice_count > 0);
 }
 
 void XwaOptionsWindow_ReportError(const char* error) {
@@ -146,36 +178,58 @@ void XwaOptionsWindow_ReportError(const char* error) {
 	g_window.close_requested = false;
 }
 
-void XwaOptionsWindow_ShowControllerResetNotice(void) {
-	if (!g_window.ui || g_window.notice_open)
-		return;
-	g_window.notice_open = true;
+/* Adds a notice and returns it, or NULL when there is no room for it. */
+static XwaOptionsNotice* XwaOptionsWindow_AddNotice(const char* title) {
+	if (!g_window.ui || g_window.notice_count >= OPTIONS_NOTICE_MAX)
+		return NULL;
+	XwaOptionsNotice* notice = &g_window.notices[g_window.notice_count++];
+	memset(notice, 0, sizeof *notice);
+	notice->title = title;
 	XwaInput_SetCaptured(true);
 	/* The game cursor is hidden as for the window. */
 	XwaPort_SetOptionsWindowOpen(1);
 	Aeron_SetHostCursorVisible(1);
+	return notice;
 }
 
+void XwaOptionsWindow_ShowControllerResetNotice(void) {
+	XwaOptionsNotice* notice = XwaOptionsWindow_AddNotice("Controller Settings Reset");
+	if (notice)
+		snprintf(notice->text, sizeof notice->text,
+				 "Controller support was improved, and your controller settings were reset. Gamepads "
+				 "work right away with the default controls. To use a joystick, set it up again in "
+				 "OpenXWA Options.");
+}
+
+void XwaOptionsWindow_ShowVrStartNotice(const char* reason) {
+	XwaOptionsNotice* notice = XwaOptionsWindow_AddNotice("VR Could Not Start");
+	if (notice)
+		snprintf(notice->text, sizeof notice->text, "VR could not start: %s.", reason);
+}
+
+/* Closes the notice that is shown. The next one shows in its place. */
 static void XwaOptionsWindow_CloseNotice(void) {
-	g_window.notice_open = false;
-	if (!g_window.open)
+	if (g_window.notice_count <= 0)
+		return;
+	g_window.notice_count--;
+	memmove(&g_window.notices[0], &g_window.notices[1],
+			(size_t)g_window.notice_count * sizeof g_window.notices[0]);
+	if (!g_window.notice_count && !g_window.open)
 		XwaPort_SetOptionsWindowOpen(0);
 }
 
 static void XwaOptionsWindow_DrawNotice(const AeronInputSnapshot* input, float seconds) {
+	const XwaOptionsNotice* notice = &g_window.notices[0];
+	bool close = false;
 	AeronUi_BeginFrame(g_window.ui, &(AeronUiFrameDesc) { .input = input, .dt_seconds = seconds });
-	if (AeronUi_BeginWindow(g_window.ui, "Controller Settings Reset",
+	if (AeronUi_BeginWindow(g_window.ui, notice->title,
 							&(AeronUiWindowDesc) { .width_ref = 720, .centered = 1 })) {
-		AeronUi_Help(g_window.ui,
-					 "Controller support was improved, and your controller settings were reset. Gamepads "
-					 "work right away with the default controls. To use a joystick, set it up again in "
-					 "OpenXWA Options.");
-		if (AeronUi_Button(g_window.ui, "OK"))
-			XwaOptionsWindow_CloseNotice();
+		AeronUi_Help(g_window.ui, notice->text);
+		close = AeronUi_Button(g_window.ui, "OK") != 0;
 		AeronUi_EndWindow(g_window.ui);
 	}
 	AeronUiOutput output = AeronUi_EndFrame(g_window.ui);
-	if (output.cancel_pressed)
+	if (close || output.cancel_pressed)
 		XwaOptionsWindow_CloseNotice();
 	AeronUi_Submit(g_window.ui);
 }
@@ -184,15 +238,31 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 	if (!input)
 		return;
 	if (!g_window.open) {
-		if (g_window.notice_open)
+		if (g_window.notice_count > 0)
 			XwaOptionsWindow_DrawNotice(input, seconds);
 		return;
 	}
-	static const char* pages[] = { "Video", "Controller", "Keyboard", "Mouse" };
+	static const char* pages[] = { "Video", "Audio", "Controller", "Keyboard", "Mouse", "Mods" };
+	/* AeronUi scales by the picture's height / 1080, so the width it has in
+	   reference pixels depends on the picture's shape: 1920 at 16:9, 1440 at
+	   4:3. The picture has the shape of the logical frame: it fills the
+	   window, or in VR the virtual screen. */
+	float width = 1200.0f;
+	int logical_width = 0;
+	int logical_height = 0;
+	if (Aeron_GetLogicalSize(&logical_width, &logical_height)) {
+		const float available = 1080.0f * (float)logical_width / (float)logical_height - 80.0f;
+		if (available < width)
+			width = available;
+	}
+	XwaModsPage_Update();
 	AeronUi_BeginFrame(g_window.ui, &(AeronUiFrameDesc) { .input = input, .dt_seconds = seconds });
 	if (AeronUi_BeginWindow(g_window.ui, "OpenXWA Options",
-							&(AeronUiWindowDesc) { .width_ref = 980, .height_ref = 1000, .centered = 1 })) {
+							&(AeronUiWindowDesc) { .width_ref = width, .height_ref = 1000, .centered = 1 })) {
+		const int previous_page = g_window.page;
 		AeronUi_BeginTabBar(g_window.ui, "pages", pages, OPTIONS_PAGE_COUNT, &g_window.page);
+		if (g_window.page != previous_page && g_window.page == OPTIONS_PAGE_MODS)
+			XwaModsPage_Open();
 		if (g_window.page != OPTIONS_PAGE_CONTROLLER) {
 			XwaControllerSettings_CancelCapture(&g_window.controller, g_window.ui);
 			g_window.controller.editor.binding_modal_open = 0;
@@ -205,13 +275,18 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 		AeronUi_EndTabBar(g_window.ui);
 		if (g_window.error[0])
 			AeronUi_Error(g_window.ui, g_window.error);
+		const char* busy = XwaModsPage_BusyMessage();
+		if (busy)
+			AeronUi_Help(g_window.ui, busy);
 		AeronUi_Separator(g_window.ui);
-		if (AeronUi_Button(g_window.ui, "Close"))
+		if (AeronUi_ButtonEnabled(g_window.ui, "Close", busy == NULL))
 			XwaOptionsWindow_RequestClose();
 		if (g_window.page == OPTIONS_PAGE_CONTROLLER)
 			XwaControllerSettings_DrawModals(&g_window.controller, g_window.ui, input);
 		if (g_window.page == OPTIONS_PAGE_KEYBOARD)
 			XwaKeyboardSettings_DrawModals(&g_window.keyboard, g_window.ui);
+		/* Whatever the tab, as quitting can open one. */
+		XwaModsPage_DrawModals();
 		AeronUi_EndWindow(g_window.ui);
 	}
 	AeronUiOutput output = AeronUi_EndFrame(g_window.ui);
@@ -222,17 +297,21 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 }
 
 bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input) {
-	bool was_showing = g_window.open || g_window.notice_open;
+	bool was_showing = g_window.open || g_window.notice_count > 0;
 	if (g_window.open)
 		XwaControllerSettings_Discover(&g_window.controller, g_window.ui, input,
-									   XwaModernInputOptions_GamepadDefaults());
+									   XwaModernInputOptions_ControllerDefaults());
 	XwaControllerMapping_ApplyPending();
 	/* The datapad closed under the window. */
 	if (XwaPort_ConsumeOptionsWindowCloseRequest() && g_window.open) {
 		g_window.close_requested = true;
 		g_window.close_forced = true;
 	}
-	if (g_window.close_requested) {
+	/* A forced close waits for the Mods tab: an import is cancelled, a delete
+	   ends. */
+	if (g_window.close_requested && g_window.close_forced && XwaModsPage_Busy())
+		XwaModsPage_CancelImport();
+	else if (g_window.close_requested) {
 		char error[1024];
 		if (XwaControllerSettings_Commit(&g_window.controller, error, sizeof error) &&
 			XwaKeyboardSettings_Commit(&g_window.keyboard, error, sizeof error) &&
@@ -244,7 +323,7 @@ bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input) {
 		} else
 			XwaOptionsWindow_ReportError(error);
 	}
-	XwaInput_BeginCaptureFrame(input, was_showing || g_window.open || g_window.notice_open || !input ||
+	XwaInput_BeginCaptureFrame(input, was_showing || g_window.open || g_window.notice_count > 0 || !input ||
 										  !input->has_focus);
 	XwaControllerMapping_Update(input);
 	return false;

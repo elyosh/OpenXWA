@@ -8,6 +8,8 @@
 
 static AeronDrawList2D* readout_list;
 static int readout_has_records;
+/* Whether the list was prepared on planes. */
+static int readout_on_planes;
 
 int XwaRemasterHudReadout_Init(void) {
 	if (readout_list)
@@ -26,30 +28,41 @@ void XwaRemasterHudReadout_PrepareDrawList(AeronCommandBuffer* cmd, int target_w
 	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
 
 	readout_has_records = 0;
+	readout_on_planes = 0;
 	if (!readout_list || !cmd || target_w <= 0 || target_h <= 0)
 		return;
 	AeronDrawList_Begin(readout_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_SetPlaneHardFills(readout_list, XwaRemasterHud_MarkersOnScreens());
 	if (boxes && boxes->valid && (boxes->readout.valid || boxes->readout.component_valid) &&
 		boxes->target_w == target_w && boxes->target_h == target_h) {
-		const AeronRectI scissor = boxes->camera_viewport;
-		for (uint16_t i = 0; i < boxes->readout.fill_count; i++) {
+		/* In a headset the bars are on the plane of the target's box, and
+		   drawings on planes aren't clipped to a rectangle. */
+		const AeronRectI viewport = boxes->camera_viewport;
+		const AeronRectI* const scissor = boxes->on_planes ? NULL : &viewport;
+		int plane_box = -1;
+		const int bars =
+			!boxes->on_planes || XwaRemasterHudBoxes_UsePlane(readout_list, boxes->readout.box, &plane_box);
+		for (uint16_t i = 0; bars && i < boxes->readout.fill_count; i++) {
 			const XwaHudReadoutFill* fill = &boxes->readout.fills[i];
 			if (fill->frame_px > 0.0f)
 				AeronDrawList_AddFrame(readout_list, fill->x, fill->y, fill->w, fill->h, fill->frame_px,
-									   fill->rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
+									   fill->rgba, AERON_BLIT2D_BLEND_PMA, scissor);
 			else
 				AeronDrawList_AddFill(readout_list, fill->x, fill->y, fill->w, fill->h, fill->rgba,
-									  AERON_BLIT2D_BLEND_PMA, &scissor);
+									  AERON_BLIT2D_BLEND_PMA, scissor);
 		}
-		XwaRemasterHudText_AddReadoutGlyphs(readout_list, &scissor);
+		XwaRemasterHudText_AddReadoutGlyphs(readout_list, scissor);
 		readout_has_records = 1;
+		readout_on_planes = boxes->on_planes;
 	}
 	(void)AeronDrawList_Prepare(readout_list, cmd);
 }
 
 void XwaRemasterHudReadout_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								  int target_w, int target_h, AeronScene3D* scene) {
-	if (!readout_has_records || !cmd || !pass || !target || target_w <= 0 || target_h <= 0)
+	/* A readout on planes is drawn by XwaRemasterHudReadout_RenderPlanes. */
+	if (!readout_has_records || readout_on_planes || !cmd || !pass || !target || target_w <= 0 ||
+		target_h <= 0)
 		return;
 	XwaModernTargetReadoutOptions options;
 	XwaModernTargetReadoutOptions_Get(&options);
@@ -69,4 +82,10 @@ void XwaRemasterHudReadout_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass
 		AeronDrawList_SetDepthMask(readout_list, NULL);
 	}
 	AeronDrawList_RenderIntoPass(readout_list, cmd, pass, target);
+}
+
+void XwaRemasterHudReadout_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+										AeronRenderTarget* target, const float view[12]) {
+	if (readout_has_records && readout_on_planes && cmd && pass && target && view)
+		AeronDrawList_RenderPlanes(readout_list, cmd, pass, target, view, 1.0f);
 }

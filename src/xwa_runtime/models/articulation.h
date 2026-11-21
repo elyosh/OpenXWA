@@ -59,7 +59,7 @@ int XwaArticulation_StepsSFoils(unsigned int objIdx);
    other way from where it is, and a refusal or "not equipped" sets
    *message (when not NULL) to the message to show. */
 XwaArticulationTriggerResult XwaArticulation_Trigger(unsigned int objIdx, XwaArticulationTrigger trigger,
-													  uint16_t* message);
+													 uint16_t* message);
 /* XwaArticulation_Trigger for an automatic trigger: nonzero to go on with
    the original toggle, `stockTest` (the original X-wing/B-wing test) for a
    craft without S-foils or landing gear. */
@@ -159,8 +159,8 @@ void XwaArticulation_StepWorld(void);
    that selects variant <name> uses its model's `variant.<name>.<group>`
    entries in place of the model's for the same group and component, and
    gains the others; every other object ignores variant entries. */
-void XwaArticulation_LoadMission(const char* missionPath, const struct XwaFlightGroup* flightGroups, size_t stride,
-								 int count);
+void XwaArticulation_LoadMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
+								 size_t stride, int count);
 
 /* Mission_InitFlightGroupObjectSlot, after the per-mesh state is reset: the
    S-foils and landing gear the mission starts at their angle for the

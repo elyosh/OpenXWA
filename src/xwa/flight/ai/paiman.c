@@ -6,6 +6,7 @@
 #include "xwa/math/fixed.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
@@ -14,6 +15,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/timing/ai_lead.h"
 #endif
 
 // GLOBAL: XWA 0x9AF178
@@ -53,51 +55,7 @@ static const uint16_t g_aiCourseOrderSpeedByManeuverPhase[11] = {
 	3600, 3600, 3600, 3600, 3600, 3600, 2400, 1800, 1200, 450, 300,
 };
 
-// GLOBAL: XWA 0x5B7080
-const int16_t g_formPosX[34][6] = {
-	{ 0, 1, -1, 2, -2, 3 },     { 0, 1, -2, -3, 2, 3 },     { 0, 0, 0, 0, 0, 0 },    { 0, 1, -1, 2, -2, 3 },
-	{ 1, 2, 3, 4, 5, 6 },       { -1, -2, -3, -4, -5, -6 }, { 0, -1, 0, -1, 0, -1 }, { 0, 1, -1, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 1, -1, 1, -1, 0 },     { 0, 1, -1, 2, -2, 3 },  { 0, 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 0, 0, 0, 0, 0 },       { 0, 0, 0, 0, 0, 0 },    { 0, 1, 2, 3, 4, 5 },
-	{ -1, -2, -3, -4, -5, -6 }, { 0, 0, 1, 2, 3, 4 },       { 1, 2, 3, 4, 5, 6 },    { 0, 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 1, -1, 2, -2, 3 },     { 0, 1, -1, 2, -2, 3 },  { -1, 1, -1, 1, -1, 1 },
-	{ 0, 0, 0, 0, 0, 0 },       { -1, 1, -1, 1, -1, 1 },    { 0, 0, 0, -1, 1, 0 },   { 0, 1, -1, 0, 0, 0 },
-	{ 0, 2, -3, 3, -2, 0 },     { 0, 0, 0, 0, 0, 0 },       { 0, 2, -3, 3, -2, 0 },  { -1, 1, -2, 2, -1, 1 },
-	{ 0, 0, 0, 0, 0, 0 },       { -1, 1, -2, 2, -1, 1 },
-};
-
-// GLOBAL: XWA 0x5B7218
-const int16_t g_formPosY[34][6] = {
-	{ 0, -1, -1, -2, -2, -3 },  { 3, 2, 1, 0, -1, -2 },    { -1, -2, -3, -4, -5, -6 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, -1, -2, -3, -4, -5 }, { 0, -1, -2, -3, -4, -5 },
-	{ 0, 0, -1, -1, -2, -2 },   { 1, 0, 0, -1, 0, 0 },     { 0, 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0, -1 },      { 1, 2, 2, 3, 3, 4 },      { 0, -1, -1, -2, -2, -3 },
-	{ 1, 2, 2, 3, 3, 4 },       { 0, 1, 2, 3, 4, 5 },      { 0, 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 0, 0, 0, 0, 0 },      { 0, 1, 2, 3, 4, 5 },
-	{ -1, -2, -3, -4, -5, -6 }, { 0, -1, -2, -3, -4, -5 }, { 0, -1, -2, -3, -4, -5 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 0, 0, 0, 0, 0 },      { 1, 1, 0, 0, -1, -1 },
-	{ 1, 1, 0, 0, -1, -1 },     { 0, 0, 0, 0, 0, 0 },      { 1, 0, 0, 0, 0, -1 },
-	{ 0, 0, 0, 0, 1, -1 },      { 3, -3, 1, 1, -3, 0 },    { 3, -3, 1, 1, -3, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 2, 2, 0, 0, -2, -2 },    { 2, 2, 0, 0, -2, -2 },
-	{ 0, 0, 0, 0, 0, 0 },
-};
-
-// GLOBAL: XWA 0x5B73B0
-const int16_t g_formPosZ[34][6] = {
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 1, -1, -2, 2, 3 }, { 0, 0, 0, 0, 0, 0 },       { 0, 0, 0, 0, 0, 0 },
-	{ 0, 1, 2, 3, 4, 5 },       { 0, 1, 2, 3, 4, 5 },   { 0, 0, 0, 0, 0, 0 },       { 0, 0, 0, 0, 1, -1 },
-	{ 0, 1, 2, 3, 4, 5 },       { 0, 1, 1, -1, -1, 0 }, { 0, 0, 0, 0, 0, 0 },       { 0, 1, -1, 2, -2, 3 },
-	{ 0, 1, -1, 2, -2, 3 },     { 0, 0, 0, 0, 0, 0 },   { -1, -2, -3, -4, -5, -6 }, { 0, 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 1, 2, 3, 4, 5 },   { 1, 2, 3, 4, 5, 6 },       { 0, 1, 2, 3, 4, 5 },
-	{ -1, -2, -3, -4, -5, -6 }, { 0, 1, 1, 2, 2, 3 },   { 0, -1, -1, -2, -2, -3 },  { 0, 0, 0, 0, 0, 0 },
-	{ 1, -1, 1, -1, 1, -1 },    { 1, 1, 0, 0, -1, -1 }, { 0, 1, -1, 0, 0, 0 },      { 1, 0, 0, -1, 0, 0 },
-	{ 0, 0, 0, 0, 0, 0 },       { 0, 2, -3, 3, -2, 0 }, { 3, -3, 1, 1, -3, 0 },     { 0, 0, 0, 0, 0, 0 },
-	{ 1, -1, 2, -2, 1, -1 },    { 2, 2, 0, 0, -2, -2 },
-};
-
-// GLOBAL: XWA 0x5B7548
-const int16_t g_formationDivisor[34] = { 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-										 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 2, 2, 2 };
+#include "paiman_formation_tables.inc"
 
 // GLOBAL: XWA 0x5B7070
 const uint16_t g_aiAvoidAttackerDelaySecondsByGroupAI[8] = { 8, 6, 5, 3, 2, 1, 0, 0 };
@@ -548,9 +506,15 @@ void paiman_initavoidattackermaneuver(void) {
 	g_paiContext.aiController->maneuverTimer = 236 * ((GameRand() & 7) + 10);
 
 	groupAI = g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+	g_paiContext.aiController->aiPlanState =
+		(int)((uint16_t)MATH2_fraction(XwaRankTables_AvoidAttackerDelayFraction(groupAI), 0x00ecu) +
+			  236u * XwaRankTables_AvoidAttackerDelaySeconds(groupAI));
+#else
 	g_paiContext.aiController->aiPlanState =
 		(int)((uint16_t)MATH2_fraction(g_aiAvoidAttackerDelayFracQ16ByGroupAI[groupAI], 0x00ecu) +
 			  236u * g_aiAvoidAttackerDelaySecondsByGroupAI[groupAI]);
+#endif
 }
 
 // FUNCTION: XWA 0x4B8650
@@ -1795,9 +1759,19 @@ void paiman_calcplanelead(int targetObjIdx) {
 		MobileObject* targetMobj;
 
 		targetMobj = g_objectTable[targetObjIdx].mobj;
+#ifdef XWA_MODERN
+		/* leadFrames counts 8-tick steps, but a high-rate step is shorter.
+		   See ai_lead.h. */
+		if (!XwaAiLead_Movement((uint32_t)targetObjIdx, &deltaX, &deltaY, &deltaZ)) {
+			deltaX = targetWorldX - targetMobj->prevWorldX;
+			deltaY = targetWorldY - targetMobj->prevWorldY;
+			deltaZ = targetWorldZ - targetMobj->prevWorldZ;
+		}
+#else
 		deltaX = targetWorldX - targetMobj->prevWorldX;
 		deltaY = targetWorldY - targetMobj->prevWorldY;
 		deltaZ = targetWorldZ - targetMobj->prevWorldZ;
+#endif
 		deltaX *= (int)leadFrames;
 		deltaY *= (int)leadFrames;
 		deltaZ *= (int)leadFrames;
@@ -5798,9 +5772,14 @@ static char paiman_outofhyperspacemaneuver(void) {
 				   aiController->aimPointY - g_objectTable[g_paiContext.aiObjIdx].world_y,
 				   aiController->aimPointZ - g_objectTable[g_paiContext.aiObjIdx].world_z);
 
-		if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_SuperStarDestroyer &&
-			trig2_polardistance > g_paiContext.aiController->maneuverDist &&
-			g_paiContext.aiController->maneuverPhase == 10) {
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_AiArrivalStopsBeforePoint()) {
+			reached = XwaCraftHyperspace_AiArrivalStopsBeforePoint(g_paiContext.aiObjIdx);
+		} else
+#endif
+			if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_SuperStarDestroyer &&
+				trig2_polardistance > g_paiContext.aiController->maneuverDist &&
+				g_paiContext.aiController->maneuverPhase == 10) {
 			reached = 1;
 		} else if (trig2_polardistance < g_paiContext.aiController->maneuverDist ||
 				   trig2_polardistance > 0x10000) {
@@ -5991,9 +5970,15 @@ static char paiman_avoidattackermaneuver(void) {
 		}
 
 		groupAI = g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+		g_paiContext.aiController->aiPlanState =
+			(uint16_t)MATH2_fraction(XwaRankTables_AvoidAttackerDelayFraction(groupAI), 0xEC) +
+			236 * XwaRankTables_AvoidAttackerDelaySeconds(groupAI);
+#else
 		g_paiContext.aiController->aiPlanState =
 			(uint16_t)MATH2_fraction(g_aiAvoidAttackerDelayFracQ16ByGroupAI[groupAI], 0xEC) +
 			236 * g_aiAvoidAttackerDelaySecondsByGroupAI[groupAI];
+#endif
 		g_paiContext.aiController->aiPlanState += (uint16_t)MATH2_fraction(GameRand(), 0xEC);
 
 		if (groupAI >= 3 && (GameRand() & 7) == 7 && g_curCraft->cmTypeId == 2 && g_curCraft->cmAmmoCount &&
@@ -6629,6 +6614,10 @@ void paiman_RefreshDeathStarPlayerFollow(int objectIdx, int playerIdx) {
 	craft->followPlayerIdx = (uint8_t)playerIdx;
 	craft->followTimer = 16;
 	groupAI = g_missionFlightGroups[g_objectTable[objectIdx].flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+	thinkInterval = XwaRankTables_ThinkInterval(groupAI);
+#else
 	thinkInterval = g_aiThinkIntervalByGroupAI[groupAI];
+#endif
 	craft->aiController.thinkInterval = thinkInterval;
 }

@@ -4,6 +4,7 @@
 #include "options/options_window.h"
 #include "xwa_runtime/input/controller_mapping.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -83,6 +84,24 @@ static const char* XwaControllerPage_GamepadButtonDisplay(int source) {
 	return source >= 0 && source < AERON_GAMEPAD_BUTTON_COUNT ? names[source] : NULL;
 }
 
+/* The name to show for an axis or a button of a gamepad or a VR hand, or
+ * NULL: a joystick's are shown by number. */
+static const char* XwaControllerPage_AxisDisplay(const AeronControllerSnapshot* controller, int source) {
+	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD)
+		return XwaControllerPage_GamepadAxisDisplay(source);
+	if (controller->kind == AERON_CONTROLLER_KIND_VR_HAND)
+		return Aeron_VrHandAxisName(controller->instance_id == AERON_VR_HAND_INSTANCE_RIGHT, source);
+	return NULL;
+}
+
+static const char* XwaControllerPage_ButtonDisplay(const AeronControllerSnapshot* controller, int source) {
+	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD)
+		return XwaControllerPage_GamepadButtonDisplay(source);
+	if (controller->kind == AERON_CONTROLLER_KIND_VR_HAND)
+		return Aeron_VrHandButtonName(controller->instance_id == AERON_VR_HAND_INSTANCE_RIGHT, source);
+	return NULL;
+}
+
 static bool XwaControllerSettings_SourceAvailable(const AeronControllerSnapshot* controller,
 												  const AeronControllerDigitalSource* source) {
 	if (!controller)
@@ -108,9 +127,7 @@ static void XwaControllerSettings_FormatAxisSource(char* buffer, size_t capacity
 		snprintf(buffer, capacity, "Not Bound");
 		return;
 	}
-	const char* name = controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
-						   ? XwaControllerPage_GamepadAxisDisplay(source)
-						   : NULL;
+	const char* name = XwaControllerPage_AxisDisplay(controller, source);
 	const bool available =
 		controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
 			? source < AERON_GAMEPAD_AXIS_COUNT && (controller->gamepad_available_axes & (1u << source))
@@ -139,18 +156,14 @@ static void XwaControllerSettings_FormatDigitalSource(char* buffer, size_t capac
 													  const AeronControllerSnapshot* controller) {
 	const char* name = NULL;
 	if (source->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
-		name = controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
-				   ? XwaControllerPage_GamepadButtonDisplay(source->index)
-				   : NULL;
+		name = XwaControllerPage_ButtonDisplay(controller, source->index);
 		if (name)
 			snprintf(buffer, capacity, "%s", name);
 		else
 			snprintf(buffer, capacity, "Button %u", (unsigned)source->index);
 	} else if (source->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
 			   source->kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-		name = controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
-				   ? XwaControllerPage_GamepadAxisDisplay(source->index)
-				   : NULL;
+		name = XwaControllerPage_AxisDisplay(controller, source->index);
 		if (name)
 			snprintf(buffer, capacity, "%s %c", name,
 					 source->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ? '+' : '-');
@@ -304,9 +317,9 @@ static void XwaControllerSettings_DeviceSelector(XwaControllerSettings* settings
 }
 
 void XwaControllerSettings_Discover(XwaControllerSettings* settings, AeronUiContext* ui,
-									const AeronInputSnapshot* input, const XwaControllerProfile* defaults) {
+									const AeronInputSnapshot* input, const XwaControllerDefaults* defaults) {
 	size_t count = settings->draft.count;
-	bool ok = XwaControllerOptions_InitializeGamepads(&settings->draft, defaults, input, settings->error,
+	bool ok = XwaControllerOptions_InitializeDefaults(&settings->draft, defaults, input, settings->error,
 													  sizeof settings->error);
 	if (settings->draft.count != count) {
 		XwaControllerSettings_ResetDeviceEditState(settings, ui);
@@ -486,12 +499,56 @@ static void XwaControllerSettings_Rumble(AeronUiContext* ui) {
 		XwaOptionsWindow_ReportError("The rumble options are invalid.");
 }
 
+/* The VR options are global too. They apply at once and are saved on Close. */
+static void XwaControllerSettings_Vr(AeronUiContext* ui) {
+	static XwaModernInputOptions options;
+	XwaModernInputOptions_Get(&options);
+	AeronUi_Spacer(ui, 8.0f);
+	AeronUi_Header(ui, "VR");
+	bool changed = AeronUi_Toggle(ui, "Show Hands", &options.vr_show_hands);
+	AeronUi_Help(ui, "Shows your hands in the cockpit, where your VR controllers are.");
+	changed |= AeronUi_Toggle(ui, "Use the Mod's Hands", &options.vr_mod_hands) != 0;
+	AeronUi_Help(ui, "When off, the game's own hands are shown even if the mod has some.");
+	changed |= AeronUi_Toggle(ui, "Show Controllers in Menus", &options.vr_menu_controllers) != 0;
+	AeronUi_Help(ui, "In the menus, shows your controllers when the headset provides their models. "
+					 "Otherwise, your hands are shown.");
+	changed |= AeronUi_Toggle(ui, "Use the Mod's Keyboard", &options.vr_mod_keyboard) != 0;
+	AeronUi_Help(ui, "When off, the game's own virtual keyboard is shown even if the mod has one.");
+	static const char* const stick_modes[] = { "Off", "Tilt", "Slide" };
+	static const char* const hand_names[] = { "Left", "Right" };
+	int stick = (int)options.vr_stick;
+	if (AeronUi_Selector(ui, "Virtual Stick", &stick, stick_modes, XWA_MODERN_VR_STICK_MODE_COUNT)) {
+		options.vr_stick = (XwaModernVrStickMode)stick;
+		changed = true;
+	}
+	if (options.vr_stick == XWA_MODERN_VR_STICK_TILT)
+		AeronUi_Help(ui, "Hold the grip and tilt your hand to steer. Twist it to roll.");
+	else if (options.vr_stick == XWA_MODERN_VR_STICK_SLIDE)
+		AeronUi_Help(
+			ui, "Hold the grip and move your hand sideways, forward or back to steer. Twist it to roll.");
+	changed |= AeronUi_Selector(ui, "Stick Hand", &options.vr_stick_hand, hand_names, 2) != 0;
+	changed |= AeronUi_Toggle(ui, "Virtual Throttle", &options.vr_throttle) != 0;
+	AeronUi_Help(ui, "Hold the grip of your other hand and move it forward or back.");
+	int range_percent = (int)lroundf(options.vr_stick_range * 100.0f);
+	if (AeronUi_SliderInt(ui, "Stick Range", &range_percent, (int)(XWA_MODERN_VR_STICK_RANGE_MIN * 100.0f),
+						  (int)(XWA_MODERN_VR_STICK_RANGE_MAX * 100.0f), 10, "%d%%")) {
+		options.vr_stick_range = (float)range_percent / 100.0f;
+		changed = true;
+	}
+	AeronUi_Help(ui, "How far your hand moves for the stick's full travel.");
+	changed |= AeronUi_Toggle(ui, "Cockpit Buttons", &options.vr_cockpit_buttons) != 0;
+	AeronUi_Help(ui, "Point at a cockpit button and pull the trigger to press it.");
+	if (changed && !XwaModernInputOptions_Set(&options))
+		XwaOptionsWindow_ReportError("The VR options are invalid.");
+}
+
 static void XwaControllerSettings_AxisPage(XwaControllerSettings* settings, AeronUiContext* ui,
 										   const AeronControllerSnapshot* controller) {
 	if (AeronUi_SegmentedSelector(ui, "Flight Axis", &settings->axis, k_axis_names, XWA_INPUT_AXIS_COUNT))
 		AeronUi_CancelControllerCapture(ui);
 	XwaControllerSettings_AxisEditor(settings, ui, controller, (XwaInputAxis)settings->axis);
 	XwaControllerSettings_Rumble(ui);
+	XwaControllerSettings_Vr(ui);
 }
 
 static void XwaControllerSettings_AxisConflictModal(XwaControllerSettings* settings, AeronUiContext* ui,
@@ -708,8 +765,10 @@ static void XwaControllerSettings_RestoreModal(XwaControllerSettings* settings, 
 			XwaControllerModel* selected = &candidate.models[model];
 			selected->kind = device->kind;
 			XwaControllerOptions_ClearProfile(&selected->profile, device->kind);
-			if (device->kind == AERON_CONTROLLER_KIND_GAMEPAD)
-				selected->profile = *XwaModernInputOptions_GamepadDefaults();
+			const XwaControllerProfile* defaults =
+				XwaControllerDefaults_ForDevice(XwaModernInputOptions_ControllerDefaults(), device);
+			if (defaults)
+				selected->profile = *defaults;
 			settings->draft = candidate;
 			XwaControllerSettings_ApplyDraft(settings, false);
 			XwaControllerSettings_ResetDeviceEditState(settings, ui);

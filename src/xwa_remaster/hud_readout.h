@@ -24,6 +24,9 @@ void XwaRemasterHudReadout_PrepareDrawList(AeronCommandBuffer* cmd, int target_w
    covers the whole target. */
 void XwaRemasterHudReadout_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								  int target_w, int target_h, AeronScene3D* scene);
+/* Draws the readout on its planes. It isn't hidden by the scene's depth. */
+void XwaRemasterHudReadout_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+										AeronRenderTarget* target, const float view[12]);
 
 #ifdef __cplusplus
 }

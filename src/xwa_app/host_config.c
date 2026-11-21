@@ -5,6 +5,7 @@
 #include "aeron/numeric.h"
 #include "controller_config.h"
 #include "keyboard_config.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
@@ -323,11 +324,9 @@ static int host_config_captured_lighting(const AeronConfigFile* config, int requ
 static int host_config_option_sections(const AeronConfigFile* config, int required, char* error,
 									   size_t error_size) {
 	XwaOptionSection* const sections[] = {
-		XwaModernCameraOptions_Section(),
-		XwaModernCameraShakeOptions_Section(),
-		XwaModernSunOptions_Section(),
-		XwaModernSpeedEffectOptions_Section(),
-		XwaModernTargetReadoutOptions_Section(),
+		XwaModernAudioOptions_Section(),       XwaModernCameraOptions_Section(),
+		XwaModernCameraShakeOptions_Section(), XwaModernSunOptions_Section(),
+		XwaModernSpeedEffectOptions_Section(), XwaModernTargetReadoutOptions_Section(),
 	};
 
 	for (size_t i = 0; i < sizeof sections / sizeof sections[0]; ++i) {
@@ -360,7 +359,8 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 }
 
 static int host_config_shipped_input(const AeronConfigFile* config, XwaModernInputOptions* out,
-									 XwaControllerProfile* gamepad_defaults, char* error, size_t error_size);
+									 XwaControllerDefaults* controller_defaults, char* error,
+									 size_t error_size);
 
 static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, char* error,
 										   size_t error_size) {
@@ -376,10 +376,10 @@ static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, ch
 		AeronConfigFile_Destroy(config);
 		return host_config_error(error, error_size, "shipped configuration root must be a mapping: %s", path);
 	}
-	valid =
-		host_config_remaster_options(config, 1, out, error, error_size) &&
-		host_config_shipped_input(config, &out->input_defaults, &out->gamepad_defaults, error, error_size) &&
-		host_config_option_sections(config, 1, error, error_size);
+	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
+			host_config_shipped_input(config, &out->input_defaults, &out->controller_defaults, error,
+									  error_size) &&
+			host_config_option_sections(config, 1, error, error_size);
 	if (valid) {
 		out->input_options = out->input_defaults;
 	}
@@ -417,9 +417,150 @@ static int host_config_named_value(const AeronConfigFile* config, const char* ke
 	return host_config_error(error, error_size, "invalid video setting '%s'", key);
 }
 
+/* Reads a number of the video section that must be from `min` to `max`. */
+static int host_config_video_float(const AeronConfigFile* config, const char* key, float min, float max,
+								   float* out, unsigned int override_bit, unsigned int* override_mask,
+								   char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		return 1;
+	}
+	const double value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < min || value > max) {
+		char message[160];
+		snprintf(message, sizeof message, "invalid '%s': expected a number from %g to %g", key, (double)min,
+				 (double)max);
+		return host_config_error(error, error_size, "%s", message);
+	}
+	*out = (float)value;
+	*override_mask |= override_bit;
+	return 1;
+}
+
+static int host_config_surround_options(const AeronConfigFile* config, XwaModernSurroundOptions* out,
+										unsigned int* override_mask, char* error, size_t error_size) {
+	static const char* const switch_names[] = { "off", "on" };
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, "video.surround");
+	if (node && AeronConfigNode_Type(node) == AERON_CONFIG_BOOL) {
+		out->enabled = AeronConfigNode_Bool(node, 0);
+		*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_SURROUND;
+	} else if (!host_config_named_value(config, "video.surround", switch_names, 2, &out->enabled,
+										XWA_MODERN_VIDEO_OVERRIDE_SURROUND, override_mask, error,
+										error_size)) {
+		return 0;
+	}
+	return host_config_video_float(config, "video.surround_screen_width_mm", XWA_MODERN_SURROUND_SIZE_MIN_MM,
+								   XWA_MODERN_SURROUND_SIZE_MAX_MM, &out->screen_width_mm,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_WIDTH, override_mask, error,
+								   error_size) &&
+		   host_config_video_float(config, "video.surround_screen_height_mm", XWA_MODERN_SURROUND_SIZE_MIN_MM,
+								   XWA_MODERN_SURROUND_SIZE_MAX_MM, &out->screen_height_mm,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_HEIGHT, override_mask, error,
+								   error_size) &&
+		   host_config_video_float(config, "video.surround_bezel_mm", 0.0f, XWA_MODERN_SURROUND_BEZEL_MAX_MM,
+								   &out->bezel_mm, XWA_MODERN_VIDEO_OVERRIDE_SURROUND_BEZEL, override_mask,
+								   error, error_size) &&
+		   host_config_video_float(config, "video.surround_distance_mm", XWA_MODERN_SURROUND_DISTANCE_MIN_MM,
+								   XWA_MODERN_SURROUND_DISTANCE_MAX_MM, &out->distance_mm,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_DISTANCE, override_mask, error,
+								   error_size) &&
+		   host_config_video_float(config, "video.surround_side_angle_deg", 0.0f,
+								   XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, &out->side_angle_deg,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE, override_mask, error,
+								   error_size);
+}
+
+static const char* const host_config_vr_mode_names[] = { "off", "on" };
+
+/* Reads video.vr_mode: off or on, which YAML also reads as booleans. The
+ * names auto and required, which earlier builds wrote, mean on. */
+static int host_config_vr_mode(const AeronConfigFile* config, int* out, unsigned int override_bit,
+							   unsigned int* override_mask, char* error, size_t error_size) {
+	static const char* const names[] = { "off", "on", "auto", "required" };
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, "video.vr_mode");
+	int value = 0;
+
+	if (node && AeronConfigNode_Type(node) == AERON_CONFIG_BOOL) {
+		*out = AeronConfigNode_Bool(node, 0) ? XWA_MODERN_VR_ON : XWA_MODERN_VR_OFF;
+		*override_mask |= override_bit;
+		return 1;
+	}
+	if (!host_config_named_value(config, "video.vr_mode", names, sizeof names / sizeof names[0], &value,
+								 override_bit, override_mask, error, error_size)) {
+		return 0;
+	}
+	if (node) {
+		*out = value == 0 ? XWA_MODERN_VR_OFF : XWA_MODERN_VR_ON;
+	}
+	return 1;
+}
+
+/* Reads the virtual screen's settings from the presentation section of
+ * the shipped remaster/config.yaml. A missing or bad value keeps Aeron's
+ * default; the flight renderer reports the file's problems later. */
+static void host_config_startup_screen(AeronVfs* vfs, AeronStartupOptions* options) {
+	AeronConfigFile* config = NULL;
+	AeronConfigError config_error = { 0 };
+
+	if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_RESOURCE, "remaster/config.yaml") ||
+		!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_RESOURCE, "remaster/config.yaml", &config,
+									&config_error)) {
+		return;
+	}
+	const int width = (int)AeronConfigFile_GetInt(config, "presentation.vr_screen_width_px", 0);
+	const int height = (int)AeronConfigFile_GetInt(config, "presentation.vr_screen_height_px", 0);
+	/* The screen's width is given as an angle, so changing the distance doesn't
+	 * change how large it looks. */
+	const double distance = AeronConfigFile_GetFloat(config, "presentation.vr_screen_distance_m", 0.0);
+	const double width_deg = AeronConfigFile_GetFloat(config, "presentation.vr_screen_width_deg", 0.0);
+	if (width >= 640 && width <= 8192 && height >= 480 && height <= 8192) {
+		options->xr_screen_width = width;
+		options->xr_screen_height = height;
+	}
+	if (distance >= 0.5 && distance <= 20.0 && width_deg >= 10.0 && width_deg <= 120.0) {
+		options->xr_screen_distance_m = (float)distance;
+		options->xr_screen_width_m =
+			(float)(2.0 * distance * tan(width_deg * 0.5 * 3.14159265358979 / 180.0));
+	}
+	AeronConfigFile_Destroy(config);
+}
+
+void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, AeronStartupOptions* options) {
+	AeronConfigFile* config = NULL;
+	AeronConfigError config_error = { 0 };
+	unsigned int override_mask = 0;
+	char error[256];
+	int value = XWA_MODERN_VR_OFF;
+	float scale = 1.0f;
+
+	options->xr_mode = AERON_XR_OFF;
+	if (!vfs) {
+		return;
+	}
+	host_config_startup_screen(vfs, options);
+	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, "config.yaml") &&
+		AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_USER, "config.yaml", &config, &config_error)) {
+		/* A build without VR ignores the setting, which its options window
+		   doesn't show. */
+		if (host_config_vr_mode(config, &value, 1u, &override_mask, error, sizeof error) &&
+			Aeron_XrSupported()) {
+			options->xr_mode = value == XWA_MODERN_VR_ON ? AERON_XR_ON : AERON_XR_OFF;
+		}
+		if (host_config_video_float(config, "video.vr_render_scale", XWA_MODERN_VR_SCALE_MIN,
+									XWA_MODERN_VR_SCALE_MAX, &scale, 1u, &override_mask, error,
+									sizeof error)) {
+			options->xr_render_scale = scale;
+		}
+		AeronConfigFile_Destroy(config);
+	}
+	if (launch && launch->vr) {
+		options->xr_mode = launch->vr > 0 ? AERON_XR_ON : AERON_XR_OFF;
+	}
+}
+
 static int host_config_video_options(const AeronConfigFile* config, XwaModernVideoOptions* out,
 									 unsigned int* override_mask, char* error, size_t error_size) {
-	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
+	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
@@ -436,6 +577,45 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	out->window_mode = (XwaModernWindowMode)value;
+	if (!host_config_surround_options(config, &out->surround, override_mask, error, error_size)) {
+		return 0;
+	}
+	value = XWA_MODERN_VR_OFF;
+	if (!host_config_vr_mode(config, &value, XWA_MODERN_VIDEO_OVERRIDE_VR_MODE, override_mask, error,
+							 error_size)) {
+		return 0;
+	}
+	out->vr_mode = (XwaModernVrMode)value;
+	if (!host_config_video_float(config, "video.vr_render_scale", XWA_MODERN_VR_SCALE_MIN,
+								 XWA_MODERN_VR_SCALE_MAX, &out->vr_render_scale,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_RENDER_SCALE, override_mask, error,
+								 error_size) ||
+		!host_config_video_float(config, "video.vr_world_scale", XWA_MODERN_VR_SCALE_MIN,
+								 XWA_MODERN_VR_SCALE_MAX, &out->vr_world_scale,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_WORLD_SCALE, override_mask, error,
+								 error_size) ||
+		!host_config_video_float(config, "video.vr_panel_scale", XWA_MODERN_VR_PANEL_SCALE_MIN,
+								 XWA_MODERN_VR_PANEL_SCALE_MAX, &out->vr_panel_scale,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE, override_mask, error,
+								 error_size) ||
+		!host_config_video_float(config, "video.vr_screen_scale", XWA_MODERN_VR_SCALE_MIN,
+								 XWA_MODERN_VR_SCALE_MAX, &out->vr_screen_scale,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE, override_mask, error,
+								 error_size)) {
+		return 0;
+	}
+	{
+		static const char* const mirror_names[] = { "off", "on" };
+		const AeronConfigNode* mirror_node = AeronConfigFile_GetNode(config, "video.vr_mirror");
+		if (mirror_node && AeronConfigNode_Type(mirror_node) == AERON_CONFIG_BOOL) {
+			out->vr_mirror = AeronConfigNode_Bool(mirror_node, 1);
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR;
+		} else if (!host_config_named_value(config, "video.vr_mirror", mirror_names, 2, &out->vr_mirror,
+											XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR, override_mask, error,
+											error_size)) {
+			return 0;
+		}
+	}
 
 	value = 0;
 	if (!host_config_named_value(config, "video.ssao_quality", quality_names,
@@ -639,9 +819,51 @@ static int host_config_input_int(const AeronConfigFile* config, const char* key,
 	return 1;
 }
 
+static const char* const k_vr_stick_names[XWA_MODERN_VR_STICK_MODE_COUNT] = { "off", "tilt", "slide" };
+static const char* const k_vr_hand_names[] = { "left", "right" };
+
+/* Reads an input setting that is one of `count` names. */
+static int host_config_input_name(const AeronConfigFile* config, const char* key, int required,
+								  const char* const* names, int count, int* out, char* error,
+								  size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_String(node, NULL);
+	for (int i = 0; value && i < count; i++) {
+		if (strcmp(value, names[i]) == 0) {
+			*out = i;
+			return 1;
+		}
+	}
+	return host_config_error(error, error_size, "invalid input setting '%s'", key);
+}
+
+/* Reads a number of the input section that must be from `min` to `max`. */
+static int host_config_input_float(const AeronConfigFile* config, const char* key, int required, float min,
+								   float max, float* out, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	const double value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < min || value > max) {
+		char message[160];
+		snprintf(message, sizeof message, "invalid '%s': expected a number from %g to %g", key, (double)min,
+				 (double)max);
+		return host_config_error(error, error_size, "%s", message);
+	}
+	*out = (float)value;
+	return 1;
+}
+
 static int host_config_input_scalars(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
 									 char* error, size_t error_size) {
 	const AeronConfigNode* node;
+	int stick = out->vr_stick;
 
 	if (!host_config_input_bool(config, "input.mouse_flight", required, &out->mouse_flight_enabled, error,
 								error_size) ||
@@ -652,8 +874,34 @@ static int host_config_input_scalars(const AeronConfigFile* config, int required
 								error_size) ||
 		!host_config_input_bool(config, "input.rumble_enabled", required, &out->rumble_enabled, error,
 								error_size) ||
+		!host_config_input_bool(config, "input.vr_show_hands", required, &out->vr_show_hands, error,
+								error_size) ||
+		!host_config_input_bool(config, "input.vr_mod_hands", required, &out->vr_mod_hands, error,
+								error_size) ||
+		!host_config_input_bool(config, "input.vr_mod_keyboard", required, &out->vr_mod_keyboard, error,
+								error_size) ||
+		!host_config_input_bool(config, "input.vr_menu_controllers", required, &out->vr_menu_controllers,
+								error, error_size) ||
 		!host_config_input_int(config, "input.rumble_strength", required, XWA_MODERN_RUMBLE_STRENGTH_MIN,
 							   XWA_MODERN_RUMBLE_STRENGTH_MAX, &out->rumble_strength, error, error_size)) {
+		return 0;
+	}
+
+	if (!host_config_input_bool(config, "input.vr_throttle", required, &out->vr_throttle, error,
+								error_size) ||
+		!host_config_input_name(config, "input.vr_stick", required, k_vr_stick_names,
+								XWA_MODERN_VR_STICK_MODE_COUNT, &stick, error, error_size) ||
+		!host_config_input_name(config, "input.vr_stick_hand", required, k_vr_hand_names, 2,
+								&out->vr_stick_hand, error, error_size)) {
+		return 0;
+	}
+	out->vr_stick = (XwaModernVrStickMode)stick;
+	if (!host_config_input_bool(config, "input.vr_cockpit_buttons", required, &out->vr_cockpit_buttons, error,
+								error_size) ||
+		!host_config_input_float(config, "input.vr_stick_range", required, XWA_MODERN_VR_STICK_RANGE_MIN,
+								 XWA_MODERN_VR_STICK_RANGE_MAX, &out->vr_stick_range, error, error_size) ||
+		!host_config_input_float(config, "input.vr_button_ray_m", required, XWA_MODERN_VR_BUTTON_RAY_MIN_M,
+								 XWA_MODERN_VR_BUTTON_RAY_MAX_M, &out->vr_button_ray_m, error, error_size)) {
 		return 0;
 	}
 
@@ -691,12 +939,17 @@ static int host_config_validate_input(const XwaModernInputOptions* options, cons
 
 /* The input section of the shipped file. Every key is required. */
 static int host_config_shipped_input(const AeronConfigFile* config, XwaModernInputOptions* out,
-									 XwaControllerProfile* gamepad_defaults, char* error, size_t error_size) {
+									 XwaControllerDefaults* controller_defaults, char* error,
+									 size_t error_size) {
 	memset(out, 0, sizeof *out);
 	return host_config_input_scalars(config, 1, out, error, error_size) &&
 		   XwaControllerConfig_Parse(config, &out->controllers, error, error_size) &&
 		   XwaControllerConfig_ReadProfile(config, "input.gamepad_defaults", AERON_CONTROLLER_KIND_GAMEPAD,
-										   gamepad_defaults, error, error_size) &&
+										   &controller_defaults->gamepad, error, error_size) &&
+		   XwaControllerConfig_ReadProfile(config, "input.vr_left_defaults", AERON_CONTROLLER_KIND_VR_HAND,
+										   &controller_defaults->vr_left, error, error_size) &&
+		   XwaControllerConfig_ReadProfile(config, "input.vr_right_defaults", AERON_CONTROLLER_KIND_VR_HAND,
+										   &controller_defaults->vr_right, error, error_size) &&
 		   XwaKeyboardConfig_Read(config, &out->keyboard, error, error_size) &&
 		   host_config_validate_input(out, "remaster/config.yaml", error, error_size);
 }
@@ -826,9 +1079,13 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		AeronConfigFile_Destroy(config);
 		return 0;
 	}
-	if (AeronConfigFile_Has(config, "input.gamepad_defaults")) {
-		Aeron_LogWarn("xwa.config",
-					  "'input.gamepad_defaults' in %s is ignored; it is read from the shipped file", path);
+	static const char* const shipped_only[] = { "input.gamepad_defaults", "input.vr_left_defaults",
+												"input.vr_right_defaults" };
+	for (size_t i = 0; i < sizeof shipped_only / sizeof shipped_only[0]; ++i) {
+		if (AeronConfigFile_Has(config, shipped_only[i])) {
+			Aeron_LogWarn("xwa.config", "'%s' in %s is ignored; it is read from the shipped file",
+						  shipped_only[i], path);
+		}
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
 		Aeron_LogWarn("xwa.config",
@@ -882,7 +1139,7 @@ static int host_config_save_user_document(AeronVfs* vfs, AeronConfigFile* docume
 
 static int host_config_set_video_options(AeronConfigFile* document, const XwaModernVideoOptions* options,
 										 AeronConfigError* error) {
-	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
+	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
@@ -891,8 +1148,17 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 	static const char* const paper_white_names[] = { "auto", "100", "150", "200", "250", "300", "400" };
 
 	if (!options || options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
-		options->window_mode > XWA_MODERN_WINDOW_MODE_FULLSCREEN ||
-		options->ssao_quality < XWA_MODERN_SSAO_OFF || options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
+		options->window_mode > XWA_MODERN_WINDOW_MODE_SPAN ||
+		!XwaModernSurroundOptions_Valid(&options->surround) || options->vr_mode < XWA_MODERN_VR_OFF ||
+		options->vr_mode > XWA_MODERN_VR_ON || !(options->vr_render_scale >= XWA_MODERN_VR_SCALE_MIN) ||
+		options->vr_render_scale > XWA_MODERN_VR_SCALE_MAX ||
+		!(options->vr_world_scale >= XWA_MODERN_VR_SCALE_MIN) ||
+		options->vr_world_scale > XWA_MODERN_VR_SCALE_MAX ||
+		!(options->vr_panel_scale >= XWA_MODERN_VR_PANEL_SCALE_MIN) ||
+		options->vr_panel_scale > XWA_MODERN_VR_PANEL_SCALE_MAX ||
+		!(options->vr_screen_scale >= XWA_MODERN_VR_SCALE_MIN) ||
+		options->vr_screen_scale > XWA_MODERN_VR_SCALE_MAX || options->ssao_quality < XWA_MODERN_SSAO_OFF ||
+		options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
 		options->shadow_quality < XWA_MODERN_SHADOW_STANDARD ||
 		options->shadow_quality > XWA_MODERN_SHADOW_HIGH || options->fsr_upscaling < XWA_MODERN_FSR_OFF ||
 		options->fsr_upscaling > XWA_MODERN_FSR_NATIVE_AA || options->msaa < XWA_MODERN_MSAA_OFF ||
@@ -928,6 +1194,23 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		   AeronConfigFile_SetString(document, "video.paper_white_nits",
 									 paper_white_names[options->paper_white], error) &&
 		   AeronConfigFile_SetFloat(document, "video.hud_scale", options->hud_scale, error) &&
+		   AeronConfigFile_SetBool(document, "video.surround", options->surround.enabled, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_screen_width_mm",
+									options->surround.screen_width_mm, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_screen_height_mm",
+									options->surround.screen_height_mm, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_bezel_mm", options->surround.bezel_mm, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_distance_mm", options->surround.distance_mm,
+									error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_side_angle_deg",
+									options->surround.side_angle_deg, error) &&
+		   AeronConfigFile_SetString(document, "video.vr_mode", host_config_vr_mode_names[options->vr_mode],
+									 error) &&
+		   AeronConfigFile_SetFloat(document, "video.vr_render_scale", options->vr_render_scale, error) &&
+		   AeronConfigFile_SetFloat(document, "video.vr_world_scale", options->vr_world_scale, error) &&
+		   AeronConfigFile_SetBool(document, "video.vr_mirror", options->vr_mirror, error) &&
+		   AeronConfigFile_SetFloat(document, "video.vr_panel_scale", options->vr_panel_scale, error) &&
+		   AeronConfigFile_SetFloat(document, "video.vr_screen_scale", options->vr_screen_scale, error) &&
 		   AeronConfigFile_SetBool(document, "video.smooth_menu_fonts", options->smooth_menu_fonts, error);
 }
 
@@ -962,6 +1245,14 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 									defaults->mouse_invert_y, error) &&
 		 host_config_set_input_bool(document, "input.rumble_enabled", options->rumble_enabled,
 									defaults->rumble_enabled, error) &&
+		 host_config_set_input_bool(document, "input.vr_show_hands", options->vr_show_hands,
+									defaults->vr_show_hands, error) &&
+		 host_config_set_input_bool(document, "input.vr_mod_hands", options->vr_mod_hands,
+									defaults->vr_mod_hands, error) &&
+		 host_config_set_input_bool(document, "input.vr_mod_keyboard", options->vr_mod_keyboard,
+									defaults->vr_mod_keyboard, error) &&
+		 host_config_set_input_bool(document, "input.vr_menu_controllers", options->vr_menu_controllers,
+									defaults->vr_menu_controllers, error) &&
 		 host_config_set_input_int(document, "input.rumble_strength", options->rumble_strength,
 								   defaults->rumble_strength, error);
 	if (ok) {
@@ -969,6 +1260,28 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 				 ? host_config_remove_key(document, "input.mouse_mode", error)
 				 : AeronConfigFile_SetString(document, "input.mouse_mode", mode_names[options->mouse_mode],
 											 error);
+	}
+	if (ok) {
+		ok = host_config_set_input_bool(document, "input.vr_throttle", options->vr_throttle,
+										defaults->vr_throttle, error) &&
+			 host_config_set_input_bool(document, "input.vr_cockpit_buttons", options->vr_cockpit_buttons,
+										defaults->vr_cockpit_buttons, error) &&
+			 (options->vr_button_ray_m == defaults->vr_button_ray_m
+				  ? host_config_remove_key(document, "input.vr_button_ray_m", error)
+				  : AeronConfigFile_SetFloat(document, "input.vr_button_ray_m", options->vr_button_ray_m,
+											 error)) &&
+			 (options->vr_stick == defaults->vr_stick
+				  ? host_config_remove_key(document, "input.vr_stick", error)
+				  : AeronConfigFile_SetString(document, "input.vr_stick", k_vr_stick_names[options->vr_stick],
+											  error)) &&
+			 (options->vr_stick_hand == defaults->vr_stick_hand
+				  ? host_config_remove_key(document, "input.vr_stick_hand", error)
+				  : AeronConfigFile_SetString(document, "input.vr_stick_hand",
+											  k_vr_hand_names[options->vr_stick_hand], error)) &&
+			 (options->vr_stick_range == defaults->vr_stick_range
+				  ? host_config_remove_key(document, "input.vr_stick_range", error)
+				  : AeronConfigFile_SetFloat(document, "input.vr_stick_range", options->vr_stick_range,
+											 error));
 	}
 	/* input.controllers replaces the shipped list as a whole. */
 	if (ok) {
@@ -1022,7 +1335,7 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 	static XwaModernInputOptions defaults;
 	static XwaModernInputOptions expected;
 	static XwaModernInputOptions saved;
-	XwaControllerProfile gamepad_defaults;
+	static XwaControllerDefaults controller_defaults;
 	AeronConfigFile* shipped = NULL;
 	AeronConfigFile* document = NULL;
 	AeronConfigError config_error = { 0 };
@@ -1038,7 +1351,7 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 								 "required shipped configuration unavailable or invalid: %s",
 								 "remaster/config.yaml");
 	}
-	valid = host_config_shipped_input(shipped, &defaults, &gamepad_defaults, error, error_size);
+	valid = host_config_shipped_input(shipped, &defaults, &controller_defaults, error, error_size);
 	AeronConfigFile_Destroy(shipped);
 	if (!valid) {
 		return 0;
@@ -1068,6 +1381,37 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "the input settings would not load again: %s",
 								 "the saved values differ");
+	}
+	return host_config_save_user_document(vfs, document, error, error_size);
+}
+
+int XwaHostConfig_SaveAudioOptions(AeronVfs* vfs, const XwaModernAudioOptions* options, char* error,
+								   size_t error_size) {
+	static const char* const outputs[] = { "speakers", "headphones" };
+	static const char* const layouts[] = { "stereo", "5.1", "7.1" };
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
+
+	if (!vfs || !options || options->output < 0 || options->output > 1 || options->speaker_layout < 0 ||
+		options->speaker_layout > 2) {
+		return host_config_error(error, error_size, "cannot save invalid audio settings to %s",
+								 "config.yaml");
+	}
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!AeronConfigFile_SetString(document, "audio.output", outputs[options->output], &config_error) ||
+		!AeronConfigFile_SetString(document, "audio.speaker_layout", layouts[options->speaker_layout],
+								   &config_error) ||
+		!AeronConfigFile_SetBool(document, "audio.distance_filter", options->distance_filter,
+								 &config_error) ||
+		/* An earlier version saved a doppler option, which no longer exists:
+		   doppler doesn't suit the game's supersonic laser bolts. */
+		(AeronConfigFile_Has(document, "audio.doppler") &&
+		 !AeronConfigFile_Remove(document, "audio.doppler", &config_error))) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message[0] ? config_error.message : "invalid audio settings");
 	}
 	return host_config_save_user_document(vfs, document, error, error_size);
 }

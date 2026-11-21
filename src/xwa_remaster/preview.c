@@ -185,8 +185,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	/* The preview's exposure comes from its own light. */
 	const float exposure = XwaRemasterFlight_LightMeterExposure(linear_lights, linear_light_count);
 	AeronScene_SetExposure(s.scene, exposure);
-	XwaRemasterShip_SetPbrEnv(s.scene, linear_lights, linear_light_count, -1, p->cam_rows, NULL,
-							  ao_on ? &ao : NULL,
+	XwaRemasterShip_SetPbrEnv(s.scene, linear_lights, linear_light_count, -1, p->cam_rows, ao_on ? &ao : NULL,
 							  /*ambient_cube=*/NULL, /*environment_map=*/NULL, /*key_probe_shadow=*/-1.0f);
 
 	/* Model->eye ("world") instance. The engine consumes the captured
@@ -252,7 +251,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 			const float scale = (float)(0.60000002 - (double)(flick & 0xf) * 0.0024999999);
 			XwaRemasterShip_SubmitEngineGlows(s.scene, mesh, inst.transform, k, table,
 											  /*knockout_mask=*/NULL, /*hidden_mask=*/NULL, scale,
-											  /*crows=*/NULL, /*cam_pos=*/NULL, glow_tex);
+											  /*crows=*/NULL, /*cam_pos=*/NULL, /*view_mask=*/0, glow_tex);
 		}
 	}
 
@@ -271,7 +270,8 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	AeronTexture* bloom_tex = NULL;
 	const float bloom_intensity = AeronSceneBloom_Intensity();
 	if (bloom_intensity > 0.0f) {
-		if (!AeronSceneBloom_Apply(s.bloom, cmd, scene_tex, PREVIEW_RT_W, PREVIEW_RT_H, PREVIEW_RT_H, NULL, NULL)) {
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, scene_tex, PREVIEW_RT_W, PREVIEW_RT_H, PREVIEW_RT_H, NULL,
+								   NULL, NULL)) {
 			Aeron_CommandBufferSetFailure(cmd, "Model-preview bloom recording failed");
 			return NULL;
 		}
@@ -295,7 +295,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	static const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, bloom_tex, bloom_intensity, exposure,
 								NULL, PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f, tint,
-								/*src_coverage=*/1);
+								/*src_coverage=*/1, NULL, NULL);
 	Aeron_EndRenderPass(pp);
 	return Aeron_RenderTargetGetTexture(s.present[slot]);
 }

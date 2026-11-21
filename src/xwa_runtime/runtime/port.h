@@ -48,6 +48,22 @@ void XwaPort_RequestOptionsWindowClose(void);
 int XwaPort_ConsumeOptionsWindowCloseRequest(void);
 void XwaPort_SetOptionsWindowOpen(int open);
 int XwaPort_OptionsWindowOpen(void);
+/* Whether the game pauses because the window is open: always, except in a
+ * network session. The host then runs XwaPort_PausedFrame instead of
+ * XwaPort_Tick, as for its own pause, and pauses the audio. */
+int XwaPort_OptionsWindowPausesGame(void);
+/* Whether the game is in a network session, where the other players don't
+ * wait. */
+int XwaPort_InNetworkSession(void);
+/* Whether a flight runs, such as a mission. Quitting ends it. */
+int XwaPort_InFlight(void);
+/* Whether a pilot is loaded. */
+int XwaPort_HasPilot(void);
+/* While set, the cockpit view can't be turned with the look keys, the hat,
+ * the mouse look or the padlock, and the enhanced camera doesn't sway the
+ * cockpit view. A headset sets it: the player's head turns the view. */
+void XwaPort_SetCockpitLookSuppressed(int suppressed);
+int XwaPort_CockpitLookSuppressed(void);
 /* While the window captures a key for a binding, the host shortcuts are
  * not run. */
 void XwaPort_SetShortcutsCaptured(int captured);

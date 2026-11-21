@@ -32,7 +32,7 @@ typedef struct MissionSettingsName {
 } MissionSettingsName;
 
 typedef struct MissionSettings {
-	int redAlert; /* -1: the stock rule */
+	int redAlert;                   /* -1: the stock rule */
 	int hideHyperspaceExitMessages; /* -1: the stock rule */
 	int hideFriendlyArrivalMessages;
 	int skipArrivalIff; /* an IFF, or SETTINGS_IFF_* */
@@ -84,6 +84,28 @@ static int s_missileDefenseAnyWarhead;
 static int s_rackCountFromRecord;
 static int s_overlappingFlyBySounds;
 static int s_hangarDroidPartsFromModel;
+static int s_noPilotEjections;
+static int s_noEscapePodEjections;
+static int s_ejectedCraftTeam9;
+static int s_ejectedCraftSkipSetup;
+static int s_skirmishEjections;
+static int s_aiWarheadsAttackOnHit;
+static int s_oneJammingBeamStopsTurrets;
+static int s_twoLauncherAdvancedMissiles;
+static int s_noTurretIdleSpin;
+static int s_noTopAiDualWarheads;
+static int s_noTurretWarheadSelfDefense;
+static int s_noTurretWarheadEscortDefense;
+static int s_noExplosionSplashDamage;
+static int s_noEngineWash;
+static int s_aiShieldsChargeToFull;
+static int s_playerAttackerLimitByDifficulty;
+static int s_noThrottleTurnRate;
+static int s_noEnergyTurnRate;
+static int s_noAiLaserConvergence;
+static int s_noPlayerLaserConvergence;
+static int s_noDifficultyRankChanges;
+static int s_aiArrivalStopsBeforePoint;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -511,6 +533,28 @@ void XwaMissionSettings_Init(void) {
 	s_rackCountFromRecord = 0;
 	s_overlappingFlyBySounds = 0;
 	s_hangarDroidPartsFromModel = 0;
+	s_noPilotEjections = 0;
+	s_noEscapePodEjections = 0;
+	s_ejectedCraftTeam9 = 0;
+	s_ejectedCraftSkipSetup = 0;
+	s_skirmishEjections = 0;
+	s_aiWarheadsAttackOnHit = 0;
+	s_oneJammingBeamStopsTurrets = 0;
+	s_twoLauncherAdvancedMissiles = 0;
+	s_noTurretIdleSpin = 0;
+	s_noTopAiDualWarheads = 0;
+	s_noTurretWarheadSelfDefense = 0;
+	s_noTurretWarheadEscortDefense = 0;
+	s_noExplosionSplashDamage = 0;
+	s_noEngineWash = 0;
+	s_aiShieldsChargeToFull = 0;
+	s_playerAttackerLimitByDifficulty = 0;
+	s_noThrottleTurnRate = 0;
+	s_noEnergyTurnRate = 0;
+	s_noAiLaserConvergence = 0;
+	s_noPlayerLaserConvergence = 0;
+	s_noDifficultyRankChanges = 0;
+	s_aiArrivalStopsBeforePoint = 0;
 	MissionSettings_ResetTargets();
 	root = XwaFlightConfig_Root();
 	rules = AeronConfigNode_MapGet(root, "rules");
@@ -623,6 +667,88 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "hangar_droid_parts_from_model", node,
 								 &s_hangarDroidPartsFromModel);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_pilot_ejections")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_pilot_ejections", node, &s_noPilotEjections);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_escape_pod_ejections")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_escape_pod_ejections", node,
+								 &s_noEscapePodEjections);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ejected_craft_team_9")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ejected_craft_team_9", node, &s_ejectedCraftTeam9);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ejected_craft_skip_setup")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ejected_craft_skip_setup", node,
+								 &s_ejectedCraftSkipSetup);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "skirmish_ejections")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "skirmish_ejections", node, &s_skirmishEjections);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ai_warheads_attack_on_hit")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_warheads_attack_on_hit", node,
+								 &s_aiWarheadsAttackOnHit);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "one_jamming_beam_stops_turrets")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "one_jamming_beam_stops_turrets", node,
+								 &s_oneJammingBeamStopsTurrets);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "two_launcher_advanced_missiles")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "two_launcher_advanced_missiles", node,
+								 &s_twoLauncherAdvancedMissiles);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_turret_idle_spin")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_turret_idle_spin", node, &s_noTurretIdleSpin);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_top_ai_dual_warheads")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_top_ai_dual_warheads", node,
+								 &s_noTopAiDualWarheads);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_turret_warhead_self_defense")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_turret_warhead_self_defense", node,
+								 &s_noTurretWarheadSelfDefense);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_turret_warhead_escort_defense")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_turret_warhead_escort_defense", node,
+								 &s_noTurretWarheadEscortDefense);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_explosion_splash_damage")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_explosion_splash_damage", node,
+								 &s_noExplosionSplashDamage);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_engine_wash")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_engine_wash", node, &s_noEngineWash);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ai_shields_charge_to_full")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_shields_charge_to_full", node,
+								 &s_aiShieldsChargeToFull);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "player_attacker_limit_by_difficulty")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "player_attacker_limit_by_difficulty", node,
+								 &s_playerAttackerLimitByDifficulty);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_throttle_turn_rate")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_throttle_turn_rate", node,
+								 &s_noThrottleTurnRate);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_energy_turn_rate")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_energy_turn_rate", node, &s_noEnergyTurnRate);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_ai_laser_convergence")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_ai_laser_convergence", node,
+								 &s_noAiLaserConvergence);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_player_laser_convergence")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_player_laser_convergence", node,
+								 &s_noPlayerLaserConvergence);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_difficulty_rank_changes")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_difficulty_rank_changes", node,
+								 &s_noDifficultyRankChanges);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ai_arrival_stops_before_point")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_arrival_stops_before_point", node,
+								 &s_aiArrivalStopsBeforePoint);
+	}
 	MissionSettings_Read(XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_MapGet(root, "mission_settings"),
 						 &s_defaults);
 	s_settings = s_defaults;
@@ -709,6 +835,28 @@ int XwaMissionSettings_WeaponRackCountFromRecord(void) { return s_rackCountFromR
 
 int XwaMissionSettings_OverlappingFlyBySounds(void) { return s_overlappingFlyBySounds; }
 int XwaMissionSettings_HangarDroidPartsFromModel(void) { return s_hangarDroidPartsFromModel; }
+int XwaMissionSettings_NoPilotEjections(void) { return s_noPilotEjections; }
+int XwaMissionSettings_NoEscapePodEjections(void) { return s_noEscapePodEjections; }
+int XwaMissionSettings_EjectedCraftTeam9(void) { return s_ejectedCraftTeam9; }
+int XwaMissionSettings_EjectedCraftSkipSetup(void) { return s_ejectedCraftSkipSetup; }
+int XwaMissionSettings_SkirmishEjections(void) { return s_skirmishEjections; }
+int XwaMissionSettings_AiWarheadsAttackOnHit(void) { return s_aiWarheadsAttackOnHit; }
+int XwaMissionSettings_OneJammingBeamStopsTurrets(void) { return s_oneJammingBeamStopsTurrets; }
+int XwaMissionSettings_TwoLauncherAdvancedMissiles(void) { return s_twoLauncherAdvancedMissiles; }
+int XwaMissionSettings_NoTurretIdleSpin(void) { return s_noTurretIdleSpin; }
+int XwaMissionSettings_NoTopAiDualWarheads(void) { return s_noTopAiDualWarheads; }
+int XwaMissionSettings_NoTurretWarheadSelfDefense(void) { return s_noTurretWarheadSelfDefense; }
+int XwaMissionSettings_NoTurretWarheadEscortDefense(void) { return s_noTurretWarheadEscortDefense; }
+int XwaMissionSettings_NoExplosionSplashDamage(void) { return s_noExplosionSplashDamage; }
+int XwaMissionSettings_NoEngineWash(void) { return s_noEngineWash; }
+int XwaMissionSettings_AiShieldsChargeToFull(void) { return s_aiShieldsChargeToFull; }
+int XwaMissionSettings_PlayerAttackerLimitByDifficulty(void) { return s_playerAttackerLimitByDifficulty; }
+int XwaMissionSettings_NoThrottleTurnRate(void) { return s_noThrottleTurnRate; }
+int XwaMissionSettings_NoEnergyTurnRate(void) { return s_noEnergyTurnRate; }
+int XwaMissionSettings_NoAiLaserConvergence(void) { return s_noAiLaserConvergence; }
+int XwaMissionSettings_NoPlayerLaserConvergence(void) { return s_noPlayerLaserConvergence; }
+int XwaMissionSettings_NoDifficultyRankChanges(void) { return s_noDifficultyRankChanges; }
+int XwaMissionSettings_AiArrivalStopsBeforePoint(void) { return s_aiArrivalStopsBeforePoint; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

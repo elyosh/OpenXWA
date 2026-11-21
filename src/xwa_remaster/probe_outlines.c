@@ -23,8 +23,11 @@ static const float outline_colors[8][3] = {
 };
 
 static struct {
+	/* One list for each view of the frame, and the list being built. */
+	AeronDrawList2D* lists[AERON_MAX_VIEWS];
 	AeronDrawList2D* list;
-	/* The frame's view, for the lines. */
+	AeronScene3D* scene;
+	/* The view the lines are built for. */
 	const XwaRemasterFlightView* view;
 	const float* world_to_eye;
 	const float* model;
@@ -35,8 +38,9 @@ static struct {
 static void outline_after_meshes(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								 void* user) {
 	(void)user;
-	if (target) {
-		AeronDrawList_RenderIntoPass(outline.list, cmd, pass, target);
+	AeronDrawList2D* list = outline.lists[AeronScene_CurrentView(outline.scene)];
+	if (target && list) {
+		AeronDrawList_RenderIntoPass(list, cmd, pass, target);
 	}
 }
 
@@ -169,38 +173,46 @@ static void outline_set(const AeronFlightProbeLayout* d) {
 }
 
 int XwaRemasterProbeOutlines_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene,
-									 const XwaRemasterFlightView* view, const float world_to_eye[9],
-									 const XwaProbeOutlineSet* sets, uint32_t count) {
-	if (!cmd || !scene || !view || !world_to_eye || !sets) {
+									 const XwaRemasterFlightView* views, const float (*world_to_eye)[9],
+									 int view_count, const XwaProbeOutlineSet* sets, uint32_t count) {
+	if (!cmd || !scene || !views || !world_to_eye || !sets || view_count <= 0 ||
+		view_count > AERON_MAX_VIEWS) {
 		return 0;
 	}
-	if (!outline.list) {
-		outline.list = AeronDrawList_Create(OUTLINE_RECORDS);
-		if (!outline.list) {
+	for (int v = 0; v < view_count; v++) {
+		const XwaRemasterFlightView* view = &views[v];
+		if (!outline.lists[v]) {
+			outline.lists[v] = AeronDrawList_Create(OUTLINE_RECORDS);
+			if (!outline.lists[v]) {
+				return 0;
+			}
+		}
+		outline.list = outline.lists[v];
+		AeronDrawList_Begin(outline.list, NULL, view->viewport.width, view->viewport.height,
+							AERON_DRAWLIST2D_LOAD, NULL);
+		outline.view = view;
+		outline.world_to_eye = world_to_eye[v];
+		outline.thickness = fmaxf(1.0f, view->classic_pixel_scale);
+		outline.points = 0;
+		for (uint32_t i = 0; i < count; i++) {
+			if (sets[i].probes) {
+				outline.model = sets[i].model;
+				outline_set(&sets[i].probes->layout);
+			}
+		}
+		outline.view = NULL;
+		if (!AeronDrawList_Prepare(outline.list, cmd)) {
 			return 0;
 		}
 	}
-	AeronDrawList_Begin(outline.list, NULL, view->viewport.width, view->viewport.height,
-						AERON_DRAWLIST2D_LOAD, NULL);
-	outline.view = view;
-	outline.world_to_eye = world_to_eye;
-	outline.thickness = fmaxf(1.0f, view->classic_pixel_scale);
-	outline.points = 0;
-	for (uint32_t i = 0; i < count; i++) {
-		if (sets[i].probes) {
-			outline.model = sets[i].model;
-			outline_set(&sets[i].probes->layout);
-		}
-	}
-	outline.view = NULL;
-	if (!AeronDrawList_Prepare(outline.list, cmd)) {
-		return 0;
-	}
+	outline.scene = scene;
 	AeronScene_SetAfterMeshes(scene, outline_after_meshes, NULL);
 	return 1;
 }
 
 void XwaRemasterProbeOutlines_Shutdown(void) {
-	AeronDrawList_Destroy(outline.list);
+	for (int v = 0; v < AERON_MAX_VIEWS; v++) {
+		AeronDrawList_Destroy(outline.lists[v]);
+	}
 	memset(&outline, 0, sizeof outline);
 }

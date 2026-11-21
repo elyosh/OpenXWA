@@ -9,8 +9,7 @@ Original game data is not included. Application resources, Metal shaders, and
 runtime libraries are contained inside the application and must not be moved
 out of it.
 
-`OpenXWA Mod Importer.app` imports a modded X-Wing Alliance installation into
-an OpenXWA mod folder, and chooses the mod that OpenXWA uses. Move it beside
-`OpenXWA.app`. It uses the same per-user configuration as OpenXWA.
+To import a modded X-Wing Alliance installation, such as XWAU or TFTC, into an
+OpenXWA mod, open OpenXWA Options from the datapad and choose the Mods tab.
 
 Third-party license notices are in the `licenses` directory beside this file.

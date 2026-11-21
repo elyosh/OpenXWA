@@ -1,8 +1,7 @@
 # macOS package build
 
-This native build produces a relocatable `OpenXWA.app`, the
-`OpenXWA Mod Importer.app` that goes with it, and a DMG disk image for the
-current Mac architecture. It downloads and builds pinned SDL3, zstd,
+This native build produces a relocatable `OpenXWA.app` and a DMG disk image
+for the current Mac architecture. It downloads and builds pinned SDL3, zstd,
 FFmpeg, and SDL_shadercross sources into a private build directory. Homebrew
 libraries are not embedded in the application.
 
@@ -15,7 +14,8 @@ contains only the minimal FFmpeg decoders and demuxer used by OpenXWA.
 - CMake 3.20 or later
 - Ninja
 - pkg-config
-- ISPC 1.30 or later, which compiles the mod importer's BC6H encoder
+- ISPC 1.30 or later, which compiles the BC6H encoder of the mod importer
+  built into OpenXWA
 - Git and Make
 
 The non-Apple build tools can be installed with Homebrew:
@@ -37,7 +37,6 @@ On Apple silicon the output is:
 ```text
 build/artifacts/openxwa-0.0.0-dev-macos-arm64-release.dmg
 build/cache/macos-arm64/stage-release/OpenXWA.app
-build/cache/macos-arm64/stage-release/OpenXWA Mod Importer.app
 ```
 
 `build/artifacts` holds final packages; `build/cache/macos-<architecture>`
@@ -45,8 +44,7 @@ holds the dependency sources, install prefixes, and build trees. The cache is
 safe to delete but expensive to rebuild — it includes the vendored DXC
 compiler.
 
-The DMG volume contains `OpenXWA.app`, `OpenXWA Mod Importer.app` and an
-`/Applications` symlink for drag-and-drop installation. It is an APFS image with LZMA compression, which
+The DMG volume contains `OpenXWA.app` and an `/Applications` symlink for drag-and-drop installation. It is an APFS image with LZMA compression, which
 requires macOS 10.15 or later to open — well below the 13.0 deployment target.
 
 The script performs an ad-hoc signature when no signing identity is supplied,
@@ -194,9 +192,8 @@ XWA_MACOS_NOTARY_PROFILE=XWA_NOTARY \
 ./packaging/macos/sign-package.sh openxwa-1.2.3-macos-arm64-release.dmg
 ```
 
-The script mounts the DMG, copies out `OpenXWA.app` and
-`OpenXWA Mod Importer.app`, signs them with the hardened runtime, notarizes
-and staples them the same way as a local Developer ID build, and rebuilds the
+The script mounts the DMG, copies out `OpenXWA.app`, signs it with the
+hardened runtime, notarizes and staples it the same way as a local Developer ID build, and rebuilds the
 DMG in place. A debug-symbol bundle in a Debug DMG is kept. With
 `XWA_MACOS_RELEASE_TAG=v1.2.3`, it also replaces the DMG on that GitHub
 release with `gh release upload --clobber`.

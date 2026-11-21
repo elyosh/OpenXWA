@@ -43,8 +43,8 @@ void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint
    replace the mod's and the mission's counts until
    XwaObjectLimits_ClearFilmCounts. If they don't divide evenly between the
    mission's regions and players, they are ignored and an error is logged. */
-void XwaObjectLimits_UseFilmCounts(uint32_t craftTotal, uint32_t projectileTotal, uint32_t playerProjectileTotal,
-								   uint32_t explosionTotal);
+void XwaObjectLimits_UseFilmCounts(uint32_t craftTotal, uint32_t projectileTotal,
+								   uint32_t playerProjectileTotal, uint32_t explosionTotal);
 void XwaObjectLimits_ClearFilmCounts(void);
 
 /* The counts of the mission that Mission_Init loaded last. */

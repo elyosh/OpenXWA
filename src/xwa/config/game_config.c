@@ -38,9 +38,8 @@
 #include "xwa/util/time.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
-#include "xwa_runtime/config/modern_mods.h"
-#include "xwa_runtime/config/modern_mods_screen.h"
 #include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/option_section.h"
@@ -180,13 +179,9 @@ int Config_MainMenuScreen(void) {
 	}
 #endif
 
-#ifdef XWA_MODERN
-	/* OpenXWA Options and Pilot Profiles, and outside flight, Mods. General
-	   Performance Tuning and Game Controller Options are not shown. */
-	rowCount = g_configRestrictedOptionsModalActive ? 7 : 11;
-#else
+	/* In OpenXWA, OpenXWA Options and Pilot Profiles take the rows of General
+	   Performance Tuning and Game Controller Options. */
 	rowCount = g_configRestrictedOptionsModalActive ? 7 : 10;
-#endif
 	y = 215 - ((25 * rowCount) >> 1);
 	keyState = (char)Config_GetMenuNavKey();
 	if (keyState == CONFIG_KEY_VK_UP) {
@@ -442,30 +437,6 @@ int Config_MainMenuScreen(void) {
 	}
 	y += 25;
 	++rowIndex;
-
-	/* The mod is chosen at startup, so it can't change during a flight. */
-	if (!g_configRestrictedOptionsModalActive) {
-		text = "Mods";
-		titleWidth = FrontendText_MeasureWidth(text, 20);
-		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
-		buttonPressed =
-			FrontendButton_DrawMenuButton(textX, y, text, 20, g_colorPaleBlue, 31, 0, "settingsound");
-		if (g_menuCursorRow == rowIndex) {
-			FrontendText_Draw(20, text, textX, y, g_colorGreen);
-			if (keyState == CONFIG_KEY_ENTER) {
-				FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-				Keyboard_FlushCharBuffer();
-				keyState = 0;
-				buttonPressed = 1;
-			}
-		}
-		if (buttonPressed) {
-			g_pendingMenuScreen = 23;
-			g_menuCursorRow = 0;
-		}
-		y += 25;
-		++rowIndex;
-	}
 #endif
 
 	text = FrontendString_Get(STR_CONFIG_RETURN_TO_GAME);
@@ -775,6 +746,11 @@ int Config_SoundOptionsScreen(void) {
 							&keyState, 22);
 	g_gameConfig.musicEnabled = (g_gameConfig.musicVolume != 0);
 
+#ifdef XWA_MODERN
+	/* Always on, so it can't be changed (see CONFIG_KEY_3D_SOUND_ENABLED). */
+	Config_DrawOptionCycleDisabled(&g_gameConfig.sound3dEnabled, STR_3D_SOUND_ENABLED,
+								   STR_CONFIG_3D_SOUND_OFF, 3, &y, &rowIndex, &keyState, 23);
+#else
 	if (g_configRestrictedOptionsModalActive) {
 		Config_DrawOptionCycleDisabled(&g_gameConfig.sound3dEnabled, STR_3D_SOUND_ENABLED,
 									   STR_CONFIG_3D_SOUND_OFF, 3, &y, &rowIndex, &keyState, 23);
@@ -782,8 +758,14 @@ int Config_SoundOptionsScreen(void) {
 		Config_DrawOptionCycle(&g_gameConfig.sound3dEnabled, STR_3D_SOUND_ENABLED, STR_CONFIG_3D_SOUND_OFF, 3,
 							   &y, &rowIndex, &keyState, 23);
 	}
+#endif
 
+#ifdef XWA_MODERN
+	/* Always 32, so it can't be changed (see CONFIG_KEY_NUMBER_OF_SFX). */
+	if (1) {
+#else
 	if (g_configRestrictedOptionsModalActive) {
+#endif
 		text = FrontendString_Get(STR_NUMBER_OF_CHANNELS);
 		textX = g_configMenuCenterX - FrontendText_MeasureWidth(text, 15) - 10;
 		if (g_menuCursorRow == rowIndex) {
@@ -959,7 +941,7 @@ int Config_SoundOptionsScreen(void) {
 #ifdef XWA_MODERN
 			/* 3D sound places each sound at its source and moves it with the
 			   source while it plays. */
-			g_gameConfig.sound3dEnabled = 1;
+			g_gameConfig.sound3dEnabled = (uint8_t)XwaModernAudioOptions_Sound3D();
 #else
 			g_gameConfig.sound3dEnabled = 0;
 #endif
@@ -2530,7 +2512,7 @@ static void Config_FinishOptionsDatapadClose(void) {
    The datapad redraws the current screen every frame inside its clip
    rectangle, so it shows only the main menu title meanwhile. */
 static void Config_OpenXwaOptionsScreen(void) {
-	const int rowCount = g_configRestrictedOptionsModalActive ? 7 : 11;
+	const int rowCount = g_configRestrictedOptionsModalActive ? 7 : 10;
 	const int y = 215 - ((25 * rowCount) >> 1);
 	const char* text;
 	unsigned int titleWidth;
@@ -2662,13 +2644,6 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			}
 			done = 0;
 			break;
-		case 23:
-			if (XwaModernModsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-				g_pendingMenuScreen = 0;
-				g_menuCursorRow = 8;
-			}
-			done = 0;
-			break;
 		case 24:
 			Config_OpenXwaOptionsScreen();
 			done = 0;
@@ -2698,9 +2673,9 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			XwaPort_RequestOptionsWindowClose();
 		}
 		XwaModernVideoOptions_Flush();
+		XwaModernAudioOptions_Flush();
 		XwaModernInputOptions_Flush();
 		XwaOptionSection_FlushAll();
-		XwaModernMods_Flush();
 		if (Movie_Play("dpclose", 1)) {
 			g_configOptionsDatapadClosingMovie = 1;
 			return 0;
@@ -5461,7 +5436,7 @@ static void Config_SetInitialDefaults(void) {
 #ifdef XWA_MODERN
 	/* 3D sound places each sound at its source and moves it with the source
 	   while it plays. Modern computers can play the most sounds at once. */
-	g_gameConfig.sound3dEnabled = 1;
+	g_gameConfig.sound3dEnabled = (uint8_t)XwaModernAudioOptions_Sound3D();
 	g_gameConfig.numberOfSfx = 32;
 #else
 	g_gameConfig.sound3dEnabled = 0;
@@ -5726,10 +5701,21 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 			break;
 #endif
 		case CONFIG_KEY_3D_SOUND_ENABLED:
+#ifdef XWA_MODERN
+			/* The modern build always uses 3D sound: the audio options of
+			   OpenXWA Options build on it. */
+			g_gameConfig.sound3dEnabled = (uint8_t)XwaModernAudioOptions_Sound3D();
+#else
 			g_gameConfig.sound3dEnabled = parsedU8;
+#endif
 			break;
 		case CONFIG_KEY_NUMBER_OF_SFX:
+#ifdef XWA_MODERN
+			/* The modern build always plays up to 32 sounds at once. */
+			g_gameConfig.numberOfSfx = 32;
+#else
 			g_gameConfig.numberOfSfx = parsedU8;
+#endif
 			break;
 		case CONFIG_KEY_HIT_EFFECTS1:
 		case CONFIG_KEY_HIT_EFFECTS2:

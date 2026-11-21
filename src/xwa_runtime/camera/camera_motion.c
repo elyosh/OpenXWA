@@ -7,6 +7,7 @@
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/units.h"
+#include "xwa_runtime/runtime/port.h"
 
 #include <math.h>
 #include <string.h>
@@ -269,7 +270,8 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 	out[2] = 0.0f;
 	XwaModernCameraOptions_Get(&options);
 	limit = (float)XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_sway_max_m);
-	if (!options.enabled || !options.cockpit_sway || limit <= 0.0f || !s_cameraMotion.valid ||
+	if (XwaPort_CockpitLookSuppressed() || !options.enabled || !options.cockpit_sway || limit <= 0.0f ||
+		!s_cameraMotion.valid ||
 		s_cameraMotion.objectIdx != player->objectIndex || player->viewState.externalCameraActive ||
 		player->viewState.cameraFocusObjIdx != player->objectIndex || player->mapCameraState ||
 		g_inHangarReady || (g_filmPlaybackMode && g_filmOverlayActive == 1)) {

@@ -486,8 +486,7 @@ static void WriteWeaponTypeTable(FILE* page) {
 		   exact speed back. */
 		const double mglt = round(g_projectileSpeedByType[index] / 2.25 * 100.0) / 100.0;
 		fprintf(page, "| %d | `%s` | %g | %d | %u | %u |\n", type, name, mglt,
-				g_projectileDamageByType[index], life_ticks * 4,
-				g_warheadProjectilePointValueByObjectType[type]);
+				g_projectileDamageByType[index], life_ticks * 4, g_projectileScoreByType[index]);
 	}
 	fprintf(page, "\n");
 }

@@ -1,6 +1,9 @@
 #include "setup.h"
 
+#include "aeron/input.h"
+#include "aeron/paths.h"
 #include "mod_list.h"
+#include "mod_update.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -47,6 +50,55 @@ static const char* setup_option_value(const char* argument, const char* option) 
 		return argument + length + 1;
 	}
 	return NULL;
+}
+
+/* The names of a VR hand's buttons in --stereo-hand-buttons, in the order of
+   AeronVrHandButton. */
+static const char* const g_stereoHandButtons[AERON_VR_HAND_BUTTON_COUNT] = {
+	"trigger", "squeeze", "primary", "secondary", "thumbstick", "trackpad", "menu",
+};
+
+/* Reads button names joined by "+", up to `end`. "none" and an empty
+   text mean no button. */
+static int setup_parse_hand_buttons(const char* text, const char* end, unsigned* out) {
+	*out = 0;
+	if (end == text || ((size_t)(end - text) == 4 && strncmp(text, "none", 4) == 0)) {
+		return 1;
+	}
+	while (text < end) {
+		const char* plus = memchr(text, '+', (size_t)(end - text));
+		const size_t length = (size_t)((plus ? plus : end) - text);
+		int button;
+		for (button = 0; button < AERON_VR_HAND_BUTTON_COUNT; button++) {
+			if (strlen(g_stereoHandButtons[button]) == length &&
+				strncmp(g_stereoHandButtons[button], text, length) == 0) {
+				break;
+			}
+		}
+		if (button == AERON_VR_HAND_BUTTON_COUNT) {
+			return 0;
+		}
+		*out |= 1u << button;
+		text += length + (plus ? 1 : 0);
+		if (plus && text == end) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static void setup_format_hand_buttons(unsigned buttons, char* out, size_t capacity) {
+	size_t length = 0;
+	out[0] = '\0';
+	for (int button = 0; button < AERON_VR_HAND_BUTTON_COUNT; button++) {
+		if (buttons & (1u << button)) {
+			length += (size_t)snprintf(out + length, capacity - length, "%s%s", length ? "+" : "",
+									   g_stereoHandButtons[button]);
+		}
+	}
+	if (!length) {
+		snprintf(out, capacity, "none");
+	}
 }
 
 int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* error, size_t error_size) {
@@ -133,6 +185,20 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--record-audio");
+		if (!pass_through && (value || strcmp(argv[i], "--record-audio") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a path", "--record-audio");
+				}
+				value = argv[i];
+			}
+			if (!setup_copy_path(out->record_audio, sizeof out->record_audio, value, "--record-audio", error,
+								 error_size)) {
+				return 0;
+			}
+			continue;
+		}
 		value = pass_through ? NULL : setup_option_value(argv[i], "--film-pause-at");
 		if (!pass_through && (value || strcmp(argv[i], "--film-pause-at") == 0)) {
 			char* end;
@@ -174,7 +240,8 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 
 			if (!value) {
 				if (++i >= argc) {
-					return setup_error(error, error_size, "%s requires a size such as 1920x1080", "--render-size");
+					return setup_error(error, error_size, "%s requires a size such as 1920x1080",
+									   "--render-size");
 				}
 				value = argv[i];
 			}
@@ -197,6 +264,113 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			out->render_height = (int)height;
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--flight-views");
+		if (!pass_through && (value || strcmp(argv[i], "--flight-views") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires surround or stereo", "--flight-views");
+				}
+				value = argv[i];
+			}
+			if (strcmp(value, "surround") == 0) {
+				out->flight_views = 1;
+			} else if (strcmp(value, "stereo") == 0) {
+				out->flight_views = 2;
+			} else {
+				return setup_error(error, error_size, "%s requires surround or stereo", "--flight-views");
+			}
+			continue;
+		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--stereo-head");
+		if (!pass_through && (value || strcmp(argv[i], "--stereo-head") == 0)) {
+			static const char usage[] = "%s requires three angles in degrees, such as 30,0,-15";
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, usage, "--stereo-head");
+				}
+				value = argv[i];
+			}
+			const char* text = value;
+			for (int axis = 0; axis < 3; axis++) {
+				char* end = NULL;
+				const double angle = strtod(text, &end);
+				if (end == text || *end != (axis < 2 ? ',' : '\0') || !(angle >= -180.0 && angle <= 180.0)) {
+					return setup_error(error, error_size, usage, "--stereo-head");
+				}
+				out->stereo_head[axis] = (float)angle;
+				text = end + 1;
+			}
+			continue;
+		}
+		{
+			static const char* const hand_options[2] = { "--stereo-hand-left", "--stereo-hand-right" };
+			static const char usage[] =
+				"%s requires a position in metres and three angles in degrees, such as 0.2,-0.3,0.4,0,0,0";
+			int hand;
+			for (hand = 0; hand < 2; hand++) {
+				value = pass_through ? NULL : setup_option_value(argv[i], hand_options[hand]);
+				if (!pass_through && (value || strcmp(argv[i], hand_options[hand]) == 0)) {
+					break;
+				}
+			}
+			if (hand < 2) {
+				XwaLaunchStereoHand* stereo_hand = &out->stereo_hands[hand];
+				if (!value) {
+					if (++i >= argc) {
+						return setup_error(error, error_size, usage, hand_options[hand]);
+					}
+					value = argv[i];
+				}
+				const char* text = value;
+				for (int field = 0; field < 6; field++) {
+					char* end = NULL;
+					const double number = strtod(text, &end);
+					const double limit = field < 3 ? 10.0 : 180.0;
+					if (end == text || *end != (field < 5 ? ',' : '\0') ||
+						!(number >= -limit && number <= limit)) {
+						return setup_error(error, error_size, usage, hand_options[hand]);
+					}
+					if (field < 3) {
+						stereo_hand->position_m[field] = (float)number;
+					} else {
+						stereo_hand->angles_deg[field - 3] = (float)number;
+					}
+					text = end + 1;
+				}
+				stereo_hand->set = 1;
+				continue;
+			}
+		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--stereo-hand-buttons");
+		if (!pass_through && (value || strcmp(argv[i], "--stereo-hand-buttons") == 0)) {
+			static const char usage[] =
+				"%s requires the buttons of the left hand, then of the right hand, such as trigger+squeeze,none";
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, usage, "--stereo-hand-buttons");
+				}
+				value = argv[i];
+			}
+			const char* comma = strchr(value, ',');
+			if (!comma || !setup_parse_hand_buttons(value, comma, &out->stereo_hands[0].buttons) ||
+				!setup_parse_hand_buttons(comma + 1, comma + 1 + strlen(comma + 1),
+										  &out->stereo_hands[1].buttons)) {
+				return setup_error(error, error_size, usage, "--stereo-hand-buttons");
+			}
+			continue;
+		}
+		if (!pass_through && strcmp(argv[i], "--vr") == 0) {
+			out->vr = 1;
+			continue;
+		}
+		if (!pass_through && strcmp(argv[i], "--no-vr") == 0) {
+			out->vr = -1;
+			continue;
+		}
+		if (!pass_through && strcmp(argv[i], "--classic-2d-sound") == 0) {
+			out->classic_2d_sound = 1;
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--film-benchmark") == 0) {
 			out->film_benchmark = 1;
 			continue;
@@ -212,6 +386,12 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 	if (out->help) {
 		return 1;
 	}
+	if (out->record_audio[0] && !out->play_film[0]) {
+		return setup_error(error, error_size, "%s requires --play-film", "--record-audio");
+	}
+	if (out->record_audio[0] && out->film_pause_at >= 0) {
+		return setup_error(error, error_size, "%s can't be used with --film-pause-at", "--record-audio");
+	}
 	if (out->film_pause_at >= 0 && !out->play_film[0]) {
 		return setup_error(error, error_size, "%s requires --play-film", "--film-pause-at");
 	}
@@ -220,6 +400,85 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 	}
 	if (out->film_benchmark && out->film_pause_at < 0) {
 		return setup_error(error, error_size, "%s requires --film-pause-at", "--film-benchmark");
+	}
+	return 1;
+}
+
+static int relaunch_path(XwaRelaunchArgs* out, const char* option, const char* path, char* storage,
+						 size_t capacity, char* error, size_t error_size) {
+	if (!path[0]) {
+		return 1;
+	}
+	if (!Aeron_AbsolutePath(path, storage, capacity)) {
+		return setup_error(error, error_size, "%s can't be made absolute", option);
+	}
+	out->args[out->count++] = option;
+	out->args[out->count++] = storage;
+	return 1;
+}
+
+int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro, XwaRelaunchArgs* out,
+								  char* error, size_t error_size) {
+	if (!launch || !out) {
+		return setup_error(error, error_size, "%s", "invalid relaunch options");
+	}
+	memset(out, 0, sizeof *out);
+	if (!relaunch_path(out, "--game-data", launch->game_data_path, out->game_data, sizeof out->game_data,
+					   error, error_size) ||
+		!relaunch_path(out, "--resource-root", launch->resource_root, out->resource_root,
+					   sizeof out->resource_root, error, error_size) ||
+		!relaunch_path(out, "--mod", launch->mod_path, out->mod, sizeof out->mod, error, error_size)) {
+		return 0;
+	}
+	if (launch->render_width > 0) {
+		snprintf(out->render_size, sizeof out->render_size, "%dx%d", launch->render_width,
+				 launch->render_height);
+		out->args[out->count++] = "--render-size";
+		out->args[out->count++] = out->render_size;
+	}
+	if (launch->flight_views) {
+		out->args[out->count++] = "--flight-views";
+		out->args[out->count++] = launch->flight_views == 1 ? "surround" : "stereo";
+	}
+	if (launch->stereo_head[0] != 0.0f || launch->stereo_head[1] != 0.0f || launch->stereo_head[2] != 0.0f) {
+		snprintf(out->stereo_head, sizeof out->stereo_head, "%g,%g,%g", launch->stereo_head[0],
+				 launch->stereo_head[1], launch->stereo_head[2]);
+		out->args[out->count++] = "--stereo-head";
+		out->args[out->count++] = out->stereo_head;
+	}
+	for (int hand = 0; hand < 2; hand++) {
+		const XwaLaunchStereoHand* stereo_hand = &launch->stereo_hands[hand];
+		if (!stereo_hand->set) {
+			continue;
+		}
+		snprintf(out->stereo_hands[hand], sizeof out->stereo_hands[hand], "%g,%g,%g,%g,%g,%g",
+				 stereo_hand->position_m[0], stereo_hand->position_m[1], stereo_hand->position_m[2],
+				 stereo_hand->angles_deg[0], stereo_hand->angles_deg[1], stereo_hand->angles_deg[2]);
+		out->args[out->count++] = hand == 0 ? "--stereo-hand-left" : "--stereo-hand-right";
+		out->args[out->count++] = out->stereo_hands[hand];
+	}
+	if (launch->stereo_hands[0].buttons || launch->stereo_hands[1].buttons) {
+		char left[64];
+		char right[64];
+		setup_format_hand_buttons(launch->stereo_hands[0].buttons, left, sizeof left);
+		setup_format_hand_buttons(launch->stereo_hands[1].buttons, right, sizeof right);
+		snprintf(out->stereo_hand_buttons, sizeof out->stereo_hand_buttons, "%s,%s", left, right);
+		out->args[out->count++] = "--stereo-hand-buttons";
+		out->args[out->count++] = out->stereo_hand_buttons;
+	}
+	if (launch->vr) {
+		out->args[out->count++] = launch->vr > 0 ? "--vr" : "--no-vr";
+	}
+	/* The parser joins the game's arguments with spaces, so one argument gives
+	   it the same text back, quotes included. */
+	snprintf(out->game_command_line, sizeof out->game_command_line, "%s", launch->game_command_line);
+	if (skip_intro && !strstr(out->game_command_line, "skipintro") &&
+		!setup_append_argument(out->game_command_line, sizeof out->game_command_line, "skipintro")) {
+		return setup_error(error, error_size, "%s", "OpenXWA command line is too long");
+	}
+	if (out->game_command_line[0]) {
+		out->args[out->count++] = "--";
+		out->args[out->count++] = out->game_command_line;
 	}
 	return 1;
 }
@@ -235,6 +494,8 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            log the frame times, then quit\n"
 		   "  --benchmark-out <file>    with --play-film: also write the time of each frame\n"
 		   "                            to this CSV file of the user folder\n"
+		   "  --record-audio <file>     with --play-film: record the film's sound to this\n"
+		   "                            WAV file of the user folder\n"
 		   "  --film-pause-at <ticks>   with --play-film: fast-forward to this film time,\n"
 		   "                            in 4 ms ticks, and freeze there\n"
 		   "  --film-capture <name>     with --film-pause-at: save the frozen frame to\n"
@@ -243,9 +504,27 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            then quit\n"
 		   "  --film-benchmark          with --film-pause-at: measure the frozen frame's\n"
 		   "                            GPU time, then quit\n"
+		   "  --classic-2d-sound        play this run with the game's 3D sound off, as the\n"
+		   "                            original game did by default\n"
 		   "  --render-size <W>x<H>     render the 3D view at this size in pixels,\n"
 		   "                            whatever the window's size, and fit it in the\n"
 		   "                            window\n"
+		   "  --flight-views <kind>     for tests: draw the flight scene of this run as\n"
+		   "                            three surround screens (surround), or as the two\n"
+		   "                            eyes of a headset side by side (stereo)\n"
+		   "  --stereo-head <y>,<p>,<r> with --flight-views stereo: head yaw, pitch and\n"
+		   "                            roll in degrees (right, up, clockwise)\n"
+		   "  --stereo-hand-left <x>,<y>,<z>,<yaw>,<pitch>,<roll>\n"
+		   "  --stereo-hand-right <x>,<y>,<z>,<yaw>,<pitch>,<roll>\n"
+		   "                            with --flight-views stereo: a VR hand that\n"
+		   "                            stays still. Position in metres from the head\n"
+		   "                            (right, up, forward), then angles in degrees\n"
+		   "  --stereo-hand-buttons <left>,<right>\n"
+		   "                            buttons held down on each hand: none, or names\n"
+		   "                            joined by +. Names: trigger, squeeze, primary,\n"
+		   "                            secondary, thumbstick, trackpad, menu\n"
+		   "  --vr                      start in VR, whatever the settings say\n"
+		   "  --no-vr                   start without VR, whatever the settings say\n"
 		   "  -h, --help                print this help and quit\n"
 		   "\n"
 		   "Other arguments, and everything after --, go to the game's own command line.\n";
@@ -256,7 +535,10 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 						char* error, size_t error_size) {
 	const int from_launch = launch->mod_path[0] != 0;
 	const char* problem = NULL;
+	const char* advice = NULL;
+	char mods_folder[XWA_INSTALL_PATH_CAPACITY];
 	XwaModEntry mod;
+	XwaModUpdateResult update;
 	int length;
 
 	if (notice_size) {
@@ -264,6 +546,13 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	}
 	if (selected_capacity) {
 		selected[0] = '\0';
+	}
+	/* Before any mod is read: the mods deleted while OpenXWA used them go to
+	   the trash, and the new imports made while OpenXWA used their mods
+	   replace the old ones. */
+	if (XwaModList_Folder(paths->mods, mods_folder, sizeof mods_folder)) {
+		XwaModUpdate_DeletePending(mods_folder, paths->mod);
+		XwaModUpdate_ApplyPending(mods_folder, paths->mod);
 	}
 	if (from_launch) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
@@ -275,11 +564,15 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	if (length < 0 || (size_t)length >= selected_capacity) {
 		return setup_error(error, error_size, "could not use mod folder: %s", selected);
 	}
+	/* A new import made while OpenXWA used the mod takes its place. */
+	update = XwaModUpdate_Apply(selected);
 	if (!XwaModList_Read(selected, &mod)) {
 		snprintf(mod.name, sizeof mod.name, "%s", selected);
-		problem = "Its folder has no mod.yaml, so it isn't a mod.";
+		problem = "Its folder is missing, or has no mod.yaml.";
+		advice = "Choose another mod in OpenXWA Options > Mods.";
 	} else if (mod.state != XWA_MOD_UNFINISHED || !from_launch) {
 		problem = mod.problem[0] ? mod.problem : NULL;
+		advice = XwaModList_Advice(&mod, XWA_MOD_ADVICE_STARTUP);
 	}
 	if (problem && from_launch) {
 		snprintf(error, error_size, "--mod %s: %s", selected, problem);
@@ -287,10 +580,17 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	}
 	if (problem) {
 		snprintf(notice, notice_size,
-				 "The mod \"%s\" can't be used. %s\n\nOpenXWA starts the original game instead.", mod.name,
-				 problem);
+				 "The mod \"%s\" can't be used. %s%s%s\n\nOpenXWA starts with the original game.", mod.name,
+				 problem, advice ? " " : "", advice ? advice : "");
 		selected[0] = '\0';
 		return 1;
+	}
+	if (update == XWA_MOD_UPDATE_FAILED) {
+		snprintf(
+			notice, notice_size,
+			"The new import of \"%s\" couldn't replace the old one, because a program is using its folder:\n"
+			"%s\n\nOpenXWA starts with the old one, and tries again the next time it starts.",
+			mod.name, selected);
 	}
 	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_MOD, selected) ||
 		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_MOD, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {

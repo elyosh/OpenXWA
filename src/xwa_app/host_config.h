@@ -1,8 +1,11 @@
 #ifndef XWA_APP_HOST_CONFIG_H
 #define XWA_APP_HOST_CONFIG_H
 
+#include "aeron/aeron.h"
 #include "aeron/vfs.h"
 #include "install_paths.h"
+#include "setup.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
@@ -40,15 +43,25 @@ typedef struct XwaHostConfig {
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;
-	/* input.gamepad_defaults: the profile that new gamepad models get. */
-	XwaControllerProfile gamepad_defaults;
+	/* input.gamepad_defaults, input.vr_left_defaults and
+	   input.vr_right_defaults: the profiles that new models get. */
+	XwaControllerDefaults controller_defaults;
 	XwaModernInputOptions input_options;
 	/* The user file had version 1 input settings, upgraded in memory. The
 	 * input options must be saved. */
 	int input_upgraded;
 } XwaHostConfig;
 
+/* Reads the VR settings that the game starts with, before Aeron creates the
+ * window and the GPU device: the mode and the eye images' scale from the
+ * video section of the user's config.yaml, and the virtual screen from the
+ * shipped remaster/config.yaml. --vr and --no-vr win over the file's mode.
+ * A missing or bad file gives "off" and reports nothing: XwaHostConfig_Load
+ * reports the problem later. */
+void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, AeronStartupOptions* options);
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
+int XwaHostConfig_SaveAudioOptions(AeronVfs* vfs, const XwaModernAudioOptions* options, char* error,
+								   size_t error_size);
 int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* options, char* error,
 								   size_t error_size);
 int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,

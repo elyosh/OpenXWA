@@ -12,9 +12,7 @@
 
 static float XwaOrientation_ClampRadians(float angle) { return atan2f(sinf(angle), cosf(angle)); }
 
-static int XwaOrientation_RoundAngle(float angle) {
-	return (int)roundf(angle);
-}
+static int XwaOrientation_RoundAngle(float angle) { return (int)roundf(angle); }
 
 static void XwaOrientation_ToRadians(XwaOrientationAngles angles, float* pitch, float* yaw, float* roll) {
 	*yaw = XwaOrientation_ClampRadians(-(float)(int16_t)angles.yaw * XWA_ORIENTATION_BAM_TO_RAD);

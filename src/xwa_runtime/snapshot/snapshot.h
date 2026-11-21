@@ -467,6 +467,9 @@ typedef struct XwaFlightObject {
 	/* The rules of the model's `surfaces` that hide their tag at the craft's
 	 * state: bit r for rule r (surfaces.h). */
 	uint32_t surface_hidden_mask;
+	/* The rules that darken their tag at the craft's state, in the same
+	 * layout. */
+	uint32_t surface_dark_mask;
 	/* Hull: CraftData.hullDamage (damage taken) and hullMax; the hull is
 	 * 100 * (1 - hull_damage / hull_max) percent. */
 	int32_t hull_damage;
@@ -593,7 +596,7 @@ typedef struct XwaFlightCamera {
 	/* ---- classic projection (resolution-dependent focal): screen =
 	 * vp_center + proj_scale * xy/z, y down (TRANSFM2_ProjectScreen*).
 	 * Screen-space records (billboards) unproject through these. */
-	float proj_scale;      /* g_projScale (512 at 640x480) */
+	float proj_scale; /* g_projScale (512 at 640x480) */
 	/* 1 when proj_scale comes from the field of view of the player's craft
 	 * (cockpit_view.h) rather than the stock view. */
 	uint8_t cockpit_fov;

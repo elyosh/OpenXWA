@@ -15,6 +15,10 @@
  * values: a key that the profile doesn't set gets the stock value, not the
  * value of the `default` profile.
  *
+ * The `factors` of a model file multiply some stats of its craft. Which
+ * factors a craft gets depends on its rank and on whether a player flies
+ * it. They also apply to the stock values.
+ *
  * `side` sets which side a weapon type belongs to. `side_model` sets the
  * weapon that replaces it when the craft's IFF is on the other side
  * (XwaCraftWeapons_IffWeaponType).
@@ -89,8 +93,15 @@ int XwaWeaponStats_ReadFlightGroup(const char* path, const char* fgKey, int fgId
 								   const struct AeronConfigNode* entry);
 
 /* Returns `stat` for weapon type `weapon` (280 to 307) when object
-   `srcObjIdx` fires it. Returns `stock` when no profile sets it. */
+   `srcObjIdx` fires it: the profile's value, or `stock` when no profile sets
+   it, times the factor of the craft's model. The decharge and recharge rates
+   get no factor here: see XwaWeaponStats_ChargeFactor. */
 int XwaWeaponStats_Value(int srcObjIdx, unsigned int weapon, XwaWeaponStat stat, int stock);
+/* Returns 1 when the model of object `objIdx` has a factor set for it. */
+int XwaWeaponStats_HasFactors(int objIdx);
+/* Returns `rate`, a decharge or recharge rate (`stat`) after its percents,
+   times the factor of the model of object `objIdx`. */
+int XwaWeaponStats_ChargeFactor(int objIdx, XwaWeaponStat stat, int rate);
 /* Returns `stat` for weapon type `weapon` when an AI craft of object type
    `objectType` fires it, without a flight group. Returns `stock` when no
    profile sets it. */

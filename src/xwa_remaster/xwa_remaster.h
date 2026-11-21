@@ -24,6 +24,17 @@ struct AeronInputSnapshot;
 extern "C" {
 #endif
 
+/* A VR hand that doesn't move, for tests without a headset. */
+typedef struct XwaRemasterStereoHand {
+	int set;
+	/* Position in metres from the head: right, up and forward. */
+	float position_m[3];
+	/* Yaw, pitch and roll in degrees. Positive is right, up and clockwise. */
+	float angles_deg[3];
+	/* One bit for each AeronVrHandButton. */
+	unsigned buttons;
+} XwaRemasterStereoHand;
+
 typedef struct XwaRemasterInitOptions {
 	float opt_smooth_angle_degrees;
 	float opt_emissive_strength;
@@ -40,6 +51,16 @@ typedef struct XwaRemasterInitOptions {
 	   follow the window. */
 	int render_width;
 	int render_height;
+	/* --flight-views: 1 draws the flight scene as a surround setup for this
+	   run, whatever the video options say, and 2 as the debug UI's stereo
+	   view with the head looking straight ahead. 0 follows the options. */
+	int flight_views;
+	/* --stereo-head: the head's yaw, pitch and roll in that stereo view, in
+	   degrees. Positive is right, up and clockwise. */
+	float stereo_head[3];
+	/* --stereo-hand-left, --stereo-hand-right and --stereo-hand-buttons: the
+	   VR hands of that stereo view. Index 0 is the left hand. */
+	XwaRemasterStereoHand stereo_hands[2];
 } XwaRemasterInitOptions;
 
 /* Loads mandatory renderer resources and creates process-wide remaster state. */
@@ -87,6 +108,38 @@ AeronSampleCount XwaRemaster_MsaaSampleCount(void);
  * settings. */
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out);
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options);
+
+/* The debug UI's stereo view: the flight scene drawn for the two eyes of a
+ * headset, side by side in the window, to test the multi-view renderer
+ * without a headset. The head's pose is set here, or follows the mouse. */
+typedef struct XwaRemasterDebugStereo {
+	int enabled;
+	/* The head turns with the mouse: the window's centre looks straight
+	 * ahead, and its edges look `mouse_yaw_deg` to the side and
+	 * `mouse_pitch_deg` up or down. */
+	int mouse_head;
+	float mouse_yaw_deg;
+	float mouse_pitch_deg;
+	float ipd_m;
+	/* The horizontal field of view of one eye. */
+	float fov_deg;
+	/* The head's pose when the mouse doesn't set it: degrees to the right,
+	 * up, and rolled clockwise. */
+	float yaw_deg;
+	float pitch_deg;
+	float roll_deg;
+	/* The head's position from the seat, in metres: right, up, forward. */
+	float position_m[3];
+} XwaRemasterDebugStereo;
+
+/* Returns whether the film capture and benchmark must wait for a later host
+ * frame: the last XwaRemaster_Frame could not render its frame yet (models
+ * are still loading, or the headset gave no eye images), or the exposure
+ * meter's values of the first render haven't come back from the GPU. */
+int XwaRemaster_FrameWaits(void);
+
+void XwaRemaster_GetDebugStereo(XwaRemasterDebugStereo* out);
+void XwaRemaster_SetDebugStereo(const XwaRemasterDebugStereo* in);
 
 #ifdef __cplusplus
 }

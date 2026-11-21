@@ -62,9 +62,9 @@ typedef struct ImStreamZone ImStreamZone;
 
 typedef struct ImSoundBuffer {
 	void* data;
-	int   size;
-	int   field_8;
-	int   field_C;
+	int size;
+	int field_8;
+	int field_C;
 } ImSoundBuffer;
 
 typedef void* (*ImSoundAddrFn)(unsigned int soundId);
@@ -79,38 +79,38 @@ typedef int (*ImHostReadResourceFn)(int resId, char* buf, unsigned int len);
 typedef void (*ImLogFn)(const char* fmt, ...);
 
 typedef enum ImSoundParam {
-	P_NONE         = 0x000,
-	P_COUNT        = 0x100,
-	P_STATUS       = 0x200,
-	P_PARAM_300    = 0x300,
-	P_VGROUP       = 0x400,
-	P_PRIORITY     = 0x500,
-	P_VOLUME       = 0x600,
-	P_PAN          = 0x700,
-	P_DETUNE       = 0x800,
-	P_PITCH        = 0x900,
-	P_PARAM_A00    = 0xA00,
+	P_NONE = 0x000,
+	P_COUNT = 0x100,
+	P_STATUS = 0x200,
+	P_PARAM_300 = 0x300,
+	P_VGROUP = 0x400,
+	P_PRIORITY = 0x500,
+	P_VOLUME = 0x600,
+	P_PAN = 0x700,
+	P_DETUNE = 0x800,
+	P_PITCH = 0x900,
+	P_PARAM_A00 = 0xA00,
 	P_IS_STREAMING = 0x1800,
-	P_STREAM_SIZE  = 0x1900,
-	P_STREAM_POS   = 0x1A00,
+	P_STREAM_SIZE = 0x1900,
+	P_STREAM_POS = 0x1A00,
 } ImSoundParam;
 
 typedef struct ImTrack {
 	struct ImTrack* prev;
 	struct ImTrack* next;
-	ImDispatch*     dispatch;
-	int             soundId;
-	int             field_10;
-	int             volumeGroup;
-	int             priority;
-	int             volume;
-	int             effectiveVolume;
-	int             pan;
-	int             detune;
-	int             transpose;
-	int             pitch;
-	int             field_34;
-	int             hookId;
+	ImDispatch* dispatch;
+	int soundId;
+	int field_10;
+	int volumeGroup;
+	int priority;
+	int volume;
+	int effectiveVolume;
+	int pan;
+	int detune;
+	int transpose;
+	int pitch;
+	int field_34;
+	int hookId;
 } ImTrack;
 
 typedef struct ImListNode {
@@ -121,36 +121,36 @@ typedef struct ImListNode {
 typedef struct ImSoundFile {
 	struct ImSoundFile* prev;
 	struct ImSoundFile* next;
-	int                 sound;
-	char                name[32];
-	int                 field_2C;
-	int                 refCount;
+	int sound;
+	char name[32];
+	int field_2C;
+	int refCount;
 } ImSoundFile;
 
 struct ImDispatch {
 	ImTrack* track;
-	int      fmtA;
-	int      fmtB;
-	int      fmtC;
-	int      atRegionStart;
-	int      currentOffset;
-	int      regionEndOffset;
-	char     map[8192];
+	int fmtA;
+	int fmtB;
+	int fmtC;
+	int atRegionStart;
+	int currentOffset;
+	int regionEndOffset;
+	char map[8192];
 	ImStreamSlot* stream;
-	int      streamSize;
+	int streamSize;
 	ImStreamZone* pendingJumpZones;
-	int      streamStarved;
-	void*    jumpBuffer;
-	int      fadeReadOffset;
-	int      fadeBytesAvailable;
-	int      fadeBitsPerSample;
-	int      fadeSampleRate;
-	int      fadeChannels;
-	int      jumpFadeHoldMask;
-	int      jumpFadeHoldFrames;
-	int      crossfadeQ16Pos;
-	int      crossfadeQ16Step;
-	int      jumpInProgress;
+	int streamStarved;
+	void* jumpBuffer;
+	int fadeReadOffset;
+	int fadeBytesAvailable;
+	int fadeBitsPerSample;
+	int fadeSampleRate;
+	int fadeChannels;
+	int jumpFadeHoldMask;
+	int jumpFadeHoldFrames;
+	int crossfadeQ16Pos;
+	int crossfadeQ16Step;
+	int jumpInProgress;
 };
 
 typedef struct ImFade {
@@ -167,11 +167,11 @@ typedef struct ImFade {
 } ImFade;
 
 typedef struct ImMarkerTrigger {
-	int  soundId;
+	int soundId;
 	char marker[256];
-	int  command;
-	int  params[10];
-	int  onceFlag;
+	int command;
+	int params[10];
+	int onceFlag;
 } ImMarkerTrigger;
 
 typedef struct ImTrigger {
@@ -198,10 +198,10 @@ struct ImStreamSlot {
 struct ImStreamZone {
 	struct ImStreamZone* prev;
 	struct ImStreamZone* next;
-	int                  inUse;
-	int                  streamOffset;
-	int                  byteCount;
-	int                  isPrefetch;
+	int inUse;
+	int streamOffset;
+	int byteCount;
+	int isPrefetch;
 };
 
 typedef struct ImMapChunk {
@@ -219,28 +219,28 @@ typedef struct ImMapEvent {
 } ImMapEvent;
 
 typedef struct ImVimaState {
-	char    stepIndex[2];
+	char stepIndex[2];
 	int16_t predictor[2];
 } ImVimaState;
 
 typedef struct ImMcmpStream {
-	void*        file;
-	int          totalSize;
-	int          offset;
-	int          blockCount;
-	char*        readText;
-	char**       blockCodec;
-	int*         blockDecodedSize;
-	int*         blockStartOffset;
-	int*         blockCompressedSize;
-	int*         blockFileOffset;
-	int          cachedBlockIndex;
-	int          segmentCapacity;
-	void*        segmentData;
-	ImVimaState  vimaState;
-	char         path[80];
-	char         padding_8A[2];
-	void*        readBuffer;
+	void* file;
+	int totalSize;
+	int offset;
+	int blockCount;
+	char* readText;
+	char** blockCodec;
+	int* blockDecodedSize;
+	int* blockStartOffset;
+	int* blockCompressedSize;
+	int* blockFileOffset;
+	int cachedBlockIndex;
+	int segmentCapacity;
+	void* segmentData;
+	ImVimaState vimaState;
+	char path[80];
+	char padding_8A[2];
+	void* readBuffer;
 	unsigned int readBufferCapacity;
 } ImMcmpStream;
 
@@ -256,12 +256,12 @@ typedef struct ImScriptHost {
 
 typedef struct ImScriptEntry {
 	char filename[32];
-	int  transType;
-	int  id;
+	int transType;
+	int id;
 	char label[24];
-	int  group;
-	int  hook;
-	int  fadeMs;
+	int group;
+	int hook;
+	int fadeMs;
 } ImScriptEntry;
 
 typedef struct ImWaveFormatEx {
@@ -283,11 +283,11 @@ typedef struct ImCriticalSection {
 #ifdef XWA_MODERN
 	void* mutex; /* AeronMutex* */
 #else
-	void*    debugInfo;
-	int32_t  lockCount;
-	int32_t  recursionCount;
-	void*    owningThread;
-	void*    lockSemaphore;
+	void* debugInfo;
+	int32_t lockCount;
+	int32_t recursionCount;
+	void* owningThread;
+	void* lockSemaphore;
 	uintptr_t spinCount;
 #endif
 } ImCriticalSection;
@@ -316,79 +316,79 @@ void ImPlatformCsDelete(ImCriticalSection* critSec);
 #endif
 
 extern IM_CROSS_THREAD int g_imBusyCount;
-extern void*    g_imDirectSoundDevice;
-extern int      g_imRunning;
-extern int      g_imInitialized;
-extern int      g_imSeqEndPending;
-extern int      g_imGroupVolume[16];
-extern int      g_imGainTable[16];
+extern void* g_imDirectSoundDevice;
+extern int g_imRunning;
+extern int g_imInitialized;
+extern int g_imSeqEndPending;
+extern int g_imGroupVolume[16];
+extern int g_imGainTable[16];
 extern ImTrack* g_imActivePlayers;
-extern char     g_imLogBuf[256];
-extern int      g_imScriptInitialized;
+extern char g_imLogBuf[256];
+extern int g_imScriptInitialized;
 extern ImHostServices* g_imHostServicesPtr;
 extern ImSoundBuffer g_imSoundBuffers[3];
 extern ImCriticalSection g_imMcmpCritSec;
-extern ImMcmpStream  g_imMcmpStreams[32];
-extern int           g_imMcmpStreamCursor;
-extern int           g_imMcmpCsInitialized;
+extern ImMcmpStream g_imMcmpStreams[32];
+extern int g_imMcmpStreamCursor;
+extern int g_imMcmpCsInitialized;
 extern ImMcmpStream* g_imResHandles[5];
-extern ImScriptHost  g_imScriptHost;
-extern int           g_imScriptEnableConfig;
-extern int           g_imScriptInitParam8Unused;
-extern int           g_imScriptEnabled;
-extern int           g_imScriptInitArg6;
-extern int           g_imScriptInitArg7;
-extern int           g_imCurMusicState;
-extern int           g_imCurMusicSeq;
-extern int           g_imPendingMusicSeq;
-extern int           g_imScriptAttribs[58];
+extern ImScriptHost g_imScriptHost;
+extern int g_imScriptEnableConfig;
+extern int g_imScriptInitParam8Unused;
+extern int g_imScriptEnabled;
+extern int g_imScriptInitArg6;
+extern int g_imScriptInitArg7;
+extern int g_imCurMusicState;
+extern int g_imCurMusicSeq;
+extern int g_imPendingMusicSeq;
+extern int g_imScriptAttribs[58];
 extern const ImScriptEntry g_imStateTable[29];
 extern const ImScriptEntry g_imSeqTable[23];
-extern int           g_imSoundBufferSize;
-extern int           g_imSoundBufferField8;
-extern int           g_imSoundBufferFieldC;
-extern int           g_imSavedMasterVolume;
-extern int           g_imLargeBufSize;
-extern int           g_imLargeBufCount;
-extern int           g_imSmallBufSize;
-extern int           g_imSmallBufCount;
-extern int           g_imTrackPoolSize;
-extern int           g_imMaxTracks[7];
-extern ImTrack       g_imTrackPool[16];
-extern int           g_imEnginePaused;
-extern int           g_imLastHeartbeatMs;
+extern int g_imSoundBufferSize;
+extern int g_imSoundBufferField8;
+extern int g_imSoundBufferFieldC;
+extern int g_imSavedMasterVolume;
+extern int g_imLargeBufSize;
+extern int g_imLargeBufCount;
+extern int g_imSmallBufSize;
+extern int g_imSmallBufCount;
+extern int g_imTrackPoolSize;
+extern int g_imMaxTracks[7];
+extern ImTrack g_imTrackPool[16];
+extern int g_imEnginePaused;
+extern int g_imLastHeartbeatMs;
 extern IM_CROSS_THREAD int g_imHeartbeatGuard;
-extern int           g_imPauseCount;
-extern int           g_imTriggerClockAccum;
-extern int           g_imVolDuckClockAccum;
-extern ImFade        g_imFades[16];
-extern int           g_imFadesActive;
+extern int g_imPauseCount;
+extern int g_imTriggerClockAccum;
+extern int g_imVolDuckClockAccum;
+extern ImFade g_imFades[16];
+extern int g_imFadesActive;
 extern ImMarkerTrigger g_imMarkerTriggers[8];
-extern ImTrigger       g_imTriggers[8];
-extern char            g_imMarkerScratch[256];
-extern int             g_imTriggersActive;
-extern int             g_imMarkerDepth;
-extern char            g_imEmptyMarker[8];
-extern void*        g_imDispatchBuffer;
-extern int*         g_imLargeBufFlags;
-extern char*        g_imLargeBufBase;
-extern int          g_imDpSwitchBufSize;
-extern char*        g_imSmallBufBase;
-extern int*         g_imSmallBufFlags;
+extern ImTrigger g_imTriggers[8];
+extern char g_imMarkerScratch[256];
+extern int g_imTriggersActive;
+extern int g_imMarkerDepth;
+extern char g_imEmptyMarker[8];
+extern void* g_imDispatchBuffer;
+extern int* g_imLargeBufFlags;
+extern char* g_imLargeBufBase;
+extern int g_imDpSwitchBufSize;
+extern char* g_imSmallBufBase;
+extern int* g_imSmallBufFlags;
 extern ImStreamZone g_imStreamZones[50];
-extern ImDispatch   g_imDispatchPool[16];
-extern int          g_imMusicJumpsEnabled;
-extern int          g_imStatStreamRefillThreshold;
-extern int          g_imNavEventReady;
-extern int          g_imStatStreamFill;
-extern int          g_imStatStreamEof;
-extern int          g_imNavBufSize;
+extern ImDispatch g_imDispatchPool[16];
+extern int g_imMusicJumpsEnabled;
+extern int g_imStatStreamRefillThreshold;
+extern int g_imNavEventReady;
+extern int g_imStatStreamFill;
+extern int g_imStatStreamEof;
+extern int g_imNavBufSize;
 extern ImCriticalSection g_imNavCritSec;
-extern int          g_imStatStreamSize;
-extern int          g_imNavCsInitialized;
+extern int g_imStatStreamSize;
+extern int g_imNavCsInitialized;
 extern ImStreamSlot g_imStreamSlots[3];
 extern ImStreamSlot* g_imCurrentStream;
-extern int          g_imStreamDirty;
+extern int g_imStreamDirty;
 extern ImHostLoadResourceFn g_imHostLoadSound;
 extern ImHostFreeResourceFn g_imHostFreeSound;
 extern ImHostOpenResourceFn g_imHostOpenStream;
@@ -396,37 +396,37 @@ extern ImHostCloseResourceFn g_imHostCloseStream;
 extern ImSoundFile g_imSoundFiles[10];
 extern ImSoundFile* g_imLoadedSoundList;
 extern ImSoundFile* g_imStreamSoundList;
-extern int          g_imFilelistReady;
+extern int g_imFilelistReady;
 extern unsigned char g_imPanVolTable[17 * 17];
-extern int           g_imMixBuffer[4096];
+extern int g_imMixBuffer[4096];
 extern ImWaveFormatEx g_imOutputWaveFormat;
-extern int          g_imRenderRate;
+extern int g_imRenderRate;
 extern unsigned int g_imRenderFrameLen;
-extern int          g_imRenderFramesPending;
-extern void*        g_imRenderWritePtr[4];
-extern int          g_imDSWriteBlock;
-extern int          g_imDSWriteCursor;
-extern uint32_t     g_imDSLockBytes2;
+extern int g_imRenderFramesPending;
+extern void* g_imRenderWritePtr[4];
+extern int g_imDSWriteBlock;
+extern int g_imDSWriteCursor;
+extern uint32_t g_imDSLockBytes2;
 extern unsigned int uDelay;
 extern IM_CROSS_THREAD unsigned int g_imTimerTicks;
-extern int          g_imDSBlockCount;
+extern int g_imDSBlockCount;
 extern ImCriticalSection g_imWaveCritSec;
-extern int          g_imDSPlayCursor;
-extern uint32_t     g_imDSLockBytes1;
+extern int g_imDSPlayCursor;
+extern uint32_t g_imDSLockBytes1;
 extern unsigned int uPeriod;
 extern unsigned int uTimerID;
-extern void*        g_imDirectSound;
-extern void*        g_imDSoundBuffer;
+extern void* g_imDirectSound;
+extern void* g_imDSoundBuffer;
 extern IM_CROSS_THREAD int g_imDSPaused;
-extern void*        hObject;
+extern void* hObject;
 extern IM_CROSS_THREAD int g_imWaveCsInitialized;
-extern int          g_imDSFillToggle;
-extern int          g_imDSLocked;
-extern void*        g_imDSLockPtr1;
-extern void*        g_imDSLockPtr2;
-extern int16_t      g_imOutputStage[4096];
-extern int          g_imJumpZoneSize;
-extern int          g_imPredictTrackHook;
+extern int g_imDSFillToggle;
+extern int g_imDSLocked;
+extern void* g_imDSLockPtr1;
+extern void* g_imDSLockPtr2;
+extern int16_t g_imOutputStage[4096];
+extern int g_imJumpZoneSize;
+extern int g_imPredictTrackHook;
 
 void ImUpdate(void);
 int ImGetMusicStreamStatus(int* outBufSize, int* outRefillThreshold, int* outFill, int* outEof);
@@ -489,8 +489,9 @@ ImMcmpStream* ImResFopen(char* path, const char* mode);
 void ImVimaResetState(ImVimaState* state);
 unsigned int ImVimaEncode(ImVimaState* state, unsigned char* dst, int16_t* samples, unsigned int byteCount,
 						  unsigned int channelCount);
-unsigned int ImVimaEncodeBlock(ImVimaState* state, unsigned char* dst, int16_t* samples, unsigned int sampleCount,
-							   unsigned int channelCount, int nativeEndian, int continueState);
+unsigned int ImVimaEncodeBlock(ImVimaState* state, unsigned char* dst, int16_t* samples,
+							   unsigned int sampleCount, unsigned int channelCount, int nativeEndian,
+							   int continueState);
 int ImVimaEncodeStats(unsigned char* dst, int16_t* samples, int byteCount, FILE* statsFile);
 void ImVimaDecodeBlock(ImVimaState* state, int16_t* dst, char* src, unsigned int sampleCount);
 unsigned int ImDecodeWvsm(int16_t* dst, unsigned char* src, int byteCount);
@@ -557,7 +558,8 @@ int ImWaveOutStart(void);
 void ImWaveOutStop(void);
 void ImCreateSoundBuffer(int blockCount);
 #ifndef XWA_MODERN
-void __stdcall ImTimerCallback(unsigned int timerId, unsigned int msg, uintptr_t user, uintptr_t dw1, uintptr_t dw2);
+void __stdcall ImTimerCallback(unsigned int timerId, unsigned int msg, uintptr_t user, uintptr_t dw1,
+							   uintptr_t dw2);
 #else
 void ImTimerCallback(unsigned int timerId, unsigned int msg, uintptr_t user, uintptr_t dw1, uintptr_t dw2);
 #endif
@@ -565,7 +567,8 @@ void ImHeartbeat(void);
 int ImStreamGetOffset(ImStreamSlot* stream);
 int ImStreamGetFileSize(ImStreamSlot* stream);
 int ImGetStreamFill(ImStreamSlot* stream);
-int ImGetStreamStatus(ImStreamSlot* stream, int* outBufSize, int* outRefillThreshold, int* outFill, int* outEof);
+int ImGetStreamStatus(ImStreamSlot* stream, int* outBufSize, int* outRefillThreshold, int* outFill,
+					  int* outEof);
 int ImProcessStreamSwitches(void);
 void* ImStreamPeek(ImStreamSlot* stream, int offset, unsigned int len);
 void* ImStreamGet(ImStreamSlot* stream, unsigned int count);
@@ -581,8 +584,7 @@ int ImListAdd2(ImListNode** head, ImListNode* node);
 int ImListRemove(ImListNode** head, ImListNode* node);
 int ImListRemove2(ImListNode** head, ImListNode* node);
 int ImMatchJumpHook(int* trackHook, int hookId);
-int ImSyncLookup(char* syncChunk, unsigned int position, unsigned char* outCodeHi,
-				 unsigned char* outCodeLo);
+int ImSyncLookup(char* syncChunk, unsigned int position, unsigned char* outCodeHi, unsigned char* outCodeLo);
 int ImGetMap(ImDispatch* dispatch);
 int ImConvertMap(char* src, char* dst);
 int ImNavigateMap(ImDispatch* dispatch);

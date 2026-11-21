@@ -83,6 +83,7 @@ The `AERON_flight_model` extension of a material holds the game data:
 | `details` | Up to two [detail maps](#detail-maps). |
 | `energy` | The [energy effects](#energy-effects) that the material shows. |
 | `screen` | [Cockpit displays](#cockpit-screens) drawn live on the material. |
+| `buttons` | [Cockpit buttons](#cockpit-buttons) that a VR player can press. |
 | `skins` | The [skin layers](#skin-layers) of the material. |
 | `tags` | Names that the `surfaces` setting uses. See [tags](#tags). |
 
@@ -402,6 +403,47 @@ the rectangle, in the `bar` colour over a dark grey. It ignores the
 `source`. It only shows while the classic HUD option is off, and never on a
 hologram.
 
+## Cockpit buttons
+
+A material can have buttons: rectangles of its texture coordinates that a
+player in VR can press. The player points a hand at the cockpit. A dot shows
+where the hand points on a material that has buttons. On a button, the
+button's label shows too, and the trigger presses it.
+
+```json
+"extensions": {
+  "AERON_flight_model": {
+    "buttons": [
+      { "rect": [0.0, 0.25, 0.5, 0.75], "action": "mfd_prev_page" },
+      { "rect": [0.5, 0.25, 1.0, 0.75], "action": "mfd_next_page" },
+      { "rect": [0.0, 0.0, 1.0, 0.25], "action": "xfer_shields_to_lasers", "label": "Shields to Lasers" }
+    ]
+  }
+}
+```
+
+| Key | Meaning |
+|-|-|
+| `rect` | Required. `[u0, v0, u1, v1]` in the material's texture coordinates, as for a screen's `dst`. The corners can be in any order. |
+| `action` | Required. The name of an input action, as in the key bindings of `config.yaml`, such as `cycle_weapon`. |
+| `label` | The text shown when the hand points at the button. Without it, the game shows the action's name from the options. |
+
+- A material has up to 80 buttons, and a model up to 256.
+- When two buttons of a material overlap, the first one in the list is
+  pressed.
+- A button with an action that the game doesn't know does nothing. The game
+  logs a warning for it.
+- A button only works where the player can see it: another part of the
+  cockpit in front of it blocks it. Glass and holograms don't.
+- Buttons work in the cockpit of the player's craft, and on the models of
+  the [VR hands](flight.md#vr_hands), where the other hand can press them.
+- The player can turn the buttons off with **Cockpit Buttons** in the
+  Controllers options.
+
+The importer converts the Active Cockpit files of an XWAU mod
+(`DynamicCockpit/<Cockpit>.ac`) into buttons. See
+[XWAU support](xwau_support.md).
+
 ## Effect libraries
 
 An effect library is a set of images that models share: the frames of
@@ -563,7 +605,8 @@ The images of effect libraries are also PNG files. They are scaled down to
 A material can have `tags`, like lights. The `surfaces` setting of the
 [craft page](craft.md) uses them to hide the materials and lights with a
 tag while the craft is disabled or slow, such as engine surfaces that go
-dark when the craft stops. See
+dark when the craft stops. It can also turn their light off while the
+craft is disabled, such as windows and running lights. See
 [material and light tags](reference/states_and_tags.md#material-and-light-tags).
 
 A tag is 1 to 63 characters: lower-case letters, digits, `.` and `_`. A

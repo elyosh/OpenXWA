@@ -72,10 +72,65 @@ static bool XwaControllerConfig_ReadString(const AeronConfigFile* document, cons
 	return true;
 }
 
+/* The names of a VR hand's axes and buttons in the configuration, in the
+ * order of AeronVrHandAxis and AeronVrHandButton. */
+static const char* const k_vr_hand_axes[AERON_VR_HAND_AXIS_COUNT] = {
+	"trigger", "squeeze", "thumbstickx", "thumbsticky", "trackpadx", "trackpady",
+};
+static const char* const k_vr_hand_buttons[AERON_VR_HAND_BUTTON_COUNT] = {
+	"trigger", "squeeze", "primary", "secondary", "thumbstick_click", "trackpad_click", "menu",
+};
+
+/* Gamepads and VR hands have a fixed layout, so their axes and buttons are
+ * saved by name. A joystick's are saved by number. */
+static bool XwaControllerConfig_Named(AeronControllerKind kind) {
+	return kind == AERON_CONTROLLER_KIND_GAMEPAD || kind == AERON_CONTROLLER_KIND_VR_HAND;
+}
+
+static const char* XwaControllerConfig_LayoutName(AeronControllerKind kind) {
+	return kind == AERON_CONTROLLER_KIND_GAMEPAD   ? "gamepad"
+		   : kind == AERON_CONTROLLER_KIND_VR_HAND ? "VR controller"
+												   : "joystick";
+}
+
+/* The index of a named axis or button, or -1. */
+static int XwaControllerConfig_AxisFromName(AeronControllerKind kind, const char* name) {
+	if (kind == AERON_CONTROLLER_KIND_GAMEPAD) {
+		const AeronGamepadAxis axis = Aeron_GamepadAxisFromName(name);
+		return axis < AERON_GAMEPAD_AXIS_COUNT ? (int)axis : -1;
+	}
+	for (int i = 0; i < AERON_VR_HAND_AXIS_COUNT; ++i)
+		if (!strcmp(name, k_vr_hand_axes[i]))
+			return i;
+	return -1;
+}
+
+static int XwaControllerConfig_ButtonFromName(AeronControllerKind kind, const char* name) {
+	if (kind == AERON_CONTROLLER_KIND_GAMEPAD) {
+		const AeronGamepadButton button = Aeron_GamepadButtonFromName(name);
+		return button < AERON_GAMEPAD_BUTTON_COUNT ? (int)button : -1;
+	}
+	for (int i = 0; i < AERON_VR_HAND_BUTTON_COUNT; ++i)
+		if (!strcmp(name, k_vr_hand_buttons[i]))
+			return i;
+	return -1;
+}
+
+static const char* XwaControllerConfig_AxisName(AeronControllerKind kind, int index) {
+	return kind == AERON_CONTROLLER_KIND_GAMEPAD ? Aeron_GamepadAxisName((AeronGamepadAxis)index)
+												 : k_vr_hand_axes[index];
+}
+
+static const char* XwaControllerConfig_ButtonName(AeronControllerKind kind, int index) {
+	return kind == AERON_CONTROLLER_KIND_GAMEPAD ? Aeron_GamepadButtonName((AeronGamepadButton)index)
+												 : k_vr_hand_buttons[index];
+}
+
 static bool XwaControllerConfig_ParseAxisMapping(const AeronConfigFile* document, const char* domain,
-												 bool gamepad, XwaControllerProfile* profile, char* error,
-												 size_t capacity) {
+												 AeronControllerKind kind, XwaControllerProfile* profile,
+												 char* error, size_t capacity) {
 	static const char* const names[] = { "yaw", "pitch", "roll", "throttle" };
+	const bool named = XwaControllerConfig_Named(kind);
 	size_t index;
 	for (index = 0; index < XWA_INPUT_AXIS_COUNT; ++index) {
 		char path[128];
@@ -90,18 +145,18 @@ static bool XwaControllerConfig_ParseAxisMapping(const AeronConfigFile* document
 			return XwaControllerConfig_ConfigError(error, capacity, "'%s' must be an axis mapping", path);
 		snprintf(path, sizeof path, "%s.axes.%s.source", domain, names[index]);
 		node = AeronConfigFile_GetNode(document, path);
-		if (gamepad) {
+		if (named) {
 			const char* name = AeronConfigNode_String(node, NULL);
 			if (!name)
-				return XwaControllerConfig_ConfigError(error, capacity, "'%s' must be a gamepad axis name",
-													   path);
+				return XwaControllerConfig_ConfigError(error, capacity, "'%s' must be a %s axis name", path,
+													   XwaControllerConfig_LayoutName(kind));
 			if (strcmp(name, "none") == 0)
 				source = -1;
 			else {
-				source = (int)Aeron_GamepadAxisFromName(name);
-				if (source >= AERON_GAMEPAD_AXIS_COUNT)
-					return XwaControllerConfig_ConfigError(error, capacity, "unknown gamepad axis '%s'",
-														   name);
+				source = XwaControllerConfig_AxisFromName(kind, name);
+				if (source < 0)
+					return XwaControllerConfig_ConfigError(error, capacity, "unknown %s axis '%s'",
+														   XwaControllerConfig_LayoutName(kind), name);
 			}
 		} else if (AeronConfigNode_Type(node) == AERON_CONFIG_STRING &&
 				   strcmp(AeronConfigNode_String(node, ""), "none") == 0) {
@@ -137,15 +192,17 @@ static bool XwaControllerConfig_SameSource(const AeronControllerDigitalSource* l
 		   (left->kind != AERON_CONTROLLER_DIGITAL_HAT || left->hat_direction == right->hat_direction);
 }
 
-static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, bool gamepad,
+static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, AeronControllerKind kind,
 												   AeronControllerDigitalSource* out, char* error,
 												   size_t capacity) {
+	const bool named = XwaControllerConfig_Named(kind);
 	memset(out, 0, sizeof *out);
 	out->threshold = 0.5f;
-	if (gamepad && AeronConfigNode_Type(node) == AERON_CONFIG_STRING) {
-		AeronGamepadButton button = Aeron_GamepadButtonFromName(AeronConfigNode_String(node, ""));
-		if (button >= AERON_GAMEPAD_BUTTON_COUNT)
-			return XwaControllerConfig_ConfigError(error, capacity, "unknown gamepad button '%s'",
+	if (named && AeronConfigNode_Type(node) == AERON_CONFIG_STRING) {
+		const int button = XwaControllerConfig_ButtonFromName(kind, AeronConfigNode_String(node, ""));
+		if (button < 0)
+			return XwaControllerConfig_ConfigError(error, capacity, "unknown %s button '%s'",
+												   XwaControllerConfig_LayoutName(kind),
 												   AeronConfigNode_String(node, ""));
 		out->kind = AERON_CONTROLLER_DIGITAL_BUTTON;
 		out->index = (uint8_t)button;
@@ -164,7 +221,7 @@ static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, 
 		const char* direction_name;
 		int64_t index;
 		if (button) {
-			if (gamepad || AeronConfigNode_MapCount(node) != 1 ||
+			if (named || AeronConfigNode_MapCount(node) != 1 ||
 				AeronConfigNode_Type(button) != AERON_CONFIG_INT)
 				return XwaControllerConfig_ConfigError(error, capacity, "malformed raw button source");
 			index = AeronConfigNode_Int(button, -1);
@@ -178,17 +235,16 @@ static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, 
 			if (!direction ||
 				AeronConfigNode_MapCount(node) != (size_t)(2 + (threshold != NULL) + (range != NULL)))
 				return XwaControllerConfig_ConfigError(error, capacity, "malformed digital axis source");
-			if (gamepad) {
-				AeronGamepadAxis gamepad_axis;
+			if (named) {
 				const char* name = AeronConfigNode_String(axis, NULL);
 				if (!name)
-					return XwaControllerConfig_ConfigError(error, capacity,
-														   "gamepad axis source must be named");
-				gamepad_axis = Aeron_GamepadAxisFromName(name);
-				if (gamepad_axis >= AERON_GAMEPAD_AXIS_COUNT)
-					return XwaControllerConfig_ConfigError(error, capacity, "unknown gamepad axis '%s'",
-														   name);
-				out->index = (uint8_t)gamepad_axis;
+					return XwaControllerConfig_ConfigError(error, capacity, "%s axis source must be named",
+														   XwaControllerConfig_LayoutName(kind));
+				const int named_axis = XwaControllerConfig_AxisFromName(kind, name);
+				if (named_axis < 0)
+					return XwaControllerConfig_ConfigError(error, capacity, "unknown %s axis '%s'",
+														   XwaControllerConfig_LayoutName(kind), name);
+				out->index = (uint8_t)named_axis;
 			} else {
 				index = AeronConfigNode_Int(axis, -1);
 				if (AeronConfigNode_Type(axis) != AERON_CONFIG_INT || index < 0 ||
@@ -215,17 +271,17 @@ static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, 
 			 * joystick axis that rests at an end. */
 			if (range) {
 				const char* range_name = AeronConfigNode_String(range, NULL);
-				if (range_name && strcmp(range_name, "full") == 0 && !gamepad)
+				if (range_name && strcmp(range_name, "full") == 0 && !named)
 					out->full_range = 1;
 				else if (!range_name || strcmp(range_name, "center") != 0)
 					return XwaControllerConfig_ConfigError(error, capacity,
-														   gamepad ? "gamepad axis range must be center"
-																   : "axis range must be center or full");
+														   named ? "only a joystick axis can use range: full"
+																 : "axis range must be center or full");
 			}
 			return true;
 		}
 		if (hat) {
-			if (gamepad || !direction || AeronConfigNode_MapCount(node) != 2 ||
+			if (named || !direction || AeronConfigNode_MapCount(node) != 2 ||
 				AeronConfigNode_Type(hat) != AERON_CONFIG_INT)
 				return XwaControllerConfig_ConfigError(error, capacity, "malformed raw hat source");
 			index = AeronConfigNode_Int(hat, -1);
@@ -271,7 +327,7 @@ static bool XwaControllerConfig_AddBinding(XwaInputActionBinding* bindings, size
 	return true;
 }
 
-static bool XwaControllerConfig_ParseBindingValue(const AeronConfigNode* node, bool gamepad,
+static bool XwaControllerConfig_ParseBindingValue(const AeronConfigNode* node, AeronControllerKind kind,
 												  XwaInputAction action, XwaInputActionBinding* bindings,
 												  size_t* count, size_t maximum, char* error,
 												  size_t capacity) {
@@ -282,7 +338,7 @@ static bool XwaControllerConfig_ParseBindingValue(const AeronConfigNode* node, b
 	for (size_t i = 0; i < length; ++i) {
 		const AeronConfigNode* item = sequence ? AeronConfigNode_SequenceGet(node, i) : node;
 		AeronControllerDigitalSource source;
-		if (!XwaControllerConfig_ParseDigitalSource(item, gamepad, &source, error, capacity) ||
+		if (!XwaControllerConfig_ParseDigitalSource(item, kind, &source, error, capacity) ||
 			!XwaControllerConfig_AddBinding(bindings, count, maximum, action, &source, error, capacity))
 			return false;
 	}
@@ -314,9 +370,12 @@ bool XwaControllerConfig_ReadProfile(const AeronConfigFile* document, const char
 		return false;
 	static const char* const axis_names[] = { "yaw", "pitch", "roll", "throttle" };
 	static const char* const fields[] = { "source", "invert", "deadzone" };
-	if (kind != AERON_CONTROLLER_KIND_GAMEPAD && kind != AERON_CONTROLLER_KIND_JOYSTICK)
-		return XwaControllerConfig_ConfigError(error, capacity, "layout must be gamepad or joystick");
-	if (!strcmp(path, "input.gamepad_defaults")) {
+	if (kind != AERON_CONTROLLER_KIND_GAMEPAD && kind != AERON_CONTROLLER_KIND_JOYSTICK &&
+		kind != AERON_CONTROLLER_KIND_VR_HAND)
+		return XwaControllerConfig_ConfigError(error, capacity,
+											   "layout must be gamepad, joystick or vr_hand");
+	if (!strcmp(path, "input.gamepad_defaults") || !strcmp(path, "input.vr_left_defaults") ||
+		!strcmp(path, "input.vr_right_defaults")) {
 		static const char* const keys[] = { "axes", "buttons" };
 		if (!Keys(AeronConfigFile_GetNode(document, path), keys, 2, error, capacity))
 			return false;
@@ -331,8 +390,7 @@ bool XwaControllerConfig_ReadProfile(const AeronConfigFile* document, const char
 		if (!Keys(AeronConfigFile_GetNode(document, sub), fields, 3, error, capacity))
 			return false;
 	}
-	if (!XwaControllerConfig_ParseAxisMapping(document, path, kind == AERON_CONTROLLER_KIND_GAMEPAD, profile,
-											  error, capacity))
+	if (!XwaControllerConfig_ParseAxisMapping(document, path, kind, profile, error, capacity))
 		return false;
 	snprintf(sub, sizeof sub, "%s.buttons", path);
 	const AeronConfigNode* map = AeronConfigFile_GetNode(document, sub);
@@ -347,9 +405,9 @@ bool XwaControllerConfig_ReadProfile(const AeronConfigFile* document, const char
 			Aeron_LogWarn("xwa.config", "unknown controller action '%s' is ignored", name);
 			continue;
 		}
-		if (!XwaControllerConfig_ParseBindingValue(
-				AeronConfigNode_MapValueAt(map, i), kind == AERON_CONTROLLER_KIND_GAMEPAD, action,
-				profile->bindings, &profile->binding_count, XWA_CONTROLLER_BINDING_CAP, error, capacity))
+		if (!XwaControllerConfig_ParseBindingValue(AeronConfigNode_MapValueAt(map, i), kind, action,
+												   profile->bindings, &profile->binding_count,
+												   XWA_CONTROLLER_BINDING_CAP, error, capacity))
 			return false;
 	}
 	return XwaControllerOptions_ValidateProfile(profile, kind, error, capacity);
@@ -390,6 +448,7 @@ bool XwaControllerConfig_Parse(const AeronConfigFile* document, XwaControllerOpt
 		const char* layout = AeronConfigNode_String(AeronConfigNode_MapGet(node, "layout"), "");
 		m->kind = !strcmp(layout, "joystick")  ? AERON_CONTROLLER_KIND_JOYSTICK
 				  : !strcmp(layout, "gamepad") ? AERON_CONTROLLER_KIND_GAMEPAD
+				  : !strcmp(layout, "vr_hand") ? AERON_CONTROLLER_KIND_VR_HAND
 											   : AERON_CONTROLLER_KIND_NONE;
 		if (!XwaControllerConfig_ReadProfile(document, path, m->kind, &m->profile, error, capacity))
 			return false;
@@ -405,14 +464,16 @@ typedef struct XwaControllerYamlScratch {
 	AeronConfigMapValue action_map[XWA_INPUT_ACTION_COUNT - 1];
 } XwaControllerYamlScratch;
 
-static void XwaControllerConfig_ControllerSourceYaml(const AeronControllerDigitalSource* source, bool gamepad,
+static void XwaControllerConfig_ControllerSourceYaml(const AeronControllerDigitalSource* source,
+													 AeronControllerKind kind,
 													 XwaControllerYamlScratch* scratch, size_t slot) {
+	const bool named = XwaControllerConfig_Named(kind);
 	AeronConfigValue* value = &scratch->sources[slot];
 	AeronConfigValue* fields = scratch->fields[slot];
 	AeronConfigMapValue* map = scratch->source_maps[slot];
-	if (gamepad && source->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
+	if (named && source->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
 		value->type = AERON_CONFIG_STRING;
-		value->value.string_value = Aeron_GamepadButtonName((AeronGamepadButton)source->index);
+		value->value.string_value = XwaControllerConfig_ButtonName(kind, source->index);
 		return;
 	}
 	value->type = AERON_CONFIG_MAP;
@@ -426,9 +487,9 @@ static void XwaControllerConfig_ControllerSourceYaml(const AeronControllerDigita
 	}
 	if (source->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
 		source->kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-		fields[0].type = gamepad ? AERON_CONFIG_STRING : AERON_CONFIG_INT;
-		if (gamepad)
-			fields[0].value.string_value = Aeron_GamepadAxisName((AeronGamepadAxis)source->index);
+		fields[0].type = named ? AERON_CONFIG_STRING : AERON_CONFIG_INT;
+		if (named)
+			fields[0].value.string_value = XwaControllerConfig_AxisName(kind, source->index);
 		else
 			fields[0].value.int_value = source->index;
 		fields[1].type = AERON_CONFIG_STRING;
@@ -490,19 +551,22 @@ static int BindingCompare(const void* left, const void* right) {
 
 static void ModelValue(const XwaControllerModel* model, ModelYaml* scratch, AeronConfigValue* value) {
 	static const char* const names[] = { "yaw", "pitch", "roll", "throttle" };
-	const bool gamepad = model->kind == AERON_CONTROLLER_KIND_GAMEPAD;
+	const bool named = XwaControllerConfig_Named(model->kind);
 	scratch->guid = (AeronConfigValue) { .type = AERON_CONFIG_STRING, .value.string_value = model->guid };
 	scratch->name = (AeronConfigValue) { .type = AERON_CONFIG_STRING, .value.string_value = model->name };
 	scratch->layout = (AeronConfigValue) { .type = AERON_CONFIG_STRING,
-										   .value.string_value = gamepad ? "gamepad" : "joystick" };
+										   .value.string_value =
+											   model->kind == AERON_CONTROLLER_KIND_GAMEPAD   ? "gamepad"
+											   : model->kind == AERON_CONTROLLER_KIND_VR_HAND ? "vr_hand"
+																							  : "joystick" };
 	for (int i = 0; i < 4; ++i) {
 		const XwaInputAxisBinding* b = &model->profile.mapping.axes[i];
 		AeronConfigValue* f = scratch->axis_fields[i];
-		f[0].type = b->source < 0 || gamepad ? AERON_CONFIG_STRING : AERON_CONFIG_INT;
+		f[0].type = b->source < 0 || named ? AERON_CONFIG_STRING : AERON_CONFIG_INT;
 		if (b->source < 0)
 			f[0].value.string_value = "none";
-		else if (gamepad)
-			f[0].value.string_value = Aeron_GamepadAxisName((AeronGamepadAxis)b->source);
+		else if (named)
+			f[0].value.string_value = XwaControllerConfig_AxisName(model->kind, b->source);
 		else
 			f[0].value.int_value = b->source;
 		f[1] = (AeronConfigValue) { .type = AERON_CONFIG_BOOL, .value.bool_value = b->invert };
@@ -525,7 +589,7 @@ static void ModelValue(const XwaControllerModel* model, ModelYaml* scratch, Aero
 		size_t first = slot;
 		XwaInputAction action = bindings[slot].action;
 		while (slot < model->profile.binding_count && bindings[slot].action == action) {
-			XwaControllerConfig_ControllerSourceYaml(&bindings[slot].source, gamepad, &scratch->digital,
+			XwaControllerConfig_ControllerSourceYaml(&bindings[slot].source, model->kind, &scratch->digital,
 													 slot);
 			++slot;
 		}

@@ -477,6 +477,32 @@ int XwaCraftHyperspace_AiOutOfHyperspaceStep(unsigned int objIdx, char* reached)
 	return 1;
 }
 
+char XwaCraftHyperspace_AiArrivalStopsBeforePoint(unsigned int objIdx) {
+	ObjectRecord* object = &g_objectTable[objIdx];
+	AiController* ai = g_paiContext.aiController;
+	const float offsetX = (float)ai->aimPointX - (float)object->world_x;
+	const float offsetY = (float)ai->aimPointY - (float)object->world_y;
+	const float offsetZ = (float)ai->aimPointZ - (float)object->world_z;
+	/* The speed is a signed 16-bit value here. */
+	const int currentSpeed = (int16_t)object->mobj->speed;
+	int distance = (int)sqrtf(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
+	int speed = currentSpeed;
+	char reached = 0;
+
+	if (distance < speed * 3) {
+		speed = distance / 3;
+	}
+	distance -= currentSpeed;
+	if (distance >= ai->maneuverDist || distance <= 0) {
+		reached = 1;
+		speed = 0;
+	} else {
+		ai->maneuverDist = distance;
+	}
+	object->mobj->speed = (uint16_t)speed;
+	return reached;
+}
+
 /* ---- Departures ------------------------------------------------------------- */
 
 /* Sets `*speed` and `*acceleration` for an AI craft whose departure has a

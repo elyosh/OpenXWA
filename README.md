@@ -138,9 +138,15 @@ installation.
 
 ## Building from source
 
-The build requires CMake 3.20 or later, a C/C++ toolchain, SDL3 3.4, zstd,
+The build requires CMake 3.20 or later, a C/C++ toolchain, SDL3, zstd,
 FFmpeg, and SDL_shadercross. Release packaging pins its dependencies and
 provides the reference for reproducible builds.
+
+A local build must use the same SDL as the packages, not a system SDL. Build
+it with `aeron/packaging/dependencies/build-sdl.sh <install prefix>` and pass
+`-DCMAKE_PREFIX_PATH=<install prefix>` to CMake. CMake stops when it finds
+another SDL. See
+[aeron/packaging/dependencies/README.md](aeron/packaging/dependencies/README.md).
 
 Platform-specific instructions are available for
 [Windows](packaging/windows/README.md),

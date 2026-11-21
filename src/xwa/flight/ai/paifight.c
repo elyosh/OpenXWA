@@ -711,8 +711,14 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 			}
 
 			if (matchesTarget1) {
+#ifdef XWA_MODERN
+				if (!XwaMissionSettings_NoTurretWarheadEscortDefense() &&
+					(g_paiContext.aiTargetSearchFlags & 0x20u) != 0 &&
+					g_objectTable[targetObjIdx].genusId != 0) {
+#else
 				if ((g_paiContext.aiTargetSearchFlags & 0x20u) != 0 &&
 					g_objectTable[targetObjIdx].genusId != 0) {
+#endif
 					uint32_t projectileRangeLimit;
 					uint16_t bestProjectileObjIdx;
 					uint16_t projectileObjIdx;
@@ -739,7 +745,7 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 						projectileObject = &g_objectTable[projectileObjIdx];
 						if (projectileType != OBJ_None && projectileObject->genusId != GENUS_Explosion &&
 #ifdef XWA_MODERN
-							projectileType >= OBJ_LaserRebel && projectileType <= OBJ_LaserImperialDS &&
+							projectileType >= OBJ_LaserRebel && projectileType <= OBJ_NoAsset_307 &&
 							g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0 &&
 #else
 							g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0 &&
@@ -2687,6 +2693,11 @@ char paifight_fightershootorder(void) {
 				uint8_t convergeMode;
 
 				convergeMode = g_modelDefs[g_curCraft->modelDefIndex].laserConvergeMode;
+#ifdef XWA_MODERN
+				if (XwaMissionSettings_NoAiLaserConvergence()) {
+					convergeMode = 0;
+				}
+#endif
 				if (convergeMode == 1) {
 					g_curCraft->laserConvergeLevel = 2;
 				} else if (convergeMode == 2) {
@@ -3086,11 +3097,19 @@ char paifight_fightershootorder(void) {
 					   g_objectTable[targetObjIdx].mobj->pCraft->weaponFireInhibitTimer < 0x49cu)))) {
 					uint16_t firstSlot;
 
+#ifdef XWA_MODERN
+					if ((!XwaMissionSettings_NoTopAiDualWarheads() && g_paiContext.aiSkillTier == 2 &&
+						 (uint32_t)firingCraft->hullDamage >=
+							 (uint32_t)firingCraft->systemDamageHullThreshold &&
+						 !isDisablePlan) ||
+						g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
+#else
 					if ((g_paiContext.aiSkillTier == 2 &&
 						 (uint32_t)firingCraft->hullDamage >=
 							 (uint32_t)firingCraft->systemDamageHullThreshold &&
 						 !isDisablePlan) ||
 						g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
+#endif
 						firingCraft->warheadLauncherFlags[launcherIdx] = 3;
 					} else {
 						firstSlot =
@@ -3109,7 +3128,13 @@ char paifight_fightershootorder(void) {
 					}
 					laser_firerocketsystem(g_paiContext.aiObjIdx, launcherIdx);
 					++g_curCraft->aiFlight.maneuverCounter;
+#ifdef XWA_MODERN
+					if (!XwaMissionSettings_AiWarheadsAttackOnHit()) {
+						targetCraft->attackedByTeam[g_objectTable[g_paiContext.aiObjIdx].mobj->team] = 1;
+					}
+#else
 					targetCraft->attackedByTeam[g_objectTable[g_paiContext.aiObjIdx].mobj->team] = 1;
+#endif
 					firingCraft = g_curCraft;
 				}
 			}
@@ -3274,7 +3299,8 @@ char paifight_gunnerselfdefenseorder(void) {
 						continue;
 					}
 #ifdef XWA_MODERN
-					if (XwaTurretIgnore_Skips(projectileObjIdx)) {
+					if (XwaMissionSettings_NoTurretWarheadSelfDefense() ||
+						XwaTurretIgnore_Skips(projectileObjIdx)) {
 						continue;
 					}
 #endif
@@ -3789,6 +3815,12 @@ int paifight_TargetHasAttackCapacity(uint16_t targetObjIdx, uint16_t candidateCo
 		}
 
 		if (g_objectTable[targetObjIdx].playerOwnerIdx != -1) {
+#ifdef XWA_MODERN
+			/* The rule always uses the limits for several candidates. */
+			if (XwaMissionSettings_PlayerAttackerLimitByDifficulty()) {
+				candidateCount = 0;
+			}
+#endif
 			switch (g_flightDifficulty) {
 				case 0:
 					targetLimit = candidateCount == 1 ? 4 : 2;

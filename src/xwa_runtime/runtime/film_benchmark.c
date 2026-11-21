@@ -51,9 +51,14 @@ typedef enum FilmBenchmarkState {
    doesn't depend on the host's timing. */
 typedef struct FilmBenchmarkRecord {
 	int32_t filmTime;
+	uint32_t beginUs; /* Aeron_BeginFrame */
+	uint32_t tickUs;  /* the whole port tick, with the flight frame and the capture */
 	uint32_t flightUs;
 	uint32_t captureUs;
 	uint32_t remasterUs;
+	uint32_t presentUs;
+	uint32_t acquireUs; /* the present's wait for the swapchain image */
+	uint32_t gpuBusy;   /* 1: the GPU work before this present wasn't done at the vsync */
 	uint32_t hostFrameUs;
 } FilmBenchmarkRecord;
 
@@ -84,13 +89,18 @@ static int s_fastForwardFrame;
 static uint32_t s_flightCommits;
 static int s_lastCommitValid;
 static int32_t s_lastCommitFilmTime;
+/* --record-audio: the WAV file in the user folder, whether the recording
+   started, and whether it failed. */
+static char s_recordPath[1024];
+static int s_recording;
+static int s_recordFailed;
 
 static uint32_t FilmBenchmark_Clamp(uint64_t us) {
 	return us < FILM_BENCHMARK_NONE ? (uint32_t)us : FILM_BENCHMARK_NONE - 1;
 }
 
-void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt,
-								const char* captureName, int measure) {
+void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, const char* recordPath,
+								int32_t pauseAt, const char* captureName, int measure) {
 	const size_t length = filmName != NULL ? strlen(filmName) : 0;
 	const int hasExtension = length >= 4 && (strcmp(filmName + length - 4, ".flm") == 0 ||
 											 strcmp(filmName + length - 4, ".FLM") == 0);
@@ -98,6 +108,9 @@ void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32
 	s_state = FILM_BENCHMARK_OFF;
 	s_filmPath[0] = '\0';
 	s_csvPath[0] = '\0';
+	snprintf(s_recordPath, sizeof s_recordPath, "%s", recordPath != NULL ? recordPath : "");
+	s_recording = 0;
+	s_recordFailed = 0;
 	s_pauseAt = pauseAt >= 0 ? pauseAt : -1;
 	snprintf(s_captureName, sizeof s_captureName, "%s", captureName != NULL ? captureName : "");
 	s_measure = measure != 0;
@@ -162,8 +175,10 @@ void XwaFilmBenchmark_NoteFlight(int flightFrameRan, uint64_t flightUs) {
 
 void XwaFilmBenchmark_NoteCapture(uint64_t captureUs) { s_pendingCaptureUs = FilmBenchmark_Clamp(captureUs); }
 
-void XwaFilmBenchmark_NoteHostFrame(uint64_t remasterUs, uint64_t hostFrameUs) {
+void XwaFilmBenchmark_NoteHostFrame(uint64_t beginUs, uint64_t tickUs, uint64_t remasterUs,
+									uint64_t presentUs, uint64_t hostFrameUs) {
 	FilmBenchmarkRecord* record;
+	AeronPacingStats pacing;
 	const int fastForwardFrame = s_fastForwardFrame;
 
 	s_fastForwardFrame = 0;
@@ -194,9 +209,15 @@ void XwaFilmBenchmark_NoteHostFrame(uint64_t remasterUs, uint64_t hostFrameUs) {
 	}
 	record = &s_records[s_recordCount++];
 	record->filmTime = g_filmStepInputTimestamp;
+	record->beginUs = FilmBenchmark_Clamp(beginUs);
+	record->tickUs = FilmBenchmark_Clamp(tickUs);
 	record->flightUs = s_pendingFlightUs;
 	record->captureUs = s_pendingCaptureUs;
 	record->remasterUs = FilmBenchmark_Clamp(remasterUs);
+	record->presentUs = FilmBenchmark_Clamp(presentUs);
+	Aeron_GetPacingStats(&pacing);
+	record->acquireUs = pacing.last_acquire_wait_us;
+	record->gpuBusy = pacing.last_gpu_busy != 0;
 	record->hostFrameUs = FilmBenchmark_Clamp(hostFrameUs);
 	s_pendingFlightUs = FILM_BENCHMARK_NONE;
 	s_pendingCaptureUs = FILM_BENCHMARK_NONE;
@@ -251,13 +272,14 @@ static void FilmBenchmark_AppendValue(char* line, size_t size, uint32_t value) {
 }
 
 static void FilmBenchmark_WriteCsv(void) {
-	static const char header[] = "frame,film_time,flight_us,capture_us,remaster_us,host_frame_us\n";
+	static const char header[] = "frame,film_time,begin_us,tick_us,flight_us,capture_us,remaster_us,present_"
+								 "us,acquire_us,gpu_busy,host_frame_us\n";
 	char* text;
 	size_t used;
 	size_t i;
 
-	/* At most 11 characters per value, 6 values, separators and a newline. */
-	text = malloc(sizeof header + s_recordCount * 80);
+	/* At most 11 characters per value, 11 values, separators and a newline. */
+	text = malloc(sizeof header + s_recordCount * 136);
 	if (text == NULL) {
 		Aeron_LogError("xwa.benchmark", "film benchmark: %s: out of memory", s_csvPath);
 		return;
@@ -266,14 +288,19 @@ static void FilmBenchmark_WriteCsv(void) {
 	used = sizeof header - 1;
 	for (i = 0; i < s_recordCount; ++i) {
 		const FilmBenchmarkRecord* record = &s_records[i];
-		char line[80];
+		char line[136];
 
 		snprintf(line, sizeof line, "%zu,%d", i, (int)record->filmTime);
+		FilmBenchmark_AppendValue(line, sizeof line, record->beginUs);
+		FilmBenchmark_AppendValue(line, sizeof line, record->tickUs);
 		FilmBenchmark_AppendValue(line, sizeof line, record->flightUs);
 		FilmBenchmark_AppendValue(line, sizeof line, record->captureUs);
 		FilmBenchmark_AppendValue(line, sizeof line, record->remasterUs);
+		FilmBenchmark_AppendValue(line, sizeof line, record->presentUs);
+		FilmBenchmark_AppendValue(line, sizeof line, record->acquireUs);
+		FilmBenchmark_AppendValue(line, sizeof line, record->gpuBusy);
 		FilmBenchmark_AppendValue(line, sizeof line, record->hostFrameUs);
-		used += (size_t)snprintf(text + used, 80, "%s\n", line);
+		used += (size_t)snprintf(text + used, sizeof line, "%s\n", line);
 	}
 	if (AeronVfs_WriteAllAtomic(Aeron_GetVfs(), AERON_VFS_ROOT_USER, s_csvPath, text, used)) {
 		Aeron_LogInfo("xwa.benchmark", "film benchmark: wrote %s", s_csvPath);
@@ -304,9 +331,17 @@ void XwaFilmBenchmark_FlightEnded(void) {
 	FilmBenchmark_LogMeasure("flight frame", offsetof(FilmBenchmarkRecord, flightUs));
 	FilmBenchmark_LogMeasure("snapshot capture", offsetof(FilmBenchmarkRecord, captureUs));
 	FilmBenchmark_LogMeasure("remaster frame", offsetof(FilmBenchmarkRecord, remasterUs));
+	FilmBenchmark_LogMeasure("present", offsetof(FilmBenchmarkRecord, presentUs));
 	FilmBenchmark_LogMeasure("host frame", offsetof(FilmBenchmarkRecord, hostFrameUs));
 	if (s_csvPath[0]) {
 		FilmBenchmark_WriteCsv();
+	}
+	if (s_recording) {
+		s_recordFailed |= !Aeron_AudioRecordStop();
+		s_recording = 0;
+	}
+	if (s_recordFailed) {
+		s_state = FILM_BENCHMARK_FAILED;
 	}
 	free(s_records);
 	s_records = NULL;
@@ -376,6 +411,12 @@ void XwaFilmBenchmark_NoteFlightCommit(void) {
 	}
 	if (s_flightCommits < 2) {
 		++s_flightCommits;
+	}
+	/* The recording starts with the film's first flight frame, after the
+	   mission has loaded. */
+	if (s_recordPath[0] && !s_recording && s_state == FILM_BENCHMARK_PLAYING) {
+		s_recording = 1;
+		s_recordFailed = !Aeron_AudioRecordStart(Aeron_GetVfs(), AERON_VFS_ROOT_USER, s_recordPath);
 	}
 	/* The renderer takes the motion vectors from the previous snapshot, so it
 	   must hold the film step before the current one. */

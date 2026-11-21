@@ -46,7 +46,6 @@ tool_prefix="${work_root}/tools"
 build_root="${work_root}/build"
 stage_root="${work_root}/stage-${build_variant}"
 application="${stage_root}/OpenXWA.app"
-importer="${stage_root}/OpenXWA Mod Importer.app"
 dmg="${artifact_dir}/openxwa-${application_version}-macos-${architecture}-${build_variant}.dmg"
 dmg_volume_name="OpenXWA"
 dmg_extras="${script_dir}/dmg"
@@ -131,25 +130,20 @@ build_dependencies() {
         "-DCMAKE_OSX_SYSROOT=${sdk_path}"
     )
 
-    clone_tag https://github.com/libsdl-org/SDL.git \
-        "release-${sdl_version}" "${source_root}/SDL-${sdl_version}"
-    apply_dependency_patches sdl "${source_root}/SDL-${sdl_version}"
     clone_tag https://github.com/facebook/zstd.git \
         "v${zstd_version}" "${source_root}/zstd-${zstd_version}"
     clone_tag https://github.com/FFmpeg/FFmpeg.git \
         "n${ffmpeg_version}" "${source_root}/FFmpeg-${ffmpeg_version}"
 
-    cmake -S "${source_root}/SDL-${sdl_version}" \
-        -B "${build_root}/sdl" \
+    # build-sdl.sh clones SDL at aeron's pinned version, applies aeron's
+    # patches, and builds and installs it.
+    SDL_VERSION="${sdl_version}" CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
+        "${dependency_dir}/build-sdl.sh" \
+        --source "${source_root}/SDL-${sdl_version}" \
+        --build "${build_root}/sdl" \
+        "${dependency_prefix}" \
         "${common_cmake[@]}" \
-        "-DCMAKE_INSTALL_PREFIX=${dependency_prefix}" \
-        -DSDL_HIDAPI_LIBUSB=OFF \
-        -DSDL_INSTALL_DOCS=OFF \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF
-    cmake --build "${build_root}/sdl" --parallel "${jobs}"
-    cmake --install "${build_root}/sdl"
+        -DSDL_HIDAPI_LIBUSB=OFF
 
     cmake -S "${source_root}/zstd-${zstd_version}/build/cmake" \
         -B "${build_root}/zstd" \
@@ -250,7 +244,7 @@ build_ispc_kernel() {
     find "${work_root}/ispc-kernel" -mindepth 1 -maxdepth 1 ! -name "${key}" -exec rm -rf {} +
 }
 
-# OpenXWA and the mod importer. The importer is built from the tool
+# OpenXWA, with the mod importer. The importer is built from the tool
 # libraries, so the tools are on, and their BC6H encoder needs the ISPC
 # kernel.
 build_application() {
@@ -259,6 +253,7 @@ build_application() {
     cmake -S "${repo_root}" \
         -B "${build_root}/xwa-${build_variant}" \
         -G Ninja \
+        "-DAERON_ALLOW_OTHER_SDL=${SDL_VERSION:+ON}" \
         "-DCMAKE_BUILD_TYPE=${build_type}" \
         "-DCMAKE_INSTALL_PREFIX=${stage_root}" \
         "-DCMAKE_PREFIX_PATH=${dependency_prefix}" \
@@ -272,8 +267,7 @@ build_application() {
         "-DXWA_MACOS_BUILD_VERSION=${build_version}" \
         "-DXWA_MACOS_BUNDLE_IDENTIFIER=${bundle_identifier}" \
         "-DXWA_VERSION=${application_version}"
-    cmake --build "${build_root}/xwa-${build_variant}" --target xwa xwa_mod_importer \
-        --parallel "${jobs}"
+    cmake --build "${build_root}/xwa-${build_variant}" --target xwa --parallel "${jobs}"
 
     cmake -E remove_directory "${stage_root}"
     cmake --install "${build_root}/xwa-${build_variant}"
@@ -302,16 +296,14 @@ build_cooker() {
     )
     local arch
 
-    cmake -S "${source_root}/SDL-${sdl_version}" \
-        -B "${build_root}/cooker-sdl" \
+    # The checkout is the one that build_dependencies made.
+    SDL_VERSION="${sdl_version}" CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
+        "${dependency_dir}/build-sdl.sh" \
+        --source "${source_root}/SDL-${sdl_version}" \
+        --build "${build_root}/cooker-sdl" \
+        "${cooker_prefix}" \
         "${universal[@]}" \
-        -DSDL_HIDAPI_LIBUSB=OFF \
-        -DSDL_INSTALL_DOCS=OFF \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF
-    cmake --build "${build_root}/cooker-sdl" --parallel "${jobs}"
-    cmake --install "${build_root}/cooker-sdl"
+        -DSDL_HIDAPI_LIBUSB=OFF
 
     cmake -S "${source_root}/zstd-${zstd_version}/build/cmake" \
         -B "${build_root}/cooker-zstd" \
@@ -326,6 +318,7 @@ build_cooker() {
     cmake -S "${repo_root}/aeron" \
         -B "${build_root}/cooker" \
         "${universal[@]}" \
+        "-DAERON_ALLOW_OTHER_SDL=${SDL_VERSION:+ON}" \
         "-DCMAKE_PREFIX_PATH=${cooker_prefix}" \
         "-DAERON_SHADERCROSS_EXECUTABLE=${build_root}/shadercross/shadercross" \
         -DAERON_BUILD_TOOLS=ON \
@@ -353,23 +346,18 @@ build_cooker() {
 }
 
 stage_licenses() {
-    local bundle
-    local license_dir
+    local license_dir="${application}/Contents/Resources/licenses"
 
-    for bundle in "${application}" "${importer}"; do
-        license_dir="${bundle}/Contents/Resources/licenses"
-        mkdir -p "${license_dir}"
-        cp "${source_root}/SDL-${sdl_version}/LICENSE.txt" "${license_dir}/SDL3.txt"
-        cp "${source_root}/zstd-${zstd_version}/LICENSE" "${license_dir}/zstd.txt"
-        cp "${source_root}/FFmpeg-${ffmpeg_version}/COPYING.LGPLv2.1" \
-            "${license_dir}/FFmpeg-LGPL-2.1.txt"
-        cp "${repo_root}/aeron/third_party/bc7enc/LICENSE" "${license_dir}/bc7enc.txt"
-        cp "${repo_root}/aeron/third_party/fidelityfx-fsr3/LICENSE.txt" \
-            "${license_dir}/FidelityFX-FSR3.txt"
-        cp "${repo_root}/aeron/third_party/libyaml/License" "${license_dir}/libyaml.txt"
-    done
-    # Code that only the importer uses.
-    license_dir="${importer}/Contents/Resources/licenses"
+    mkdir -p "${license_dir}"
+    cp "${source_root}/SDL-${sdl_version}/LICENSE.txt" "${license_dir}/SDL3.txt"
+    cp "${source_root}/zstd-${zstd_version}/LICENSE" "${license_dir}/zstd.txt"
+    cp "${source_root}/FFmpeg-${ffmpeg_version}/COPYING.LGPLv2.1" \
+        "${license_dir}/FFmpeg-LGPL-2.1.txt"
+    cp "${repo_root}/aeron/third_party/bc7enc/LICENSE" "${license_dir}/bc7enc.txt"
+    cp "${repo_root}/aeron/third_party/fidelityfx-fsr3/LICENSE.txt" \
+        "${license_dir}/FidelityFX-FSR3.txt"
+    cp "${repo_root}/aeron/third_party/libyaml/License" "${license_dir}/libyaml.txt"
+    # Code that the mod importer uses.
     cp "${repo_root}/aeron/third_party/ispc_texcomp/LICENSE" \
         "${license_dir}/ISPC-Texture-Compressor.txt"
     cp "${repo_root}/aeron/third_party/bcdec/LICENSE" "${license_dir}/bcdec.txt"
@@ -378,22 +366,19 @@ stage_licenses() {
 }
 
 validate_bundle_paths() {
-    local bundle
     local item
     local invalid=0
 
-    for bundle in "${application}" "${importer}"; do
-        while IFS= read -r item; do
-            if file "${item}" | grep -q "Mach-O"; then
-                if otool -L "${item}" |
-                        grep -E -q "${dependency_prefix}|${tool_prefix}|/opt/homebrew|/usr/local"; then
-                    echo "Non-relocatable library reference in ${item}:" >&2
-                    otool -L "${item}" >&2
-                    invalid=1
-                fi
+    while IFS= read -r item; do
+        if file "${item}" | grep -q "Mach-O"; then
+            if otool -L "${item}" |
+                    grep -E -q "${dependency_prefix}|${tool_prefix}|/opt/homebrew|/usr/local"; then
+                echo "Non-relocatable library reference in ${item}:" >&2
+                otool -L "${item}" >&2
+                invalid=1
             fi
-        done < <(find "${bundle}" -type f -print)
-    done
+        fi
+    done < <(find "${application}" -type f -print)
 
     if [[ "${invalid}" -ne 0 ]]; then
         exit 1
@@ -444,15 +429,12 @@ main() {
     test -f "${application}/Contents/Resources/resources/remaster/config.yaml"
     test -f "${application}/Contents/Resources/resources/assets/fonts/menu.fnt"
     test -f "${application}/Contents/Resources/resources/assets/fonts/menu.ktx2"
+    test -f "${application}/Contents/Resources/resources/assets/fonts/DejaVuSans.ttf"
+    test -f "${application}/Contents/Resources/resources/assets/fonts/Inconsolata-Bold.ttf"
     test -f "${application}/Contents/Resources/shaders/hyperspace_streak.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.frag.msl"
     plutil -lint "${application}/Contents/Info.plist"
-    test -x "${importer}/Contents/MacOS/OpenXWA Mod Importer"
-    test -f "${importer}/Contents/Resources/resources/assets/fonts/menu.fnt"
-    test -f "${importer}/Contents/Resources/resources/assets/fonts/menu.ktx2"
-    test -f "${importer}/Contents/Resources/shaders/fullscreen.frag.msl"
-    plutil -lint "${importer}/Contents/Info.plist"
     if [[ "${build_type}" == Debug ]]; then
         application_uuid="$(dwarfdump --uuid \
             "${application}/Contents/MacOS/OpenXWA" | awk 'NR == 1 {print $2}')"
@@ -466,11 +448,9 @@ main() {
     fi
     validate_bundle_paths
     sign_bundle "${application}"
-    sign_bundle "${importer}"
 
     if [[ "${notarize_enabled}" -eq 1 ]]; then
         notarize_application "${application}"
-        notarize_application "${importer}"
     fi
 
     create_dmg
@@ -480,7 +460,7 @@ main() {
     fi
 
     echo "Created ${dmg}"
-    echo "Application bundles: ${application}, ${importer}"
+    echo "Application bundle: ${application}"
     if [[ "${cooker_enabled}" == 1 ]]; then
         echo "Add-on tools: ${cooker_dir}"
     fi

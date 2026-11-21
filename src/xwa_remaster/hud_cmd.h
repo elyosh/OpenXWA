@@ -2,9 +2,9 @@
 #define XWA_REMASTER_HUD_CMD_H
 
 #include "aeron/render.h"
-#include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/hud.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,11 +32,11 @@ typedef struct XwaHudCmdPreparedState {
 int XwaRemasterHudCmd_Init(void);
 void XwaRemasterHudCmd_Shutdown(void);
 void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
-							   XwaRemasterAssets* assets, XwaHudProfileIndex profile,
-							   int target_w, int target_h);
+							   XwaRemasterAssets* assets, XwaHudProfileIndex profile, int target_w,
+							   int target_h);
 void XwaRemasterHudCmd_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h);
-void XwaRemasterHudCmd_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
-							  AeronRenderTarget* target, int target_w, int target_h);
+void XwaRemasterHudCmd_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							  int target_w, int target_h);
 const XwaHudCmdPreparedState* XwaRemasterHudCmd_Prepared(void);
 
 #ifdef __cplusplus

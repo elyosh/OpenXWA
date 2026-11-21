@@ -8,8 +8,40 @@ input:
   mouse_invert_y: true
   rumble_enabled: true
   rumble_strength: 6
+  # Show the player's hands in the cockpit, where the VR controllers are.
+  vr_show_hands: true
+  # Use the mod's hand models when it has some. When false, the game's own
+  # are always shown.
+  vr_mod_hands: true
+  # Use the mod's virtual keyboard when it has one. When false, the game's
+  # own is always shown.
+  vr_mod_keyboard: true
+  # In the menus, show the headset's own model of each VR controller, with
+  # its moving buttons, when the headset's software provides one (SteamVR
+  # does). When false, or without a model, the hands are shown as in the
+  # cockpit.
+  vr_menu_controllers: true
+  # The virtual stick of the VR controllers: hold the grip of the stick hand
+  # and move the hand to steer. 'tilt' reads the hand's rotation, as on a
+  # stick. 'slide' reads the hand's movement sideways, forward and back, and
+  # its twist for the roll. 'off' leaves the grip free for a binding.
+  vr_stick: 'tilt'
+  # The hand that holds the virtual stick: 'left' or 'right'.
+  vr_stick_hand: 'right'
+  # While the virtual stick is on, hold the grip of the other hand and move
+  # the hand forward and back to move the throttle.
+  vr_throttle: true
+  # Multiplies how far the hand moves for the stick's full travel, from 0.5
+  # to 2. At 1, that is 30 degrees of tilt, 40 degrees of twist and 12 cm.
+  vr_stick_range: 1.0
+  # A VR hand can point at the buttons of a cockpit and press them with its
+  # trigger. A cockpit has buttons when its model defines some.
+  vr_cockpit_buttons: true
+  # How far a button can be from the fingertip, in metres.
+  vr_button_ray_m: 1.5
   # Saved controller models, one complete profile each. New gamepads get
-  # gamepad_defaults; joysticks start with nothing bound.
+  # gamepad_defaults, and new VR controllers get vr_left_defaults or
+  # vr_right_defaults. Joysticks start with nothing bound.
   controllers: []
   gamepad_defaults:
     axes:
@@ -30,6 +62,30 @@ input:
       look_right: [dpadright]
       look_down: [dpaddown]
       look_left: [dpadleft]
+  # A VR controller's axes are trigger, squeeze (the grip), thumbstickx,
+  # thumbsticky, trackpadx and trackpady. Its buttons are trigger, squeeze,
+  # primary (A or X), secondary (B or Y), thumbstick_click, trackpad_click and
+  # menu.
+  vr_left_defaults:
+    axes:
+      roll: {source: thumbstickx, invert: false, deadzone: 0.15}
+    buttons:
+      target_in_sights: [trigger]
+      throttle_up: [{axis: thumbsticky, direction: positive, threshold: 0.5}]
+      throttle_down: [{axis: thumbsticky, direction: negative, threshold: 0.5}]
+      throttle_full: [thumbstick_click]
+      target_nearest_fighter: [primary]
+      target_my_attackers: [secondary]
+      options_menu: [menu]
+  vr_right_defaults:
+    axes:
+      yaw: {source: thumbstickx, invert: false, deadzone: 0.15}
+      pitch: {source: thumbsticky, invert: false, deadzone: 0.15}
+    buttons:
+      fire_weapon: [trigger]
+      recenter_headset: [thumbstick_click]
+      cycle_weapon: [primary]
+      cycle_firing_mode: [secondary]
   # Every action, with its keys. Escape always opens the options and can't
   # be listed; options_menu can get other keys.
   keyboard:
@@ -186,6 +242,8 @@ input:
     switch_seat:
       - {key: "G"}
       - {key: "W", modifiers: [alt]}
+    recenter_headset:
+      - {key: "R", modifiers: [ctrl, alt]}
     mfd_prev_page:
       - {key: "Left"}
     mfd_next_page:
@@ -216,6 +274,9 @@ input:
       - {key: "S", modifiers: [alt]}
     console_page:
       - {key: "C", modifiers: [ctrl]}
+    toggle_holograms:
+      - {key: "H", modifiers: [ctrl]}
+    toggle_vr_keyboard: []
     wingman_command_page:
       - {key: "Tab"}
     command_option_1:
@@ -320,7 +381,8 @@ dynamic_cockpit:
   # Keep the whole 2D HUD on screen; transparent displays
   # without always_visible are hidden and the throttle bar is not drawn.
   classic_hud: false
-  # Hologram displays visible; Ctrl+H toggles them in flight.
+  # Hologram displays visible. The toggle_holograms action (Ctrl+H by
+  # default) toggles them in flight.
   holograms: true
   # Emissive multipliers of the display content and of holograms.
   display_emissive_strength: 0.7
@@ -353,6 +415,51 @@ presentation:
   # wider view, so that the horizontal field of view stays the one at this
   # aspect. 1.778 is 16:9. 0 turns it off.
   cockpit_fov_min_aspect: 1.778
+  # The stereo view of the debug UI, which draws the two eyes of a headset
+  # side by side without a headset: the distance between the eyes in metres,
+  # and the horizontal field of view of one eye in degrees.
+  debug_stereo_ipd_m: 0.064
+  debug_stereo_fov_deg: 100
+  # In VR, the menus, the briefings and the movies are shown on a flat
+  # screen in front of the player: its size in pixels, its distance from the
+  # head in metres, and the angle that its width covers, in degrees. The
+  # screen looks the same size at any distance. Read when the game starts.
+  # The player's video.vr_screen_scale multiplies the width.
+  vr_screen_width_px: 1920
+  vr_screen_height_px: 1080
+  vr_screen_distance_m: 2.0
+  vr_screen_width_deg: 62
+  # In VR, the flight HUD is laid out for an image of this size, in pixels,
+  # and shown in two parts. The reticle, the target boxes and the arrows are
+  # drawn in the scene, so they line up with what they point at. The radars,
+  # the gauges, the MFDs and the text are drawn into that image and shown on
+  # a flat panel in front of the seat, at this distance in metres.
+  # The panel looks the same size at any distance. The player's
+  # video.vr_panel_scale sets its size, where 1 covers the same part of the
+  # view as the HUD does on a screen.
+  vr_hud_width_px: 1920
+  vr_hud_height_px: 1440
+  vr_hud_panel_distance_m: 0.8
+  # In VR, the size of the reticle and of the marks and counts around it,
+  # where 1 is the size they have on a screen.
+  vr_hud_reticle_scale: 1.0
+  # In VR, the arrow that points to a target out of view. Both values are
+  # fractions of the part of the view that both eyes see, from its centre:
+  # 1 is the edge of that part. vr_hud_arrow_position is where the arrow is
+  # drawn. vr_hud_arrow_view is how far from the centre the target must be
+  # for the arrow to show. Closer than that, the target is in view and has
+  # its box.
+  vr_hud_arrow_position: 0.85
+  vr_hud_arrow_view: 1.0
+# Sound. The Audio tab of OpenXWA Options changes these settings.
+audio:
+  # speakers or headphones. On headphones, sounds also seem to come from
+  # above, below and behind.
+  output: speakers
+  # stereo, 5.1 or 7.1. A change applies the next time OpenXWA starts.
+  speaker_layout: stereo
+  # Distant sounds lose their high frequencies, as through air.
+  distance_filter: true
 # The camera lag and tilt, the cockpit sway and the HUD in the exterior view.
 # A mod can change these values. The options only offer Enhanced Camera,
 # which sets `enabled`.
@@ -698,6 +805,10 @@ point_lights:
   enabled: true
   cluster_depth_slices: 24
   cluster_debug: false       # occupancy view; debug-UI builds only
+  # Spot lights close together that point the same way, such as a ship's
+  # engines, are shaded as one light away from them. Near them, they stay
+  # separate.
+  merge_spot_lights: true
   # The game's lights (lasers, explosions, engines) are physical
   # inverse-square sphere lights from the classic intensities. This many
   # metres away they give what the classic law gives, converted by

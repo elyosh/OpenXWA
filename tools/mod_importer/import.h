@@ -6,9 +6,11 @@
  * XWAU or a TFTC release, into an OpenXWA mod folder, in one process.
  *
  * The import runs in phases on the calling thread. The models are converted
- * and cooked by a pool of worker threads. Every message of the tool libraries
- * goes to <mod>/import.log, to the log lines of the progress, and to the
- * `echo` callback when there is one.
+ * and cooked by a pool of worker threads. The messages of the tool libraries,
+ * and everything that the import's threads log through SDL, go to
+ * <mod>/import.log, to the log lines of the progress, and to the `echo`
+ * callback when there is one. A program that doesn't call Aeron_Init calls
+ * Aeron_LogInstallOutput first, or the SDL lines go to its own log.
  *
  * The import stops at the first failure. The importer writes a mod.yaml with
  * the mod format version (xwa_app/mod_format.h) and `complete: false` at the
@@ -45,7 +47,8 @@ typedef struct XwaModImportOptions {
 	int zstd_level;          /* of the models' textures; 0: the cook's default */
 	const char* const* only; /* only import these models (lower-case keys) */
 	size_t only_count;
-	/* Receives each log line as it is written, from any thread. */
+	/* Receives each log line as it is written, from any thread. It must not
+	   log: it is called while the log's lock is held. */
 	ToolLogSink echo;
 	void* echo_user;
 } XwaModImportOptions;
@@ -86,7 +89,7 @@ typedef struct XwaModImportProgress {
 	volatile int warnings;
 	volatile int errors;
 	volatile int finished;
-	volatile int result;                      /* XwaModImportResult */
+	volatile int result; /* XwaModImportResult */
 	/* How long each phase should take, in ms, estimated before the models
 	   phase starts. It doesn't change after that. */
 	volatile int phase_cost[XWA_MOD_IMPORT_PHASE_COUNT];
@@ -117,7 +120,8 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
 
 /* The folder of the mod `name` in the mods folder `mods`: <mods>/<name>, with
  * the name in lower case and other characters than letters, digits, '.' and
- * '-' replaced by '-'. */
+ * '-' replaced by '-'. A '.' at the start is replaced by '-' too: those
+ * folders hold the staging and trash folders of the mods. */
 bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_t cap);
 
 /* Whether folder `dir` holds a mod that the importer made. */
@@ -156,7 +160,9 @@ const char* XwaModImport_PhaseName(XwaModImportPhase phase);
 
 /* Calls `fn` for each log line kept since line number `*next`, then sets
  * `*next` past the last one. The progress keeps the last 2,000 lines. Can be
- * called from any thread during the import. */
+ * called from any thread during the import. `fn` must not log: it is called
+ * while the log's lock is held, and a line logged by an import thread waits
+ * for that lock. */
 void XwaModImport_ReadLog(XwaModImportProgress* progress, unsigned long long* next, ToolLogSink fn,
 						  void* user);
 

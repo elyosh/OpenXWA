@@ -1,14 +1,14 @@
 # Windows build with GCC MinGW-w64
 
 This Docker build produces a self-contained x86-64 Windows package using GCC
-MinGW-w64, with OpenXWA and the OpenXWA Mod Importer. It uses Debian 13's
-MinGW-w64 toolchain for UCRT, the C runtime of Windows 10 and later, so the
-package needs Windows 10 or later. SDL3, zstd, and the
-required FFmpeg components are downloaded and built inside Docker; they are
-not vendored in this repository or required on the host. ISPC's Windows release
-is downloaded too, and runs under Wine: it compiles the importer's BC6H
-encoder. That kernel takes minutes to compile, so it has a stage of its own,
-which the build cache keeps until the kernel or the ISPC version changes.
+MinGW-w64. It uses Debian 13's MinGW-w64 toolchain for UCRT, the C runtime of
+Windows 10 and later, so the package needs Windows 10 or later. SDL3, zstd,
+and the required FFmpeg components are downloaded and built inside Docker;
+they are not vendored in this repository or required on the host. ISPC's
+Windows release is downloaded too, and runs under Wine: it compiles the BC6H
+encoder of the mod importer, which is built into OpenXWA. That kernel takes
+minutes to compile, so it has a stage of its own, which the build cache keeps
+until the kernel or the ISPC version changes.
 
 The build requires the Docker Buildx plugin.
 
@@ -69,7 +69,6 @@ After extraction, the package contains:
 ```text
 openxwa-0.0.0-dev-windows-x86_64-release/
 ├── OpenXWA.exe
-├── OpenXWA Mod Importer.exe
 ├── *.dll
 ├── licenses/
 ├── resources/
@@ -77,10 +76,7 @@ openxwa-0.0.0-dev-windows-x86_64-release/
 ```
 
 The DLL set includes SDL3, the minimal FFmpeg runtime, zstd, and the GCC
-MinGW-w64 runtime libraries imported by `OpenXWA.exe` and
-`OpenXWA Mod Importer.exe`. The importer imports a modded X-Wing Alliance
-installation into an OpenXWA mod folder, and chooses the mod that OpenXWA
-uses. On first launch, OpenXWA asks for the original game-data directory and
+MinGW-w64 runtime libraries imported by `OpenXWA.exe`. On first launch, OpenXWA asks for the original game-data directory and
 remembers the validated selection. The selected directory must contain
 `ALLIANCE`, `FLIGHTMODELS`, and `MISSIONS`. Application resources are resolved from the packaged `resources`
 directory; original game assets are not included in the package.
@@ -112,17 +108,28 @@ Set a build argument to test another version:
 ```sh
 docker buildx build \
   --file packaging/windows/Dockerfile \
-  --build-arg SDL_VERSION=3.4.18 \
+  --build-arg ZSTD_VERSION=1.5.6 \
   --target artifact \
   --output type=local,dest=build/artifacts \
   .
 ```
+
+`SDL_VERSION` takes a commit or a release. With an SDL that isn't the pinned
+one, the build only prints a warning, but that SDL must still have the OpenXR
+API.
 
 ## Icons
 
 `OpenXWA.exe` embeds `cmake/windows/openxwa.ico` and a `VERSIONINFO` resource
 generated from `cmake/windows/xwa.rc.in`. See `packaging/icons/README.md` for
 regenerating icon assets from the master image.
+
+## OpenXR loader
+
+The package ships `openxr_loader.dll`, which VR needs. It comes from the
+Khronos `OpenXR.Loader` NuGet package, pinned by the `OPENXR_LOADER_VERSION`
+and `OPENXR_LOADER_NUPKG_SHA256` build arguments. Keep the version equal to
+the OpenXR headers in `aeron/third_party/openxr`.
 
 ## Applied dependency patches
 

@@ -269,14 +269,15 @@ static int WeaponRates_DechargeRate(unsigned int objIdx, const WeaponRatesSet* m
 		}
 	}
 	rate = XwaWeaponStats_Value((int)objIdx, weapon, XWA_WEAPON_STAT_DECHARGE_RATE, rate);
-	return WeaponRates_Scale(model, rate, WEAPON_RATES_DECHARGE_PERCENT, s_dechargePercent);
+	rate = WeaponRates_Scale(model, rate, WEAPON_RATES_DECHARGE_PERCENT, s_dechargePercent);
+	return XwaWeaponStats_ChargeFactor((int)objIdx, XWA_WEAPON_STAT_DECHARGE_RATE, rate);
 }
 
 int XwaWeaponRates_Decharge(unsigned int objIdx, unsigned int rackIdx, int* rate) {
 	const WeaponRatesSet* model = WeaponRates_Model(g_objectTable[objIdx].objectType);
 	const unsigned int weapon = WeaponRates_RackWeapon(objIdx, &g_curCraft->warheadData[rackIdx]);
 
-	if (!s_active && !WeaponRates_HasRates(model) &&
+	if (!s_active && !WeaponRates_HasRates(model) && !XwaWeaponStats_HasFactors((int)objIdx) &&
 		!WeaponRates_HasStat(objIdx, weapon, XWA_WEAPON_STAT_DECHARGE_RATE)) {
 		return 0;
 	}
@@ -291,7 +292,7 @@ void XwaWeaponRates_Recharge(unsigned int objIdx, unsigned int rackIdx, int16_t 
 	const unsigned int weapon = WeaponRates_RackWeapon(objIdx, &g_curCraft->warheadData[rackIdx]);
 	int32_t rate;
 
-	if (!s_active && !WeaponRates_HasRates(model) &&
+	if (!s_active && !WeaponRates_HasRates(model) && !XwaWeaponStats_HasFactors((int)objIdx) &&
 		!WeaponRates_HasStat(objIdx, weapon, XWA_WEAPON_STAT_RECHARGE_RATE)) {
 		return;
 	}
@@ -301,6 +302,7 @@ void XwaWeaponRates_Recharge(unsigned int objIdx, unsigned int rackIdx, int16_t 
 	}
 	rate = XwaWeaponStats_Value((int)objIdx, weapon, XWA_WEAPON_STAT_RECHARGE_RATE, rate);
 	rate = WeaponRates_Scale(model, rate, WEAPON_RATES_RECHARGE_PERCENT, s_rechargePercent);
+	rate = XwaWeaponStats_ChargeFactor((int)objIdx, XWA_WEAPON_STAT_RECHARGE_RATE, rate);
 	*chargeDelta = (int16_t)((int64_t)rate * chargeBasis);
 }
 

@@ -22,10 +22,13 @@ void XwaRemasterFlightMap_Shutdown(void);
  * The icons, lines and boxes are drawn into the scene, so the present pass
  * multiplies them by the exposure. `overlay_scale` multiplies their colours
  * to undo that: pass 1 / exposure. The labels are drawn after the present
- * pass and don't use it. */
+ * pass and don't use it.
+ * `scene_w` x `scene_h` is the size of the scene, which the view's viewport
+ * can be a part of. The labels are drawn into a target of the viewport's
+ * size. */
 int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, const XwaSnapshot* snapshot,
-								 XwaRemasterAssets* assets, const XwaRemasterFlightView* view,
-								 const float world_to_eye[9], float overlay_scale,
+								 XwaRemasterAssets* assets, const XwaRemasterFlightView* view, int scene_w,
+								 int scene_h, const float world_to_eye[9], float overlay_scale,
 								 XwaRemasterFlightMapSubmitObjectFn submit_object, void* submit_user);
 
 void XwaRemasterFlightMap_RenderDeferredText(AeronCommandBuffer* cmd, AeronRenderPass* pass,

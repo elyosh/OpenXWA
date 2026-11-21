@@ -42,6 +42,8 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Greebles | Implemented | They become detail maps. The UV displacement modes are left out. | [Materials](materials.md#detail-maps) |
 | Lava | Implemented | The importer makes animated textures that look like XWAU's lava. | [Materials](materials.md#flipbooks) |
 | `SkipWhenDisabled` and `DisplayIf` | Implemented | | [Craft](craft.md#surfaces) |
+| Light maps off on disabled craft (`hook_d3dinfos_textures`) | Implemented | The importer gives the tag `illumination` to the materials with an illumination, and a `dark_when_disabled` rule. `Shadeless` materials keep their light. | [Craft](craft.md#surfaces) |
+| `Ambient` | Not needed | In XWAU, it keeps part of a surface lit when no light reaches it. OpenXWA's own ambient light, environment light and hangar light probes already do this, and they follow the colour and level of the scene's light. | |
 | Bloom | Implemented | OpenXWA has its own bloom, which follows the brightness of the image. `NoBloom` isn't needed: lower the emission of a surface that shouldn't glow. | [Materials](materials.md#pbr-materials) |
 | `EffectBloom` | Not implemented | Used by two Death Star models. | |
 | `AlphaToBloom` and `NoColorAlpha` | Partial | The surface becomes fully unlit. | |
@@ -53,7 +55,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Feature | Status | Notes | See |
 |-|-|-|-|
 | Dynamic Cockpit | Implemented | Including the holograms. | [Materials](materials.md#cockpit-screens) |
-| Active Cockpit | Not implemented | It needs VR. XWAU and TFTC turn it off. | |
+| Active Cockpit | Partial | The cockpit buttons (`.ac` files), the VR hands (XWAU's gloves), the buttons on their wrists and the VR keyboard are imported. A button does the action that its key has in the game's default key bindings; a key without one is left out. The keyboard's keys that move the keyboard or the player's head are left out. | [Materials](materials.md#cockpit-buttons), [Flight](flight.md#vr_hands), [Frontend](frontend.md#vr-keyboard) |
 | Moving stick, throttle and hyperspace levers | Implemented | Levers that slide or turn on a free axis are left out. No installation has them. | [Models](models.md#cockpit-controls) |
 | Cockpit field of view | Implemented | | [Craft](craft.md#cockpit_view) |
 | Target display edges (`enable_wireframe_CMD`) | Implemented | | [Flight](flight.md#target-display) |
@@ -134,6 +136,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 |-|-|-|-|
 | Custom hangars | Implemented | Hangar models, objects, maps, cameras, family hangars, and the choice by ship and side. | [Hangars](hangars.md) |
 | A mission's hangar settings | Implemented | A mission's hangar sections for one command ship, such as `[HangarObjects_<ship>]`, and a mission's own hangar model, `<mission>_Hangar.opt`, aren't converted. | [Hangars](hangars.md#a-missions-hangar-section) |
+| Hangar craft selection (`CraftSelectionFighters.txt`, `CraftSelectionTransports.txt`, `CraftSelectionCrafts.txt`) | Implemented | | [Flight](flight.md#hangar_crafts) |
 | Hangar ambient sounds | Implemented | | [Flight](flight.md#soundsyaml) |
 | Hangar lights and shadows | Implemented | OpenXWA lights the hangars in its own way. XWAU's light settings aren't needed. | [Hangars](hangars.md#hangar-lighting) |
 

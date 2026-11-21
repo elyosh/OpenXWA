@@ -6,11 +6,11 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/frontend/frontend_resources.h"
+#include "xwa/util/memory.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/opt_synth.h"
-#include "xwa/util/memory.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,8 +21,8 @@
    component sets written by the model converter. */
 
 /* The skirmish test reads header.missionType, at its original offset. */
-typedef char object_profiles_mission_type_offset
-	[(offsetof(FrontendMission, header.missionType) == 0xB1B82) ? 1 : -1];
+typedef char
+	object_profiles_mission_type_offset[(offsetof(FrontendMission, header.missionType) == 0xB1B82) ? 1 : -1];
 
 #define OBJECT_PROFILE_SET_PREFIX "hidden_by_profile."
 /* AERON_FLIGHT_TAG_MAX minus its terminator. */
@@ -103,12 +103,13 @@ static int ObjectProfiles_ReadWeapons(const char* path, const AeronConfigNode* w
 		const int sourceType = XwaNames_Find(&g_xwaObjectTypeNames, sourceName);
 
 		if (sourceType < 0) {
-			Aeron_LogWarn("xwa.models", "%s: object_profiles.weapons: '%s' isn't an object type; ignored", path,
-						  sourceName);
+			Aeron_LogWarn("xwa.models", "%s: object_profiles.weapons: '%s' isn't an object type; ignored",
+						  path, sourceName);
 			continue;
 		}
 		if (AeronConfigNode_Type(byType) != AERON_CONFIG_MAP) {
-			Aeron_LogWarn("xwa.models", "%s: object_profiles.weapons.%s isn't a map; ignored", path, sourceName);
+			Aeron_LogWarn("xwa.models", "%s: object_profiles.weapons.%s isn't a map; ignored", path,
+						  sourceName);
 			continue;
 		}
 		for (index = 0; index < AeronConfigNode_MapCount(byType); ++index) {
@@ -118,12 +119,13 @@ static int ObjectProfiles_ReadWeapons(const char* path, const AeronConfigNode* w
 
 			if (objectType < 0 || profile == NULL || profile[0] == '\0') {
 				Aeron_LogWarn("xwa.models",
-							  "%s: object_profiles.weapons.%s.%s needs an object type and a profile; ignored", path,
-							  sourceName, typeName);
+							  "%s: object_profiles.weapons.%s.%s needs an object type and a profile; ignored",
+							  path, sourceName, typeName);
 				continue;
 			}
 			if (s_weaponCount == OBJECT_PROFILE_WEAPONS) {
-				Aeron_LogWarn("xwa.models", "%s: object_profiles.weapons has more than %d selections; the rest are ignored",
+				Aeron_LogWarn("xwa.models",
+							  "%s: object_profiles.weapons has more than %d selections; the rest are ignored",
 							  path, OBJECT_PROFILE_WEAPONS);
 				return loaded;
 			}
@@ -140,9 +142,7 @@ static int ObjectProfiles_ReadWeapons(const char* path, const AeronConfigNode* w
 	return loaded;
 }
 
-static char ObjectProfiles_Lower(char c) {
-	return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
-}
+static char ObjectProfiles_Lower(char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; }
 
 void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
 								   size_t stride, int count) {
@@ -194,7 +194,8 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
 	}
 	weaponsLoaded = weapons != NULL ? ObjectProfiles_ReadWeapons(path, weapons) : 0;
 	AeronConfigFile_Destroy(config);
-	Aeron_LogInfo("xwa.models", "%s: %d object profile selections, %d for weapons", path, loaded, weaponsLoaded);
+	Aeron_LogInfo("xwa.models", "%s: %d object profile selections, %d for weapons", path, loaded,
+				  weaponsLoaded);
 }
 
 /* The components of profile `profile`'s set, `hidden_by_profile.` and the
@@ -239,7 +240,8 @@ static int ObjectProfiles_Collect(uint16_t objectType, const char* profile, int*
 	}
 	set = OptSynth_FindComponentSet(model, name);
 	count = 0;
-	for (component = 0; set != NULL && component < XWA_CRAFT_MESH_SLOT_COUNT && count < capacity; ++component) {
+	for (component = 0; set != NULL && component < XWA_CRAFT_MESH_SLOT_COUNT && count < capacity;
+		 ++component) {
 		if ((set->members[component / 32] & (1u << (component % 32))) != 0) {
 			components[count++] = component;
 		}
@@ -250,8 +252,9 @@ static int ObjectProfiles_Collect(uint16_t objectType, const char* profile, int*
 
 /* Whether the current mission is a quick start or a skirmish. */
 static int ObjectProfiles_InSkirmish(void) {
-	return g_frontendMission != NULL && (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START ||
-										 g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH);
+	return g_frontendMission != NULL &&
+		   (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH);
 }
 
 int XwaObjectProfiles_HideWithoutCraft(uint16_t objectType, uint16_t sourceType, uint8_t* states, int count) {
@@ -331,8 +334,9 @@ void XwaObjectProfiles_Apply(uint16_t objectType, int flightGroupIdx, uint8_t ma
 	}
 
 	/* The flight group's profile. */
-	selected = flightGroupIdx >= 0 && flightGroupIdx < OBJECT_PROFILE_FLIGHT_GROUPS ? s_profiles[flightGroupIdx]
-																				   : NULL;
+	selected = flightGroupIdx >= 0 && flightGroupIdx < OBJECT_PROFILE_FLIGHT_GROUPS
+				   ? s_profiles[flightGroupIdx]
+				   : NULL;
 	/* In a quick start or skirmish, Skirmish when the model has it. */
 	if (selected == NULL && ObjectProfiles_InSkirmish() &&
 		ObjectProfiles_Collect(objectType, "Skirmish", components, XWA_OPT_SYNTH_MAX_COMPONENTS) > 0) {

@@ -249,6 +249,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		}
 	}
 	instance.hidden_tag_groups = XwaRemasterShip_HiddenTagGroups(mesh, object);
+	instance.dark_tag_groups = XwaRemasterShip_DarkTagGroups(mesh, object);
 	AeronScene_AddMeshInstance(s_cmd.scene, &instance);
 	if (target_effects) {
 		XwaRemasterGlowMarks_SubmitObject(s_cmd.scene, cmd, assets, snapshot, object, mesh, transform,
@@ -257,7 +258,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 			XwaRemasterShip_SubmitEngineGlows(
 				s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER, instance.mesh_table,
 				object->eg_knockout_mask, object->eg_hidden_mask,
-				cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL, glow_ref);
+				cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL, 0, glow_ref);
 		}
 		if (object->has_craft) {
 			const uint32_t remaining = CMD_MAX_POINT_CANDIDATES - s_cmd.point_candidate_count;
@@ -491,6 +492,7 @@ static int cmd_configure_clustered_lights(void) {
 	const AeronSceneClusteredLightDesc desc = {
 		.depth_slices = (uint32_t)config.cluster_depth_slices,
 		.debug_view = config.cluster_debug,
+		.merge_spot_lights = config.merge_spot_lights,
 	};
 	return AeronScene_SetClusteredLights(s_cmd.scene, &desc);
 }
@@ -821,7 +823,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 		Aeron_CommandBufferSetFailure(cmd, "HUD CMD clustered-light configuration failed");
 		return;
 	}
-	XwaRemasterShip_SetPbrEnv(s_cmd.scene, lights, light_count, -1, rows, NULL, NULL, /*ambient_cube=*/NULL,
+	XwaRemasterShip_SetPbrEnv(s_cmd.scene, lights, light_count, -1, rows, NULL, /*ambient_cube=*/NULL,
 							  /*environment_map=*/NULL,
 							  /*key_probe_shadow=*/-1.0f);
 	if (!AeronScene_Render(s_cmd.scene, cmd)) {
@@ -841,7 +843,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	static const float tint[4] = { 1, 1, 1, 1 };
 	AeronScenePresentChain_Draw(s_cmd.present, pass, scene_texture, s_cmd.sampler, NULL, 0.0f, s_cmd.exposure,
 								NULL, width, height, /*bar_y_uv=*/1.0f, tint,
-								/*src_coverage=*/1);
+								/*src_coverage=*/1, NULL, NULL);
 	Aeron_EndRenderPass(pass);
 	s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.present_rt);
 	/* With edges, the display shows the edges of the shaded image, and it is

@@ -26,10 +26,13 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/compat/projectile_tables.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/timing/ai_lead.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -213,6 +216,11 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	if (g_objectTable[sourceObjIdx].genusId == 0) {
 		int sourceIff;
 
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_NoPilotEjections()) {
+			return 0xffffu;
+		}
+#endif
 		if (!g_flightConfNoPilot) {
 			sourceIff = (uint8_t)g_objectTable[sourceObjIdx].mobj->iff;
 			switch (sourceIff) {
@@ -231,6 +239,13 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 			return 0xffffu;
 		}
 	} else {
+#ifdef XWA_MODERN
+		/* Return before GameRand, so that turning pods off doesn't use up a
+		   random number. */
+		if (XwaMissionSettings_NoEscapePodEjections()) {
+			return 0xffffu;
+		}
+#endif
 		objectType = (ObjectTypeId)((GameRand() & 1u) + OBJ_EscapePod);
 		objectGenus = GENUS_Utility;
 		DebugPrintfChannel(512, "Ejecting escape pod..\n");
@@ -261,6 +276,11 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 			g_missionFlightGroups[g_objectTable[sourceObjIdx].flightGroupIdx].fg.iff;
 		g_missionFlightGroups[fgIdx].fg.team =
 			g_missionFlightGroups[g_objectTable[sourceObjIdx].flightGroupIdx].fg.team;
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_EjectedCraftTeam9()) {
+			g_missionFlightGroups[fgIdx].fg.team = 9;
+		}
+#endif
 		for (i = 0; i < XWA_CRAFT_TYPE_REVERSE_SEARCH_COUNT; ++i) {
 			if (g_objectTypeTables.craftTypeToObjectType[i] == objectTypeId) {
 				g_missionFlightGroups[fgIdx].fg.craftType = (uint8_t)i;
@@ -305,6 +325,11 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	g_objectTable[objIdx].mobj->ejectionSpawnCount = 0;
 	g_objectTable[objIdx].mobj->iff = g_objectTable[sourceObjIdx].mobj->iff;
 	g_objectTable[objIdx].mobj->team = g_objectTable[sourceObjIdx].mobj->team;
+#ifdef XWA_MODERN
+	if (XwaMissionSettings_EjectedCraftTeam9()) {
+		g_objectTable[objIdx].mobj->team = 9;
+	}
+#endif
 	g_objectTable[objIdx].mobj->nodeSwitchIndex = g_objectTable[sourceObjIdx].mobj->nodeSwitchIndex;
 	g_objectTable[objIdx].mobj->moveVectorDirty = 1;
 	g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
@@ -646,6 +671,12 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* Skips the switch below, which sets up pods and pilots. */
+	if (XwaMissionSettings_EjectedCraftSkipSetup()) {
+		return objIdx;
+	}
+#endif
 	switch (objectTypeId) {
 		case OBJ_RebelPilot:
 		case OBJ_ImperialPilot:
@@ -1461,6 +1492,17 @@ static __inline void Object_ApplyTrigMoveDeltaAndClampWorldPosition(ObjectRecord
 	}
 }
 
+/* How much the jolt of a hit (viewState.cameraPanDelta*) fades in this step:
+   64 a second. In the modern build it fades at that rate with any step size.
+   With steps of 1 to 3 ticks, the stock step is 0, so the jolt would never
+   fade and the camera would stay off the seat. */
+#ifdef XWA_MODERN
+#define OBJECT_CAMERA_PAN_DECAY                                                                              \
+	XwaModernFlightTiming_ScaleStepTicks(g_gameTime, (uint16_t)g_elapsedTicks, 64, 236)
+#else
+#define OBJECT_CAMERA_PAN_DECAY (((uint16_t)g_elapsedTicks << 6) / 236)
+#endif
+
 #ifndef XWA_MODERN
 #pragma optimize("y", off)
 #endif
@@ -1523,6 +1565,9 @@ void Object_UpdateLifetimeAndMovement(void) {
 			g_elapsedTicks = delta;
 			if (delta == 0) {
 				if (singleIdx == -1 && obj->playerOwnerIdx != -1) {
+#ifdef XWA_MODERN
+					XwaAiLead_AddMovement(objIdx);
+#endif
 					mobj->prevWorldX = obj->world_x;
 					mobj->prevWorldY = obj->world_y;
 					mobj->prevWorldZ = obj->world_z;
@@ -1693,10 +1738,10 @@ void Object_UpdateLifetimeAndMovement(void) {
 #ifdef XWA_MODERN
 									g_players[ownerPlayer].missionStats.missionScore -= XwaWeaponStats_Value(
 										obj->mobj->sourceObjIdx, obj->objectType, XWA_WEAPON_STAT_SCORE,
-										g_warheadProjectilePointValueByObjectType[obj->objectType]);
+										g_projectileScoreByType[obj->objectType - OBJ_LaserRebel]);
 #else
 									g_players[ownerPlayer].missionStats.missionScore -=
-										g_warheadProjectilePointValueByObjectType[obj->objectType];
+										g_projectileScoreByObjectType_BiasedBase[obj->objectType];
 #endif
 								}
 							}
@@ -1726,6 +1771,9 @@ void Object_UpdateLifetimeAndMovement(void) {
 	movement:
 		// --- Movement (LABEL_55) ---
 		if (g_singleObjectUpdateOverrideIdx == -1) {
+#ifdef XWA_MODERN
+			XwaAiLead_AddMovement(objIdx);
+#endif
 			obj->mobj->prevWorldX = obj->world_x;
 			obj->mobj->prevWorldY = obj->world_y;
 			obj->mobj->prevWorldZ = obj->world_z;
@@ -1737,12 +1785,12 @@ void Object_UpdateLifetimeAndMovement(void) {
 
 			if (vs->cameraPanDeltaX) {
 				if (vs->cameraPanDeltaX < 0) {
-					vs->cameraPanDeltaX += ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaX += OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaX > 0) {
 						vs->cameraPanDeltaX = 0;
 					}
 				} else {
-					vs->cameraPanDeltaX -= ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaX -= OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaX < 0) {
 						vs->cameraPanDeltaX = 0;
 					}
@@ -1750,12 +1798,12 @@ void Object_UpdateLifetimeAndMovement(void) {
 			}
 			if (vs->cameraPanDeltaY) {
 				if (vs->cameraPanDeltaY < 0) {
-					vs->cameraPanDeltaY += ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaY += OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaY > 0) {
 						vs->cameraPanDeltaY = 0;
 					}
 				} else {
-					vs->cameraPanDeltaY -= ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaY -= OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaY < 0) {
 						vs->cameraPanDeltaY = 0;
 					}
@@ -1763,12 +1811,12 @@ void Object_UpdateLifetimeAndMovement(void) {
 			}
 			if (vs->cameraPanDeltaZ) {
 				if (vs->cameraPanDeltaZ < 0) {
-					vs->cameraPanDeltaZ += ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaZ += OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaZ > 0) {
 						vs->cameraPanDeltaZ = 0;
 					}
 				} else {
-					vs->cameraPanDeltaZ -= ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaZ -= OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaZ < 0) {
 						vs->cameraPanDeltaZ = 0;
 					}
@@ -2230,8 +2278,14 @@ void Object_UpdateLifetimeAndMovement(void) {
 
 					{
 						uint16_t tgtComp = pWG->targetComponentIdx;
+#ifdef XWA_MODERN
 						uint16_t profile =
-							(uint8_t)g_projectileHomingProfileBaseByObjectType[obj->objectType] + homingTier;
+							XwaProjectileTables_HomingProfileBase(obj->objectType) + homingTier;
+#else
+						uint16_t profile =
+							(uint8_t)g_projectileHomingProfileBaseByObjectType_BiasedBase[obj->objectType] +
+							homingTier;
+#endif
 						int targetIsActiveBeam = 0;
 
 						if (tgtIdx >= g_activeRegionObjectSlotStart &&

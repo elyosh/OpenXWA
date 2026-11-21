@@ -85,6 +85,11 @@ int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
  * tag at the object's state (XwaFlightObject.surface_hidden_mask). */
 uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f);
 
+/* The tag groups of `mesh` that `f` draws dark (AeronSceneMeshInstance
+ * .dark_tag_groups): those named by the `surfaces` rules that darken their
+ * tag at the object's state (XwaFlightObject.surface_dark_mask). */
+uint32_t XwaRemasterShip_DarkTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f);
+
 /* Build a static mesh table that hides the slots whose component_state is
  * nonzero (the `count` values of a craft's componentState). Returns 1 when
  * any slot hides (callers skip the table bind otherwise). */
@@ -281,13 +286,15 @@ const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRe
 
 /* Queue the shared PBR fragment environment (PbrLightFS b1, including
  * lighting tuning) as a scene frame uniform, built from WORLD-space linear
- * directional lights (scene_lights.h). The FS lights in the space the instances were submitted
- * in, so the env must match that convention:
- *   - world-space instances (flight driver): cam_rows = NULL (light
- *     dirs stay world-space), cam_pos = world camera position;
- *   - eye-space instances (preview PiP, identity camera): cam_rows =
- *     the view's g_camMat world->eye rows (lights rotate into eye
- *     space), cam_pos = NULL (camera at the origin).
+ * directional lights (scene_lights.h). The fragment shader computes
+ * lighting in the space of the instances, so the light directions must be
+ * in that space:
+ *   - world-space instances (the flight scene): pass cam_rows = NULL, and
+ *     the directions stay in world space;
+ *   - eye-space instances (the preview and the CMD view, whose cameras are
+ *     the identity): pass the view's world-to-eye rows (g_camMat), and the
+ *     directions are rotated into eye space.
+ * The shaders read the camera position from the scene.
  * `ao` carries the per-frame SSAO inputs the FS folds into the
  * ambient (and optionally direct-diffuse) term; NULL = AO off.
  * The key light is lights[key_index] when key_index is in range, otherwise
@@ -301,8 +308,8 @@ const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRe
  * inside a probe grid it then only casts shadows, which remove that share
  * of the probe light; < 0 for a normal key light. */
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* lights, uint32_t light_count,
-							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
-							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
+							   int32_t key_index, const float cam_rows[9], const XwaShipAoParams* ao,
+							   const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow);
 
 /* Classic per-object engine-glow intensity scale — the float mirror
@@ -335,12 +342,13 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
  * classic intensity scale (EngineGlowScale / the preview's fixed
  * ~0.6 flickered base; <= 0 skips everything). `crows`/`cam_pos`
  * convert space->view for the view-dependent parts (NULL/NULL =
- * identity camera, space == eye — preview PiP). */
+ * identity camera, space == eye — preview PiP). `view_mask` has one bit for
+ * each view of the scene that draws the glows; 0 is every view. */
 void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh* mesh,
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
 									   const uint32_t* hidden_mask, float scale, const float crows[9],
-									   const float cam_pos[3], const XwaAssetRef* tex);
+									   const float cam_pos[3], uint32_t view_mask, const XwaAssetRef* tex);
 
 #ifdef __cplusplus
 }

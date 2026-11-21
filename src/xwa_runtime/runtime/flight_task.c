@@ -2,8 +2,8 @@
 #include "xwa/flight/hangar.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/film_state.h"
-#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/port.h"
 
 #include "aeron/aeron.h"
@@ -113,7 +113,6 @@ static uint32_t g_xwaFlightTaskTickLogCount;
 static int g_xwaFlightTaskLastStepTargetTimestamp;
 static int g_xwaFlightTaskOverlayTargetTimestamp;
 static int g_xwaFlightTaskPredictedFrameDelta;
-static int g_xwaFlightTaskLastSoundUpdateTimestamp;
 static int g_xwaFlightTaskRestartMission;
 static int g_xwaFlightTaskMissionLoaded;
 static int g_xwaFlightTaskPingPrevHostDropCount;
@@ -773,10 +772,13 @@ static void XwaFlightTask_RenderFrameAndAudio(const XwaFlightTaskLoopTiming* tim
 	XwaPort_SetClassicFlightFrameActive(0);
 	g_flightSfxSideEffectGate = 0;
 	Sound_FlushQueuedEffects();
-	if (g_inputTimestamp - g_xwaFlightTaskLastSoundUpdateTimestamp > 29) {
-		g_xwaFlightTaskLastSoundUpdateTimestamp = g_inputTimestamp;
-		Sound_Update3DListenerAndSources();
-	}
+	/* The stock loop only updates the 3D sound state g_sound3DUpdatesPerSecond
+	   (8) times a game second: when more than 236 / 8 = 29 ticks have passed.
+	   Sources then jump in direction and volume 8 times a second, which is
+	   audible. Updating every frame moves them smoothly. The update itself
+	   still runs at most once per game time step. It only reads the
+	   simulation, and the original already runs it here on any frame. */
+	Sound_Update3DListenerAndSources();
 	FlightSync_CaptureRemotePlayerRenderSamples();
 	g_inputTimestamp += (int)Time_GetFrameDelta();
 	renderTicks = g_inputTimestamp - renderStartTimestamp;
@@ -941,10 +943,8 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 	}
 	g_gameTime = g_inputTimestamp;
 	Sound_FlushQueuedEffects();
-	if (g_inputTimestamp - g_xwaFlightTaskLastSoundUpdateTimestamp > 29) {
-		g_xwaFlightTaskLastSoundUpdateTimestamp = g_inputTimestamp;
-		Sound_Update3DListenerAndSources();
-	}
+	/* Every frame, as in the flight loop above. */
+	Sound_Update3DListenerAndSources();
 	if (g_launchAnimDone || g_flightExitRequest || !g_inHangarReady) {
 		/* Leaving the hangar: the other objects get their own models back
 		   from the hangar's swaps. */
@@ -1308,7 +1308,6 @@ int XwaFlightTask_Init(char* missionCmdLine, const char* filmFilePath) {
 	g_xwaFlightTaskLastStepTargetTimestamp = 0;
 	g_xwaFlightTaskOverlayTargetTimestamp = 0;
 	g_xwaFlightTaskPredictedFrameDelta = 0;
-	g_xwaFlightTaskLastSoundUpdateTimestamp = 0;
 	g_xwaFlightTaskRestartMission = 0;
 	g_xwaFlightTaskMissionLoaded = 0;
 	g_xwaFlightTaskPingPrevHostDropCount = 0;
@@ -1774,7 +1773,6 @@ static void XwaFlightTask_TickPhases(int now) {
 					g_filmPlaybackTimestampOverrideApplied = 1;
 				}
 				g_filmPlaybackStepCatchupTicks = 0;
-				g_xwaFlightTaskLastSoundUpdateTimestamp = 0;
 				g_xwaFlightTaskLastStepTargetTimestamp = 0;
 				g_xwaFlightTaskOverlayTargetTimestamp = 0;
 				g_lastLocalReplayInputTimestamp = 0;
@@ -1865,7 +1863,13 @@ static void XwaFlightTask_TickPhases(int now) {
 				Backdrop_FreeCoordinateBuffers();
 				FlightStarfield_Shutdown();
 				/* A film plays again from the start when it ends. The film
-				   benchmark ends the flight instead. */
+				   benchmark ends the flight instead. At the end of the file a
+				   read fails, which can stop the playback with mode 3. The
+				   flight then asks for a restart (exit request 2), so clear it
+				   too. */
+				if (XwaFilmBenchmark_IsPlaying()) {
+					restartMission = 0;
+				}
 				if ((restartMission || g_filmPlaybackMode == 3 || g_filmPlaybackMode == 2) &&
 					!XwaFilmBenchmark_IsPlaying()) {
 					int playerCount;
@@ -2062,9 +2066,10 @@ void XwaFlightTask_Tick(void) { XwaFlightTask_TickPhases(0); }
 int XwaFlightTask_RunFrameNow(void) {
 	const uint32_t framesBefore = g_xwaFlightTaskFramesRun;
 
-	if (!g_xwaFlightTaskActive || g_xwaFlightTaskComplete || g_xwaFlightTaskPhase != XWA_FLIGHT_TASK_PHASE_FRAME ||
-		g_flightPlayerCount != 1 || g_filmPlaybackMode != 2 || g_flightMissionEndPending ||
-		XwaFlightPauseTask_IsActive() || FlightDisplay_IsFrontendModalActive()) {
+	if (!g_xwaFlightTaskActive || g_xwaFlightTaskComplete ||
+		g_xwaFlightTaskPhase != XWA_FLIGHT_TASK_PHASE_FRAME || g_flightPlayerCount != 1 ||
+		g_filmPlaybackMode != 2 || g_flightMissionEndPending || XwaFlightPauseTask_IsActive() ||
+		FlightDisplay_IsFrontendModalActive()) {
 		return 0;
 	}
 	XwaFlightTask_TickPhases(1);

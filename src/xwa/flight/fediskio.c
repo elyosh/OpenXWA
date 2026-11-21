@@ -36,6 +36,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/audio/sound_banks.h"
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/models/craft_definitions.h"
@@ -2367,7 +2368,11 @@ int16_t FeDiskIo_CommitFlightResults(void) {
 				int rating;
 
 				groupAI = g_missionFlightGroups[fgIdx].fg.groupAI;
+#ifdef XWA_MODERN
+				rating = XwaRankTables_KillScoreBase((unsigned int)groupAI);
+#else
 				rating = g_pilotKillScoreBaseByAiLevel[groupAI];
+#endif
 				if (groupAI != 0) {
 					rating += fgIdx & 3;
 				}

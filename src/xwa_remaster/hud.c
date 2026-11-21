@@ -361,6 +361,18 @@ static int hud_cache_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const
 	return ok;
 }
 
+static int hud_separate_markers;
+static int hud_markers_on_screens;
+
+void XwaRemasterHud_SetSeparateMarkers(int separate, int on_screens) {
+	hud_separate_markers = separate != 0;
+	hud_markers_on_screens = separate && on_screens;
+}
+
+int XwaRemasterHud_MarkersOnScreens(void) { return hud_markers_on_screens; }
+
+int XwaRemasterHud_SeparateMarkers(void) { return hud_separate_markers; }
+
 void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
 								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
 								 int target_w, int target_h) {

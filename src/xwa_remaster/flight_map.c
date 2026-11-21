@@ -363,20 +363,19 @@ void XwaRemasterFlightMap_Shutdown(void) {
 }
 
 int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, const XwaSnapshot* snapshot,
-								 XwaRemasterAssets* assets, const XwaRemasterFlightView* view,
-								 const float world_to_eye[9], float overlay_scale,
+								 XwaRemasterAssets* assets, const XwaRemasterFlightView* view, int scene_w,
+								 int scene_h, const float world_to_eye[9], float overlay_scale,
 								 XwaRemasterFlightMapSubmitObjectFn submit_object, void* submit_user) {
-	if (!cmd || !scene || !snapshot || !assets || !view || !world_to_eye || !submit_object ||
-		!snapshot->flight_map.active || !XwaRemasterFlightMap_Init())
+	if (!cmd || !scene || !snapshot || !assets || !view || scene_w <= 0 || scene_h <= 0 || !world_to_eye ||
+		!submit_object || !snapshot->flight_map.active || !XwaRemasterFlightMap_Init())
 		return 0;
 	memcpy(map_state.world_to_eye, world_to_eye, sizeof map_state.world_to_eye);
 	map_state.overlay_scale = isfinite(overlay_scale) && overlay_scale > 0.0f ? overlay_scale : 1.0f;
 	map_state.object_count = 0;
+	/* These lists are drawn into the scene. */
 	for (int i = 0; i < 2; i++)
-		AeronDrawList_Begin(map_state.annotations[i], NULL, view->viewport.width, view->viewport.height,
-							AERON_DRAWLIST2D_LOAD, NULL);
-	AeronDrawList_Begin(map_state.grid, NULL, view->viewport.width, view->viewport.height,
-						AERON_DRAWLIST2D_LOAD, NULL);
+		AeronDrawList_Begin(map_state.annotations[i], NULL, scene_w, scene_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(map_state.grid, NULL, scene_w, scene_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_Begin(map_state.text, NULL, view->viewport.width, view->viewport.height,
 						AERON_DRAWLIST2D_LOAD, NULL);
 

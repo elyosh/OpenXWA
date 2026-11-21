@@ -11,17 +11,16 @@ static int read_asset(AeronVfs* vfs, const char* path, uint8_t** out_data, size_
 	size_t i = 0;
 	for (; path[i] && i + 1 < sizeof normalized; i++) {
 		normalized[i] = path[i] == '\\' ? '/' : path[i];
-		uppercase[i] = normalized[i] >= 'a' && normalized[i] <= 'z'
-						 ? (char)(normalized[i] - ('a' - 'A'))
-						 : normalized[i];
+		uppercase[i] = normalized[i] >= 'a' && normalized[i] <= 'z' ? (char)(normalized[i] - ('a' - 'A'))
+																	: normalized[i];
 	}
 	normalized[i] = uppercase[i] = '\0';
 	return AeronVfs_ReadAll(vfs, AERON_VFS_ROOT_ASSET, normalized, 0, out_data, out_size) ||
 		   AeronVfs_ReadAll(vfs, AERON_VFS_ROOT_ASSET, uppercase, 0, out_data, out_size);
 }
 
-int BakeSource_LoadFrontend(AeronVfs* vfs, const char* source_path, Xwa2dFrameSet* out,
-							char* error, size_t error_size) {
+int BakeSource_LoadFrontend(AeronVfs* vfs, const char* source_path, Xwa2dFrameSet* out, char* error,
+							size_t error_size) {
 	char cbm_path[512];
 	snprintf(cbm_path, sizeof cbm_path, "%s", source_path);
 	char* extension = strrchr(cbm_path, '.');
@@ -35,8 +34,8 @@ int BakeSource_LoadFrontend(AeronVfs* vfs, const char* source_path, Xwa2dFrameSe
 	} else if (read_asset(vfs, source_path, &bytes, &size)) {
 		extension = strrchr(source_path, '.');
 		result = extension && strcasecmp(extension, ".FLC") == 0
-				 ? Xwa2d_DecodeFlc(bytes, size, out, error, error_size)
-				 : Xwa2d_DecodeBmp(bytes, size, out, error, error_size);
+					 ? Xwa2d_DecodeFlc(bytes, size, out, error, error_size)
+					 : Xwa2d_DecodeBmp(bytes, size, out, error, error_size);
 	} else if (error && error_size) {
 		snprintf(error, error_size, "file not found");
 	}
@@ -67,8 +66,8 @@ int BakeSource_InitDatCatalog(AeronVfs* vfs, BakeDatCatalog* catalog, char* erro
 		BakeDatFile* file = &catalog->files[catalog->file_count];
 		if (!read_asset(vfs, path, &file->bytes, &file->size))
 			continue;
-		if (!Xwa2d_DatListGroups(file->bytes, file->size, catalog->groups, 0x10000,
-								 &catalog->group_count, error, error_size))
+		if (!Xwa2d_DatListGroups(file->bytes, file->size, catalog->groups, 0x10000, &catalog->group_count,
+								 error, error_size))
 			goto failed;
 		catalog->file_count++;
 	}
@@ -87,12 +86,12 @@ failed:
 	return 0;
 }
 
-int BakeSource_LoadDatGroup(const BakeDatCatalog* catalog, uint16_t group, Xwa2dFrameSet* out,
-							char* error, size_t error_size) {
+int BakeSource_LoadDatGroup(const BakeDatCatalog* catalog, uint16_t group, Xwa2dFrameSet* out, char* error,
+							size_t error_size) {
 	memset(out, 0, sizeof *out);
 	for (int i = 0; i < catalog->file_count; i++) {
-		if (!Xwa2d_DatAppendGroup(catalog->files[i].bytes, catalog->files[i].size, group, out,
-								  error, error_size)) {
+		if (!Xwa2d_DatAppendGroup(catalog->files[i].bytes, catalog->files[i].size, group, out, error,
+								  error_size)) {
 			Xwa2dFrameSet_Free(out);
 			return 0;
 		}

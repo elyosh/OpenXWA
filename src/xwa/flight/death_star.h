@@ -26,43 +26,43 @@ typedef struct DeathStarChildObjectRef {
 } DeathStarChildObjectRef;
 
 typedef struct DeathStarSegmentDef {
-	uint16_t                  objectType;
-	uint32_t                  flags;
-	int                       worldX;
-	int                       worldY;
-	int                       worldZ;
-	Q16Angle                  yaw;
-	Q16Angle                  pitch;
-	uint16_t                  nextSegmentSet;
-	int16_t                   nextSegmentIdx;
-	uint16_t                  activeSegmentCount;
-	DeathStarSegmentUpdateFn  updateFn;
-	DeathStarChildObjectRef   childObjects[10];
+	uint16_t objectType;
+	uint32_t flags;
+	int worldX;
+	int worldY;
+	int worldZ;
+	Q16Angle yaw;
+	Q16Angle pitch;
+	uint16_t nextSegmentSet;
+	int16_t nextSegmentIdx;
+	uint16_t activeSegmentCount;
+	DeathStarSegmentUpdateFn updateFn;
+	DeathStarChildObjectRef childObjects[10];
 } DeathStarSegmentDef;
 
 typedef struct DeathStarSegmentRule {
-	int16_t                  segmentIdx;
-	uint16_t                 objectType;
-	uint32_t                 flags;
-	Q16Angle                 yaw;
-	Q16Angle                 pitch;
-	uint16_t                 attachPointIdx;
-	int16_t                  parentSegmentIdx;
-	uint16_t                 parentPointKind;
-	uint16_t                 activeSegmentCount;
-	uint16_t                 redirectSegmentSet;
-	int16_t                  redirectSegmentIdx;
-	uint16_t                 nextSegmentSet;
-	int16_t                  nextSegmentIdx;
+	int16_t segmentIdx;
+	uint16_t objectType;
+	uint32_t flags;
+	Q16Angle yaw;
+	Q16Angle pitch;
+	uint16_t attachPointIdx;
+	int16_t parentSegmentIdx;
+	uint16_t parentPointKind;
+	uint16_t activeSegmentCount;
+	uint16_t redirectSegmentSet;
+	int16_t redirectSegmentIdx;
+	uint16_t nextSegmentSet;
+	int16_t nextSegmentIdx;
 	DeathStarSegmentUpdateFn updateFn;
 } DeathStarSegmentRule;
 
 typedef struct DeathStarSegmentSet {
-	DeathStarSegmentDef*  segments;
-	uint16_t              count;
-	Q16Angle              baseYaw;
-	Q16Angle              basePitch;
-	uint16_t              fixedSegmentObjectType; /* ObjectTypeId */
+	DeathStarSegmentDef* segments;
+	uint16_t count;
+	Q16Angle baseYaw;
+	Q16Angle basePitch;
+	uint16_t fixedSegmentObjectType; /* ObjectTypeId */
 	DeathStarSegmentRule* rules;
 } DeathStarSegmentSet;
 
@@ -73,40 +73,40 @@ typedef struct DeathStarSegmentLocalPoint {
 } DeathStarSegmentLocalPoint;
 
 typedef struct DeathStarObjectPointTable {
-	uint16_t                   attachPointCount;
+	uint16_t attachPointCount;
 	DeathStarSegmentLocalPoint attachPoints[5];
-	uint16_t                   spawnPointCount;
+	uint16_t spawnPointCount;
 	DeathStarSegmentLocalPoint spawnPoints[10];
 } DeathStarObjectPointTable;
 
 typedef struct DeathStarFollowChainSlot {
-	int      objectIdx;
+	int objectIdx;
 	uint16_t objectSignature;
 	uint16_t reserved06;
-	int      pathDistance;
-	int      desiredSpacing;
-	int      refreshTimer;
+	int pathDistance;
+	int desiredSpacing;
+	int refreshTimer;
 } DeathStarFollowChainSlot;
 
 typedef struct DeathStarLaserEffectSlot {
-	int      objectIdx;
+	int objectIdx;
 	uint16_t objectSignature;
 } DeathStarLaserEffectSlot;
 
 typedef struct DeathStarPathSample {
-	int      worldX;
-	int      worldY;
-	int      worldZ;
+	int worldX;
+	int worldY;
+	int worldZ;
 	Q16Angle yaw;
 	Q16Angle pitch;
 	Q16Angle roll;
 	uint16_t tacticalIndex;
-	int      elapsedTicksSincePrev;
+	int elapsedTicksSincePrev;
 } DeathStarPathSample;
 
 typedef struct DeathStarPathHistory {
-	int                 sampleWriteIdx;
-	int                 sampleLastTime;
+	int sampleWriteIdx;
+	int sampleLastTime;
 	DeathStarPathSample samples[30];
 } DeathStarPathHistory;
 #pragma pack(pop)
@@ -126,85 +126,84 @@ extern uint16_t g_deathStarLastGeneratedRandomSegmentType;
 extern DeathStarSegmentIndex g_deathStarCurrentSegmentIdx;
 extern int g_deathStarSegmentSetIdx;
 extern uint16_t g_deathStarEntranceProximityArmed;
-extern int      g_deathStarEntranceTransitionState;
-extern int      g_deathStarEntranceTransitionTimer;
+extern int g_deathStarEntranceTransitionState;
+extern int g_deathStarEntranceTransitionTimer;
 extern uint8_t g_deathStarReactorCoreRoomFgIdx;
 extern uint8_t g_deathStarTankPipeBlueFgIdx;
 extern uint8_t g_deathStarDefaultScriptedObjectFgIdx;
 extern uint8_t g_deathStarGeneratedObjectFgIdx;
-extern int     g_deathStarTripodGunFgIdx;
+extern int g_deathStarTripodGunFgIdx;
 extern uint8_t g_deathStarFocusChamberFgIdx;
 extern uint8_t g_deathStarTankLightsFgIdx;
-extern int     g_deathStarBentTubeGrayFgIdx;
+extern int g_deathStarBentTubeGrayFgIdx;
 extern uint8_t g_deathStarBentTubeRedFgIdx;
 extern uint8_t g_deathStarTankPipeRedFgIdx;
 extern uint8_t g_deathStarFocusLensFgIdx;
-extern int     g_deathStarBentTubeBlueFgIdx;
+extern int g_deathStarBentTubeBlueFgIdx;
 extern uint8_t g_deathStarSegmentChildInitialHitCount;
 extern uint8_t g_deathStarRandomChildObjectLimit;
 extern uint8_t g_deathStarActiveSegmentPlaceholderFgIdx;
 extern uint16_t g_deathStarActiveSegmentCount;
 extern uint16_t g_deathStarActiveSegmentIdx[10];
-extern int      g_deathStarActiveSegmentObjIdx[10];
+extern int g_deathStarActiveSegmentObjIdx[10];
 extern uint16_t g_deathStarLaserChamberSegmentIdx;
-extern int     g_deathStarLaserChamberSegmentSetIdx;
-extern int     g_deathStarLaserFireTimer;
-extern int     g_deathStarLaserCooldownTimer;
-extern int     g_deathStarLaserChamberX;
-extern int     g_deathStarLaserChamberY;
-extern int     g_deathStarLaserChamberZ;
-extern int     g_deathStarLaserChamberDirX;
-extern int     g_deathStarLaserChamberDirY;
-extern int     g_deathStarLaserChamberDirZ;
-extern int     g_deathStarLaserEffectSlotCount;
+extern int g_deathStarLaserChamberSegmentSetIdx;
+extern int g_deathStarLaserFireTimer;
+extern int g_deathStarLaserCooldownTimer;
+extern int g_deathStarLaserChamberX;
+extern int g_deathStarLaserChamberY;
+extern int g_deathStarLaserChamberZ;
+extern int g_deathStarLaserChamberDirX;
+extern int g_deathStarLaserChamberDirY;
+extern int g_deathStarLaserChamberDirZ;
+extern int g_deathStarLaserEffectSlotCount;
 extern DeathStarLaserEffectSlot g_deathStarLaserEffectSlots[10];
-extern int     g_deathStarLaserPowerSourceObjIdx;
-extern int     g_deathStarPowerSourceLinkedFocusLensObjIdx;
+extern int g_deathStarLaserPowerSourceObjIdx;
+extern int g_deathStarPowerSourceLinkedFocusLensObjIdx;
 extern unsigned int g_deathStarLaserGlowExtent;
-extern int     g_deathStarFollowLeaderObjIdx;
-extern int     g_deathStarFollowBaseDesiredSpacing;
-extern int     g_deathStarAccelChamberLightTimer;
-extern int     g_deathStarAccelChamberContainerSpawnInterval;
-extern int     g_deathStarAccelChamberLastContainerSpawnTime;
+extern int g_deathStarFollowLeaderObjIdx;
+extern int g_deathStarFollowBaseDesiredSpacing;
+extern int g_deathStarAccelChamberLightTimer;
+extern int g_deathStarAccelChamberContainerSpawnInterval;
+extern int g_deathStarAccelChamberLastContainerSpawnTime;
 extern uint8_t g_deathStarAccelChamberContainersCleared;
 extern Q16Angle g_deathStarAccelChamberPitchOffset;
-extern int     g_deathStarContainerCollisionLightTimer;
-extern int     g_deathStarFocusChamberObjIdx;
+extern int g_deathStarContainerCollisionLightTimer;
+extern int g_deathStarFocusChamberObjIdx;
 extern DeathStarSegmentIndex g_deathStarFocusChamberSegmentIdx;
-extern int     g_deathStarTripodGunObjIdx;
-extern int     g_deathStarTripodGunsActivated;
-extern int     g_deathStarReactorCoreRoomObjIdx;
-extern int     g_deathStarReactorCoreFgIdx;
-extern float   g_deathStarReactorCoreDriftDirZ;
-extern float   g_deathStarReactorCoreDriftDirX;
-extern float   g_deathStarReactorCoreDriftDirY;
-extern int     g_deathStarReactorExplosionOriginZ;
-extern int     g_deathStarReactorExplosionOriginY;
-extern int     g_deathStarReactorExplosionOriginX;
-extern float   g_deathStarReactorShockwaveDistance;
-extern int     g_deathStarReactorShockwaveSpeed;
+extern int g_deathStarTripodGunObjIdx;
+extern int g_deathStarTripodGunsActivated;
+extern int g_deathStarReactorCoreRoomObjIdx;
+extern int g_deathStarReactorCoreFgIdx;
+extern float g_deathStarReactorCoreDriftDirZ;
+extern float g_deathStarReactorCoreDriftDirX;
+extern float g_deathStarReactorCoreDriftDirY;
+extern int g_deathStarReactorExplosionOriginZ;
+extern int g_deathStarReactorExplosionOriginY;
+extern int g_deathStarReactorExplosionOriginX;
+extern float g_deathStarReactorShockwaveDistance;
+extern int g_deathStarReactorShockwaveSpeed;
 extern DeathStarSegmentIndex g_deathStarReactorCoreRoomSegmentIdx;
-extern int      g_deathStarReactorCoreObjIdx;
-extern int     g_deathStarReactorCylinderObjIdx;
-extern int     g_deathStarReactorDestructionTimer;
-extern int     g_deathStarReactorReservedFilmState;
-extern int     g_deathStarReactorCylinderAnimTimer;
-extern int     g_deathStarReactorExplosionSpawnCount;
+extern int g_deathStarReactorCoreObjIdx;
+extern int g_deathStarReactorCylinderObjIdx;
+extern int g_deathStarReactorDestructionTimer;
+extern int g_deathStarReactorReservedFilmState;
+extern int g_deathStarReactorCylinderAnimTimer;
+extern int g_deathStarReactorExplosionSpawnCount;
 extern uint16_t g_deathStarReactorCoreDriftSpeed;
-extern int     g_deathStarReactorShockwaveObjIdx[5];
-extern int     g_deathStarReactorAssaultCraftObjIdx;
+extern int g_deathStarReactorShockwaveObjIdx[5];
+extern int g_deathStarReactorAssaultCraftObjIdx;
 extern uint8_t g_deathStarReactorAssaultFgIdx;
-extern int     g_deathStarLoopSfxVolume[2];
+extern int g_deathStarLoopSfxVolume[2];
 extern uint8_t g_deathStarLoopSfxActive[2];
 
 DeathStarSegmentDef* DeathStar_ResolveSegmentRedirect(const DeathStarSegmentRule* rule,
 													  DeathStarSegmentDef* outDef);
 void DeathStar_ApplySegmentOrientationFlags(DeathStarSegmentDef* segment,
 											const DeathStarSegmentDef* relativeTo);
-int  DeathStar_AreSegmentSetStartDistancesOrdered(void);
-void DeathStar_PopulateRandomSegmentChildren(int16_t segmentSetIdx,
-											 DeathStarSegmentDef* segment);
-int  DeathStar_BuildSegmentSets(void);
+int DeathStar_AreSegmentSetStartDistancesOrdered(void);
+void DeathStar_PopulateRandomSegmentChildren(int16_t segmentSetIdx, DeathStarSegmentDef* segment);
+int DeathStar_BuildSegmentSets(void);
 void DeathStar_SelectSuperlaserTarget(int preferredTargetObjIdx);
 void DeathStar_FireSuperlaser(void);
 void DeathStar_Init(void);
@@ -212,18 +211,16 @@ void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx)
 void DeathStar_SpawnScriptedObjects(void);
 void DeathStar_ComputeSegmentPointOffset(const DeathStarSegmentDef* segmentDef, uint16_t pointIdx,
 										 int pointKind, int* outX, int* outY, int* outZ);
-void DeathStar_RebuildSegmentChildObjects(uint16_t* oldActiveSegmentIdx,
-										  uint16_t oldSegmentSetIdx,
+void DeathStar_RebuildSegmentChildObjects(uint16_t* oldActiveSegmentIdx, uint16_t oldSegmentSetIdx,
 										  uint16_t oldActiveSegmentCount);
 void DeathStar_SpawnSegmentChildObject(DeathStarChildObjectRef* childList, uint16_t childIdx,
-									  DeathStarSegmentDef* parentSegment);
+									   DeathStarSegmentDef* parentSegment);
 void DeathStar_LoadActiveSegments(void);
 void DeathStar_SpawnLaserPowerSourceObject(void);
 unsigned int DeathStarTunnel_SpawnExplosionEffectObject(ObjectTypeId explosionObjectType,
 														unsigned int instanceExtent);
-void DeathStar_SetOrderWaypointFromSegmentPoint(int objectIdx, uint16_t segmentPointIdx,
-												int pointKind, uint8_t flightGroupIdx,
-												int orderSlot, int waypointSlot);
+void DeathStar_SetOrderWaypointFromSegmentPoint(int objectIdx, uint16_t segmentPointIdx, int pointKind,
+												uint8_t flightGroupIdx, int orderSlot, int waypointSlot);
 void DeathStar_InitReactorAssaultState(void);
 void DeathStar_InitZeroGStormtrooperWaypoints(void);
 void DeathStar_PositionPlayerAndFollowersAtStart(void);
@@ -242,16 +239,15 @@ char DeathStar_InterpolateFollowCraftOnPath(int objectIdx, int sampleIdxA, int s
 void DeathStar_AddFollowChainSlot(int objectIdx);
 void DeathStar_ApplyFollowSeparationOffset(int objectIdx, int followSlotIdx);
 void DeathStar_UpdateFollowOverrideCraft(int objectIdx);
-int  DeathStar_HandlePowerNodeHit(unsigned int sourceObjIdx, unsigned int powerNodeObjIdx,
-								  unsigned int hitComponentId);
+int DeathStar_HandlePowerNodeHit(unsigned int sourceObjIdx, unsigned int powerNodeObjIdx,
+								 unsigned int hitComponentId);
 void DeathStar_HandleReactorHit(unsigned int projectileObjIdx, unsigned int reactorObjIdx,
 								unsigned int hitComponentId);
 void DeathStarTunnel_UpdateReactorDestructionSequence(int16_t activeSegmentSlotIdx);
 void DeathStarTunnel_Update(void);
-int  DeathStar_SpawnReactorDebrisGirders(void);
+int DeathStar_SpawnReactorDebrisGirders(void);
 void DeathStar_Shutdown(void);
-void DeathStar_UpdateLoopingObjectSfxVolume(int channelIdx, unsigned int sourceObjIdx,
-											int useDirectVolume);
+void DeathStar_UpdateLoopingObjectSfxVolume(int channelIdx, unsigned int sourceObjIdx, int useDirectVolume);
 void DeathStar_WriteFilmStateBlock(void);
 void DeathStar_ReadFilmStateBlock(void);
 #ifdef XWA_MODERN

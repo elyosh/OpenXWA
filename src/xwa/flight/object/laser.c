@@ -27,6 +27,7 @@
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
 #include "xwa/util/time.h"
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -46,158 +47,7 @@
 #include <stddef.h>
 #include <string.h>
 
-// GLOBAL: XWA 0x5B6330
-const uint16_t g_projectileLifetimeSecondsByObjectType[OBJ_LaserImperialDS + 1] = {
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,   0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 1, 1, 1, 1, 1, 2, 40, 25, 3, 3, 5, 45, 25, 120, 90, 25, 40, 3, 5, 0, 0, 3, 4, 3, 3, 4, 10
-};
-
-// GLOBAL: XWA 0x5B6368
-const uint16_t g_projectileLifetimeFracQ16ByObjectType[OBJ_LaserImperialDS + 1] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0,      0, 0,      0,      0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      0, 0, 0,      0, 0x8000, 0, 0x8000, 0x8000, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x8000, 0, 0, 0x8000, 0
-};
-
-// GLOBAL: XWA 0x5B6560
-const uint16_t g_projectileLifetimeSecondsByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-#include "projectile_lifetime_seconds.inc"
-};
-
-// GLOBAL: XWA 0x5B6598
-const uint16_t g_projectileLifetimeFracQ16ByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-#include "projectile_lifetime_fractions.inc"
-};
-
-// GLOBAL: XWA 0x5B6528
-const uint16_t g_projectileSpeedByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	2000, 2000, 1800, 1800, 1400, 1600, 250, 500,  1000, 900,  400,  300, 600, 50,
-	100,  600,  300,  1400, 500,  225,  0,   1200, 1000, 1250, 1100, 900, 0
-};
-
-#ifndef XWA_MODERN
-/* The original executable addresses compact projectile tables through biased object-type bases. */
-extern const uint16_t g_projectileSpeedByObjectType_BiasedBase[];
-extern const uint8_t g_projectileRequiredIffByObjectType_BiasedBase[];
-extern const uint16_t g_projectileAlternateIffTypeByObjectType_BiasedBase[];
-#endif
-
-// GLOBAL: XWA 0x5B64B8
-const int g_projectileDamageByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	250,   500,  200,  400, 200, 400,  10000, 3000, 1500, 1600, 800,  15000, 6000,   65000,
-	35000, 3000, 6000, 600, 500, 2000, 0,     750,  1000, 750,  1000, 1200,  1000000
-};
-
-// GLOBAL: XWA 0x5B6608
-const uint8_t g_projectileWarheadClassByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 2, 1, 2, 2, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0
-};
-
-// GLOBAL: XWA 0x5B63F8 (biased-base; only the warhead object-type window carries data)
-const uint16_t g_warheadProjectilePointValueByObjectType[OBJ_LaserImperialDS + 1] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 9, 6, 0, 0, 0, 15, 15, 45, 24, 9, 9, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
-// GLOBAL: XWA 0x5B6634
-const uint16_t g_warheadProjectilePointValue[11] = {
-	9, 6, 0, 0, 0, 15, 15, 45, 24, 9, 9,
-};
-
-// GLOBAL: XWA 0x5B6658 (biased-base; only the warhead object-type window carries data)
-const uint8_t g_projectileHomingProfileBaseByObjectType[OBJ_LaserImperialDS + 1] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 14, 21, 28, 14, 14, 0, 35, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
-// GLOBAL: XWA 0x5B6790 (7-entry rows: row base 0/7/14/21/28/35 + homing tier)
-const uint16_t g_projectileHomingTurnRateByProfile[42] = {
-	0, 1024, 2048, 3072, 5120,  7168,  9216,  0, 512,  1024, 2048,  3072,  4608,  6144,
-	0, 2048, 4096, 5120, 10240, 14336, 18432, 0, 32,   64,   80,    96,    112,   128,
-	0, 512,  1024, 1280, 1536,  1792,  2048,  0, 4096, 8192, 12288, 16384, 20480, 24576,
-};
-
-// GLOBAL: XWA 0x5B67E8 (7-entry rows: row base 0/7/14/21/28/35 + homing tier)
-const uint16_t g_projectileHomingSpeedAdjustRateByProfile[42] = {
-	0, 50, 100, 200, 300, 400, 500, 0, 25, 50, 100, 150, 200, 250, 0, 100, 200, 400, 600, 800, 1000,
-	0, 0,  0,   0,   0,   0,   0,   0, 10, 20, 30,  40,  50,  60,  0, 100, 200, 400, 600, 800, 1000,
-};
-
-// GLOBAL: XWA 0x5B65D0
-const int16_t g_projectileLaunchOffsetByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	921, 921, 921, 921, 921, 921, 512, 512, 921, 921, 921, 512, 512, 48,
-	512, 512, 512, 921, 256, 256, 0,   921, 921, 921, 921, 921, 921
-};
-
-// GLOBAL: XWA 0x5B6660
-const uint8_t g_projectileRequiredIffByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	0,    0,    1,    1, 0xff, 0xff, 0xff, 0xff, 0, 1, 0xff, 0xff, 0xff, 0xff,
-	0xff, 0xff, 0xff, 0, 0xff, 0xff, 0xff, 0,    0, 1, 1,    1,    1
-};
-
-// GLOBAL: XWA 0x5B6680
-const uint16_t g_projectileAlternateIffTypeByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	OBJ_LaserImperial,
-	OBJ_LaserImperialTurbo,
-	OBJ_LaserRebel,
-	OBJ_LaserRebelTurbo,
-	OBJ_LaserIon,
-	OBJ_LaserIonTurbo,
-	OBJ_WarheadTorpedo,
-	OBJ_WarheadMissile,
-	OBJ_WarheadLaser2,
-	OBJ_WarheadLaser1,
-	OBJ_WarheadIon,
-	OBJ_WarheadAdvancedTorpedo,
-	OBJ_WarheadAdvancedMissile,
-	OBJ_WarheadSpaceBomb,
-	OBJ_WarheadRocket,
-	OBJ_WarheadMagPulse,
-	OBJ_WarheadIonPulse,
-	OBJ_LaserImperialTurbo_303,
-	OBJ_WarheadFlare,
-	OBJ_SparkTextureGroup3002_299,
-	OBJ_ChaffTextureGroup5000,
-	OBJ_LaserImperialTurbo_304,
-	OBJ_LaserImperialTurbo_305,
-	OBJ_WarheadLaser3,
-	OBJ_LaserRebelTurbo_301,
-	OBJ_LaserRebelTurbo_302,
-	OBJ_LaserImperialDS
-};
+#include "projectile_tables.inc"
 
 // GLOBAL: XWA 0x5FE738
 const uint16_t g_warheadLeadErrorModulusByAiLevel[6] = { 15, 10, 6, 5, 2, 0 };
@@ -497,10 +347,10 @@ static __inline void laser_UpdateAiPowerRedirects(uint16_t objectIdx, int* shiel
 			}
 
 #ifdef XWA_MODERN
-			shieldMax =
-				4 * XwaStatsProfiles_Value(
-						objectIdx, XWA_STATS_SHIELDS,
-						g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength);
+			shieldMax = (XwaMissionSettings_AiShieldsChargeToFull() ? 2 : 4) *
+						XwaStatsProfiles_Value(
+							objectIdx, XWA_STATS_SHIELDS,
+							g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength);
 #else
 			shieldMax = 4 * g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength;
 #endif
@@ -1359,7 +1209,11 @@ static __inline void laser_ApplyWarheadLauncherAimError(ObjectRecord* ownerObj, 
 
 			fireRoll = GameRand();
 			groupAi = g_missionFlightGroups[ownerObj->flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+			if (fireRoll >= XwaRankTables_WarheadFireChance(groupAi)) {
+#else
 			if (fireRoll >= g_warheadFireChanceThresholdByAiLevel[groupAi]) {
+#endif
 				return;
 			}
 		}
@@ -1424,7 +1278,12 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (g_curCraft->beamEffectAccum[2] >=
+		(XwaMissionSettings_OneJammingBeamStopsTurrets() ? 0xffffu : 0x28000u)) {
+#else
 	if (g_curCraft->beamEffectAccum[2] >= 0x28000u) {
+#endif
 		return;
 	}
 	if (g_curCraft->beamEffectAccum[2] >= 0x18000u) {
@@ -1604,7 +1463,11 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 			uint8_t groupAi;
 
 			groupAi = g_missionFlightGroups[ownerObj->flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+			leadError = GameRandRange(XwaRankTables_WarheadLeadError(groupAi));
+#else
 			leadError = GameRandRange(g_warheadLeadErrorModulusByAiLevel[groupAi]);
+#endif
 			if ((GameRand() & 1) != 0) {
 				leadFrames = (uint16_t)(leadFrames + leadError);
 			} else {
@@ -2045,14 +1908,14 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 			lifetimeTimer =
 				(uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
 									  (int)firerObjIdx, projectileType, XWA_WEAPON_STAT_DURATION_SECONDS,
-									  g_projectileLifetimeSecondsByObjectType[projectileType]));
+									  g_projectileLifetimeSecondsByType[projectileType - OBJ_LaserRebel]));
 			lifetimeTimer =
 				(uint16_t)(lifetimeTimer +
-						   MATH2_fraction((uint16_t)XwaWeaponStats_Value(
-											  (int)firerObjIdx, projectileType,
-											  XWA_WEAPON_STAT_DURATION_FRACTION,
-											  g_projectileLifetimeFracQ16ByObjectType[projectileType]),
-										  236u));
+						   MATH2_fraction(
+							   (uint16_t)XwaWeaponStats_Value(
+								   (int)firerObjIdx, projectileType, XWA_WEAPON_STAT_DURATION_FRACTION,
+								   g_projectileLifetimeFracQ16ByType[projectileType - OBJ_LaserRebel]),
+							   236u));
 			g_objectTable[projectileObjIdx].mobj->lifetimeTimer = lifetimeTimer;
 		}
 #else
@@ -2081,10 +1944,12 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		{
 			uint16_t lifetimeTimer;
 
-			lifetimeTimer = (uint16_t)(236u * g_projectileLifetimeSecondsByObjectType[projectileType]);
+			lifetimeTimer =
+				(uint16_t)(236u * g_projectileLifetimeSecondsByObjectType_BiasedBase[projectileType]);
 			lifetimeTimer =
 				(uint16_t)(lifetimeTimer +
-						   MATH2_fraction(g_projectileLifetimeFracQ16ByObjectType[projectileType], 236u));
+						   MATH2_fraction(g_projectileLifetimeFracQ16ByObjectType_BiasedBase[projectileType],
+										  236u));
 			g_objectTable[projectileObjIdx].mobj->lifetimeTimer = lifetimeTimer;
 		}
 #endif
@@ -3421,20 +3286,21 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 	g_objectTable[projectileObjIdx].mobj->lifetimeTimer =
 		(int)(uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
 								   staticObjIdx, projectileObjectType, XWA_WEAPON_STAT_DURATION_SECONDS,
-								   g_projectileLifetimeSecondsByObjectType[projectileObjectType]) +
-						MATH2_fraction((uint16_t)XwaWeaponStats_Value(
-										   staticObjIdx, projectileObjectType,
-										   XWA_WEAPON_STAT_DURATION_FRACTION,
-										   g_projectileLifetimeFracQ16ByObjectType[projectileObjectType]),
-									   236u));
+								   g_projectileLifetimeSecondsByType[projectileObjectType - OBJ_LaserRebel]) +
+						MATH2_fraction(
+							(uint16_t)XwaWeaponStats_Value(
+								staticObjIdx, projectileObjectType, XWA_WEAPON_STAT_DURATION_FRACTION,
+								g_projectileLifetimeFracQ16ByType[projectileObjectType - OBJ_LaserRebel]),
+							236u));
 #else
 	projectileMobj->speed = g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel];
 	guidance->minSpeed = g_objectTable[projectileObjIdx].mobj->speed;
 	g_objectTable[projectileObjIdx].mobj->damageAmount =
 		g_projectileDamageByType[projectileObjectType - OBJ_LaserRebel];
 	g_objectTable[projectileObjIdx].mobj->lifetimeTimer =
-		(int)(uint16_t)(236u * g_projectileLifetimeSecondsByObjectType[projectileObjectType] +
-						MATH2_fraction(g_projectileLifetimeFracQ16ByObjectType[projectileObjectType], 236u));
+		(int)(uint16_t)(236u * g_projectileLifetimeSecondsByObjectType_BiasedBase[projectileObjectType] +
+						MATH2_fraction(
+							g_projectileLifetimeFracQ16ByObjectType_BiasedBase[projectileObjectType], 236u));
 #endif
 
 	Mission_ResolveObjectOrMissionPointWorldLoc(staticObjIdx, 0, 0, 0);
@@ -3595,17 +3461,17 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 				g_objectTable[(uint16_t)projectileObjIdx].mobj->damageAmount = power;
 			}
 			wholeSecondsTicks =
-				(uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
-									  (int)ownerObjIdx, projectileObjectType,
-									  XWA_WEAPON_STAT_DURATION_SECONDS,
-									  g_projectileLifetimeSecondsByObjectType[projectileObjectType]));
+				(uint16_t)(236u *
+						   (uint16_t)XwaWeaponStats_Value(
+							   (int)ownerObjIdx, projectileObjectType, XWA_WEAPON_STAT_DURATION_SECONDS,
+							   g_projectileLifetimeSecondsByType[projectileObjectType - OBJ_LaserRebel]));
 			wholeSecondsTicks =
 				(uint16_t)(wholeSecondsTicks +
-						   MATH2_fraction((uint16_t)XwaWeaponStats_Value(
-											  (int)ownerObjIdx, projectileObjectType,
-											  XWA_WEAPON_STAT_DURATION_FRACTION,
-											  g_projectileLifetimeFracQ16ByObjectType[projectileObjectType]),
-										  236u));
+						   MATH2_fraction(
+							   (uint16_t)XwaWeaponStats_Value(
+								   (int)ownerObjIdx, projectileObjectType, XWA_WEAPON_STAT_DURATION_FRACTION,
+								   g_projectileLifetimeFracQ16ByType[projectileObjectType - OBJ_LaserRebel]),
+							   236u));
 			g_objectTable[(uint16_t)projectileObjIdx].mobj->lifetimeTimer = wholeSecondsTicks;
 		}
 #else
@@ -3624,11 +3490,12 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 			uint16_t wholeSecondsTicks;
 
 			wholeSecondsTicks =
-				(uint16_t)(236u * g_projectileLifetimeSecondsByObjectType[projectileObjectType]);
+				(uint16_t)(236u * g_projectileLifetimeSecondsByObjectType_BiasedBase[projectileObjectType]);
 			wholeSecondsTicks =
 				(uint16_t)(wholeSecondsTicks +
-						   MATH2_fraction(g_projectileLifetimeFracQ16ByObjectType[projectileObjectType],
-										  236u));
+						   MATH2_fraction(
+							   g_projectileLifetimeFracQ16ByObjectType_BiasedBase[projectileObjectType],
+							   236u));
 			g_objectTable[(uint16_t)projectileObjIdx].mobj->lifetimeTimer = wholeSecondsTicks;
 		}
 #endif

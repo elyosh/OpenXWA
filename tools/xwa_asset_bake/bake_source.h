@@ -16,11 +16,11 @@ typedef struct BakeDatCatalog {
 	int group_count;
 } BakeDatCatalog;
 
-int BakeSource_LoadFrontend(AeronVfs* vfs, const char* source_path, Xwa2dFrameSet* out,
-							char* error, size_t error_size);
+int BakeSource_LoadFrontend(AeronVfs* vfs, const char* source_path, Xwa2dFrameSet* out, char* error,
+							size_t error_size);
 int BakeSource_InitDatCatalog(AeronVfs* vfs, BakeDatCatalog* catalog, char* error, size_t error_size);
-int BakeSource_LoadDatGroup(const BakeDatCatalog* catalog, uint16_t group, Xwa2dFrameSet* out,
-							char* error, size_t error_size);
+int BakeSource_LoadDatGroup(const BakeDatCatalog* catalog, uint16_t group, Xwa2dFrameSet* out, char* error,
+							size_t error_size);
 void BakeSource_FreeDatCatalog(BakeDatCatalog* catalog);
 
 #endif

@@ -38,10 +38,10 @@ typedef struct XwaRemasterHyperspaceLighting {
 /* The moment of the hyperspace sequence to draw. Real hyperspace takes it
  * from the snapshot; the debug preview makes it up. */
 typedef struct XwaRemasterHyperspaceMoment {
-	uint8_t phase;      /* XwaHyperspacePhase */
-	float phase_ticks;  /* ticks since the phase started; may have a fraction */
-	float tunnel_ticks; /* the tunnel phase's length */
-	uint32_t seed;      /* picks the jump's stars */
+	uint8_t phase;       /* XwaHyperspacePhase */
+	float phase_ticks;   /* ticks since the phase started; may have a fraction */
+	float tunnel_ticks;  /* the tunnel phase's length */
+	uint32_t seed;       /* picks the jump's stars */
 	uint8_t tunnel_only; /* the tunnel without end, and without the jump's brightening */
 	int look;            /* the jump's look (XwaRemasterFlight_HyperspaceLookName), or -1 */
 } XwaRemasterHyperspaceMoment;
@@ -100,6 +100,15 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* hyperspace, AeronComman
 								  const float camera_rows[9], int rt_w, int rt_h,
 								  const XwaRemasterHyperspaceMoment* moment,
 								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene);
+
+/* Sets the view that XwaRemasterHyperspace_Draw and
+ * XwaRemasterHyperspace_RenderWarp draw next, for a frame with several
+ * views. Call it after Prepare, which takes the frame's centre view; without
+ * this call, that view is drawn. The views share what Prepare worked out
+ * from the centre view: the timeline, the lighting, how much the frame
+ * faces the direction of travel, and the size of the warp's reveal. */
+void XwaRemasterHyperspace_SetView(XwaRemasterHyperspace* hyperspace,
+								   const XwaRemasterHyperspaceTunnelView* view);
 
 /* What the scene warp reads from the finished flight scene. */
 typedef struct XwaRemasterHyperspaceWarpInput {

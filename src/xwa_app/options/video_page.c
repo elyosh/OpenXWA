@@ -1,6 +1,7 @@
 #include "options/video_page.h"
 
 #include "aeron/render.h"
+#include "aeron/xr.h"
 #include "options/options_window.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
@@ -13,15 +14,18 @@
  * the OpenXW Video tab. */
 
 static bool XwaVideoPage_Display(AeronUiContext* ui, XwaModernVideoOptions* options) {
-	int fullscreen = options->window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN;
+	static const char* const window_modes[] = { "Windowed", "Fullscreen", "Span Displays" };
+	int window_mode = (int)options->window_mode;
 	bool changed = false;
 
 	AeronUi_Header(ui, "Display");
-	if (AeronUi_Toggle(ui, "Fullscreen", &fullscreen)) {
-		options->window_mode =
-			fullscreen ? XWA_MODERN_WINDOW_MODE_FULLSCREEN : XWA_MODERN_WINDOW_MODE_WINDOWED;
+	if (AeronUi_Selector(ui, "Window Mode", &window_mode, window_modes, 3)) {
+		options->window_mode = (XwaModernWindowMode)window_mode;
 		changed = true;
 	}
+	if (options->window_mode == XWA_MODERN_WINDOW_MODE_SPAN)
+		AeronUi_Help(ui, "Stretches one window across the displays that sit side by side. Uses "
+						 "fullscreen when the system doesn't allow it.");
 	changed |= AeronUi_Toggle(ui, "HDR Output", &options->hdr_output);
 	if (options->hdr_output && !Aeron_OutputHdrEnabled())
 		AeronUi_Help(ui, Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()));
@@ -52,6 +56,115 @@ static bool XwaVideoPage_Display(AeronUiContext* ui, XwaModernVideoOptions* opti
 	}
 #endif
 	changed |= AeronUi_Toggle(ui, "Smooth Menu Fonts", &options->smooth_menu_fonts);
+	return changed;
+}
+
+static bool XwaVideoPage_SurroundSize(AeronUiContext* ui, const char* label, float* value, float min,
+									  float max, int step, const char* format) {
+	int shown = (int)lroundf(*value);
+	if (!AeronUi_SliderInt(ui, label, &shown, (int)min, (int)max, step, format))
+		return false;
+	*value = (float)shown;
+	return true;
+}
+
+static bool XwaVideoPage_Surround(AeronUiContext* ui, XwaModernSurroundOptions* surround) {
+	bool changed = false;
+
+	AeronUi_Header(ui, "Surround Screens");
+	changed |= AeronUi_Toggle(ui, "Surround", &surround->enabled);
+	AeronUi_Help(ui, "Draws the flight view across three screens of the same size, with the right "
+					 "perspective on each. The window must cover all three (see Span Displays). FSR "
+					 "upscaling is off in this mode, so use MSAA.");
+	if (!surround->enabled)
+		return changed;
+	changed |= XwaVideoPage_SurroundSize(ui, "Screen Width", &surround->screen_width_mm,
+										 XWA_MODERN_SURROUND_SIZE_MIN_MM, XWA_MODERN_SURROUND_SIZE_MAX_MM, 1,
+										 "%d mm");
+	changed |= XwaVideoPage_SurroundSize(ui, "Screen Height", &surround->screen_height_mm,
+										 XWA_MODERN_SURROUND_SIZE_MIN_MM, XWA_MODERN_SURROUND_SIZE_MAX_MM, 1,
+										 "%d mm");
+	AeronUi_Help(ui, "The visible picture of one screen, without the bezel.");
+	changed |= XwaVideoPage_SurroundSize(ui, "Bezel", &surround->bezel_mm, 0.0f,
+										 XWA_MODERN_SURROUND_BEZEL_MAX_MM, 1, "%d mm");
+	AeronUi_Help(ui, "The width of the frame beside a screen's picture.");
+	changed |=
+		XwaVideoPage_SurroundSize(ui, "Distance", &surround->distance_mm, XWA_MODERN_SURROUND_DISTANCE_MIN_MM,
+								  XWA_MODERN_SURROUND_DISTANCE_MAX_MM, 10, "%d mm");
+	AeronUi_Help(ui, "From your eyes to the center screen.");
+	changed |= XwaVideoPage_SurroundSize(ui, "Side Screen Angle", &surround->side_angle_deg, 0.0f,
+										 XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, 1, "%d degrees");
+	AeronUi_Help(ui, "How far each side screen is turned toward you. 0 is flat.");
+	return changed;
+}
+
+/* Set by the Restart Now button, until main.c takes it. */
+static bool s_restart_requested;
+
+bool XwaVideoPage_TakeRestartRequest(void) {
+	const bool requested = s_restart_requested;
+	s_restart_requested = false;
+	return requested;
+}
+
+/* The VR mode is read when the game starts, so a change needs a restart. */
+static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) {
+	static int started_mode = -1;
+	static int started_render_percent;
+	int mode = (int)options->vr_mode;
+	int render_percent = (int)lroundf(options->vr_render_scale * 100.0f);
+	int world_percent = (int)lroundf(options->vr_world_scale * 100.0f);
+	int panel_percent = (int)lroundf(options->vr_panel_scale * 100.0f);
+	int screen_percent = (int)lroundf(options->vr_screen_scale * 100.0f);
+	bool changed = false;
+
+	if (!Aeron_XrSupported())
+		return false;
+	if (started_mode < 0) {
+		started_mode = mode;
+		started_render_percent = render_percent;
+	}
+	AeronUi_Header(ui, "Virtual Reality");
+	if (AeronUi_Toggle(ui, "VR Headset", &mode)) {
+		options->vr_mode = mode ? XWA_MODERN_VR_ON : XWA_MODERN_VR_OFF;
+		changed = true;
+	}
+	AeronUi_Help(ui, "Applies the next time OpenXWA starts.");
+	if (mode != XWA_MODERN_VR_OFF) {
+		if (AeronUi_SliderInt(ui, "Headset Render Scale", &render_percent,
+							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f), (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5,
+							  "%d%%")) {
+			options->vr_render_scale = (float)render_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "The resolution of the headset's picture. 100% is what the headset recommends, "
+						 "and lower is faster. Applies the next time OpenXWA starts.");
+		if (AeronUi_SliderInt(ui, "World Scale", &world_percent, (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
+							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
+			options->vr_world_scale = (float)world_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "How far the view moves when your head moves. Above 100%, the cockpit and the "
+						 "world look smaller.");
+		if (AeronUi_SliderInt(ui, "Cockpit Panel Size", &panel_percent,
+							  (int)(XWA_MODERN_VR_PANEL_SCALE_MIN * 100.0f),
+							  (int)(XWA_MODERN_VR_PANEL_SCALE_MAX * 100.0f), 5, "%d%%")) {
+			options->vr_panel_scale = (float)panel_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "The size of the HUD panel in the cockpit: the radars, the gauges and the text.");
+		if (AeronUi_SliderInt(ui, "Menu Screen Size", &screen_percent,
+							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
+							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
+			options->vr_screen_scale = (float)screen_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "The size of the flat screen that shows the menus, briefings and movies.");
+		changed |= AeronUi_Toggle(ui, "Show Headset View in Window", &options->vr_mirror);
+	}
+	if ((mode != started_mode || (mode != XWA_MODERN_VR_OFF && render_percent != started_render_percent)) &&
+		AeronUi_Button(ui, "Restart Now"))
+		s_restart_requested = true;
 	return changed;
 }
 
@@ -150,6 +263,8 @@ void XwaVideoPage_Draw(AeronUiContext* ui, const AeronInputSnapshot* input) {
 		return;
 	XwaModernVideoOptions_Get(&options);
 	changed = XwaVideoPage_Display(ui, &options);
+	changed |= XwaVideoPage_Surround(ui, &options.surround);
+	changed |= XwaVideoPage_Vr(ui, &options);
 	changed |= XwaVideoPage_FlightRendering(ui, &options);
 
 	AeronUi_Header(ui, "HUD");

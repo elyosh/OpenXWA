@@ -160,8 +160,8 @@ static uint32_t ship_markings_variants(const XwaRemasterSkinModel* skin, const X
 }
 
 static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, uint8_t source,
-									  uint8_t projectile, const XwaSnapshot* snapshot, XwaRemasterSkinModel** out_skin,
-									  uint64_t* out_markings_variants_hash) {
+									  uint8_t projectile, const XwaSnapshot* snapshot,
+									  XwaRemasterSkinModel** out_skin, uint64_t* out_markings_variants_hash) {
 	char path[512];
 	AeronFlightModel model;
 	*out_skin = NULL;
@@ -403,8 +403,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		snprintf(asset->key, sizeof asset->key, "%s", desired[i].key);
 		asset->source = desired[i].source;
 		asset->projectile = desired[i].projectile;
-		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, asset->projectile, snapshot, &asset->skin,
-									 &asset->markings_variants_hash);
+		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, asset->projectile, snapshot,
+									 &asset->skin, &asset->markings_variants_hash);
 		if (!asset->mesh) {
 			memset(asset, 0, sizeof *asset);
 			return XWA_REMASTER_SHIP_SYNC_FAILED;
@@ -565,7 +565,7 @@ typedef struct PbrLightFS {
 	float ssao_direct;
 	float spec_geom_adapt;
 	float _pad_tuning;
-	float camera_pos_world[3], _pad0;
+	float reserved_camera_pos[4];    /* unused: the shaders read the camera position from the scene */
 	float directional_dir[3], _pad1; /* surface -> light */
 	float sun_color[3], _pad2;
 	float amb_pos_x[3], _pad3;
@@ -676,8 +676,8 @@ const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRe
 }
 
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* lights, uint32_t light_count,
-							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
-							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
+							   int32_t key_index, const float cam_rows[9], const XwaShipAoParams* ao,
+							   const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow) {
 	if (!scene) {
 		return;
@@ -709,13 +709,11 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
 	 * direction (light directions, colors, relative intensities); the
 	 * response curve belongs to the exposure and the present chain. */
 
-	/* The FS lights in the space the instances were submitted in:
-	 * world-space instances pass cam_rows = NULL (light dirs stay
-	 * world) + the world camera pos; eye-space instances (preview PiP)
-	 * pass their world->eye rows + NULL pos (camera at the origin). */
-	if (cam_pos) {
-		memcpy(env.camera_pos_world, cam_pos, sizeof env.camera_pos_world);
-	}
+	/* The fragment shader computes lighting in the space of the instances.
+	 * For world-space instances, cam_rows is NULL and the light directions
+	 * stay in world space. For eye-space instances (the preview and the CMD
+	 * view), cam_rows are the world-to-eye rows, and the directions are
+	 * rotated into eye space. */
 	if (ambient_cube) {
 		memcpy(env.amb_pos_x, ambient_cube->pos_x, sizeof env.amb_pos_x);
 		memcpy(env.amb_neg_x, ambient_cube->neg_x, sizeof env.amb_neg_x);
@@ -1026,14 +1024,14 @@ static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)
 	memcpy(out->emissive_packed, d->emissive_packed, count * sizeof(float));
 }
 
-uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
-	if (!mesh || !f || !f->surface_hidden_mask) {
+/* The tag groups of `mesh` that the `surfaces` rules in `rules` name. */
+static uint32_t ship_rule_tag_groups(const AeronSceneMesh* mesh, const XwaFlightObject* f, uint32_t rules) {
+	if (!mesh || !f || !rules) {
 		return 0;
 	}
 	uint32_t groups = 0;
 	for (unsigned rule = 0; rule < XWA_SURFACES_MAX_RULES; ++rule) {
-		const char* tag =
-			(f->surface_hidden_mask >> rule) & 1u ? XwaSurfaces_RuleTag(f->object_type, rule) : NULL;
+		const char* tag = (rules >> rule) & 1u ? XwaSurfaces_RuleTag(f->object_type, rule) : NULL;
 		for (uint32_t g = 0; tag && g < mesh->tag_groups.count; ++g) {
 			if (strcmp(mesh->tag_groups.names[g].name, tag) == 0) {
 				groups |= 1u << g;
@@ -1041,6 +1039,14 @@ uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFl
 		}
 	}
 	return groups;
+}
+
+uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
+	return f ? ship_rule_tag_groups(mesh, f, f->surface_hidden_mask) : 0;
+}
+
+uint32_t XwaRemasterShip_DarkTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
+	return f ? ship_rule_tag_groups(mesh, f, f->surface_dark_mask) : 0;
 }
 
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
@@ -1401,7 +1407,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
 									   const uint32_t* hidden_mask, float scale, const float crows[9],
-									   const float cam_pos[3], const XwaAssetRef* tex) {
+									   const float cam_pos[3], uint32_t view_mask, const XwaAssetRef* tex) {
 	if (!scene || !mesh || !mesh->engine_glow_count || !transform || scale <= 0.0f ||
 		s_engine_emissive_strength <= 0.0f || !tex || !tex->texture) {
 		return;
@@ -1594,6 +1600,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		d.texture = tex->texture;
 		d.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 		d.stage = AERON_SCENE_BILLBOARD_STAGE_OVERLAY;
+		d.view_mask = view_mask;
 		d.center_color = core;
 		for (int v = 0; v < 4; v++) {
 			/* View corners -> submission space (inverse of the camera

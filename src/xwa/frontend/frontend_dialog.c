@@ -1,6 +1,7 @@
 #include "xwa/frontend/frontend_dialog.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/input/vr_keyboard.h"
 #endif
 
 #include "xwa/assets/string_table.h"
@@ -239,6 +240,10 @@ int FrontendDialog_CreatePilotNameCallback(int frameState) {
 	XwaConcourseLayout_AssignRect(&rect, "create_pilot.name_field", 250, 245, 440, 265);
 #else
 	FrontendDraw_RectAssign(&rect, 250, 245, 440, 265);
+#endif
+#ifdef XWA_MODERN
+	/* The pilot's name is typed here: VR opens its keyboard. */
+	XwaVrKeyboard_NoteTextField();
 #endif
 	accepted = FrontendText_DrawEditableField(&rect, g_frontDialogText0, 13, 0, 12, "\\*$");
 
@@ -617,6 +622,9 @@ int FrontendDialog_EditTextCallback(int frameState) {
 	savedGlyphGradientBg = FrontendText_GetGlyphGradientBg();
 	FrontendText_SetGlyphGradientBg(g_colorNearBlack);
 	FrontendDraw_FillRectTranslucent(&rect, 0, 0, (unsigned int)g_colorSlateBlue);
+#ifdef XWA_MODERN
+	XwaVrKeyboard_NoteTextField();
+#endif
 	accepted =
 		FrontendText_DrawEditableField(&rect, g_frontDialogText0, g_frontDialogEditMaxChars, 0, 12, NULL);
 	FrontendText_SetGlyphGradientBg(savedGlyphGradientBg);

@@ -25,6 +25,8 @@
 #include "aeron/render.h"
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
+#include "aeron/scene/view_rig.h"
+#include "aeron/xr.h"
 #include "aeron/vfs.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/environment.h"
@@ -108,7 +110,7 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
  * inspector). Fixed, the image is exposed at ev100 - compensation. Metered,
  * the flight scene meters it from its image (AeronScene_SetAutoExposure). */
 typedef struct XwaFlightExposureParams {
-	int   metered;
+	int metered;
 	float ev100;        /* fixed mode, and the anchor of partial metering */
 	float compensation; /* EV added to brightness */
 	float metering;     /* 0 = ev100, 1 = the metered EV */
@@ -122,8 +124,8 @@ typedef struct XwaFlightExposureParams {
 	float near_weight;   /* geometry nearer than near_distance: the cockpit */
 	float near_distance; /* metres */
 	float edge_weight;
-	int   max_channel; /* meter the largest of r, g and b instead of luminance */
-	int   freeze;      /* keep the current EV; debug only, not in the file */
+	int max_channel; /* meter the largest of r, g and b instead of luminance */
+	int freeze;      /* keep the current EV; debug only, not in the file */
 } XwaFlightExposureParams;
 
 void XwaRemasterFlight_GetExposure(XwaFlightExposureParams* out);
@@ -135,7 +137,11 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
 float XwaRemasterFlight_Exposure(void);
 /* Logs how many instances and triangles the last frame drew at each level
  * of detail (the film benchmark). */
-void  XwaRemasterFlight_LogLodStats(void);
+void XwaRemasterFlight_LogLodStats(void);
+/* Logs counts for the last flight render: the instances, shadow casters,
+ * lights and billboards of the scene, then the instances drawn and the draw
+ * calls of each view. */
+void XwaRemasterFlight_LogFrameStats(void);
 /* The debug view drawn in place of the flight image
  * (AeronScenePresentDebugView): the image, false colour, or the meter's
  * weights. Debug only, not in the settings. */
@@ -143,6 +149,11 @@ int XwaRemasterFlight_PresentDebugView(void);
 void XwaRemasterFlight_SetPresentDebugView(int view);
 /* The flight scene's newest metering; 0 when there is none. */
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
+/* Returns whether the exposure is metered and the meter's values of the
+ * first render haven't come back from the GPU yet. They take two presented
+ * frames. Until then XwaRemasterFlight_Exposure gives the fixed exposure,
+ * which is not the one the frame was drawn with. */
+int XwaRemasterFlight_ExposureReadoutPending(void);
 /* The fixed exposure of a view lit by its own lights (the CMD display, the
  * model preview): its brightest directional light metered as incident
  * light, EV100 = log2(E * 100 / 250) with E in lux, minus the compensation.
@@ -195,8 +206,12 @@ typedef struct XwaFlightPointLightParams {
 	int enabled;
 	int cluster_depth_slices;
 	int cluster_debug;
-	float match_distance_m;      /* metres at which a light is as bright as the classic law */
-	float range_scale;           /* multiplies the derived falloff range */
+	/* Shade spot lights that point the same way close together, such as a
+	 * ship's engines, as one light far from them
+	 * (AeronSceneClusteredLightDesc.merge_spot_lights). */
+	int merge_spot_lights;
+	float match_distance_m; /* metres at which a light is as bright as the classic law */
+	float range_scale;      /* multiplies the derived falloff range */
 	/* While the cockpit is drawn, the light of an explosion up to
 	 * cockpit_explosion_distance_m from the eye is multiplied by
 	 * cockpit_explosion_light_scale. From there to twice that distance,
@@ -204,7 +219,7 @@ typedef struct XwaFlightPointLightParams {
 	 * player's craft, whose lights would wash out the cockpit. */
 	float cockpit_explosion_light_scale;
 	float cockpit_explosion_distance_m;
-	int model_lights;            /* lights authored in models, and the headlight */
+	int model_lights; /* lights authored in models, and the headlight */
 	/* Multiplies the lights authored in models, to find a calibration by
 	 * eye; debug only, not in the settings. 1 by default. */
 	float model_light_scale;
@@ -278,7 +293,7 @@ typedef struct XwaFlightProjectileParams {
  * aren't saved. */
 typedef struct XwaFlightLodParams {
 	float max_error;
-	int   tint;
+	int tint;
 } XwaFlightLodParams;
 
 void XwaRemasterFlight_GetLod(XwaFlightLodParams* out);
@@ -518,6 +533,10 @@ typedef struct XwaFlightTemporalStats {
 /* presentation.cockpit_fov_min_aspect, for the debug UI. */
 float XwaRemasterFlight_GetCockpitFovMinAspect(void);
 void XwaRemasterFlight_SetCockpitFovMinAspect(float aspect);
+/* presentation.debug_stereo_ipd_m and debug_stereo_fov_deg: the distance
+ * between the eyes and the horizontal field of view of the debug UI's
+ * stereo view. */
+void XwaRemasterFlight_GetDebugStereoDefaults(float* ipd_m, float* fov_deg);
 
 void XwaRemasterFlight_GetTemporal(XwaFlightTemporalParams* out);
 void XwaRemasterFlight_SetTemporal(const XwaFlightTemporalParams* in);
@@ -526,6 +545,8 @@ void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out);
 /* Renderer-owned main-flight view. HUD layouts never participate in its
  * construction. The captured classic projection supplies vertical framing;
  * the active viewport aspect supplies the horizontal field of view. */
+struct XwaRemasterHudPlanes;
+
 typedef struct XwaRemasterFlightView {
 	AeronSceneCamera camera;
 	float view_proj[16];
@@ -537,6 +558,25 @@ typedef struct XwaRemasterFlightView {
 	 * particle's. It is smaller than classic_pixel_scale when the view is
 	 * wider than the classic projection (presentation.cockpit_fov_min_aspect). */
 	float projection_pixel_scale;
+	/* Nonzero for a view of a view rig: its projection is the rig's, not
+	 * the game's. */
+	uint8_t rig_view;
+	/* Nonzero when the view turns with the player's head, so it doesn't
+	 * look where the game camera looks. */
+	uint8_t head_tracked;
+	/* For a headset's HUD view, which is larger than what one eye sees.
+	 * `arrow_rect` is the part of the view that both eyes see, in the
+	 * view's pixels. When it isn't empty, the arrow to a target out of view
+	 * is placed from it and not from the edge of the view: the arrow is on
+	 * the rectangle scaled by `arrow_position` about its centre, and it
+	 * shows when the target is outside the rectangle scaled by
+	 * `arrow_view`. */
+	AeronRectI arrow_rect;
+	float arrow_position;
+	float arrow_view;
+	/* For the seat's HUD view of a headset: the planes that the HUD's markers
+	 * are drawn on (hud_planes.h). NULL draws the HUD flat. */
+	const struct XwaRemasterHudPlanes* hud_planes;
 } XwaRemasterFlightView;
 
 int XwaRemasterFlight_BuildView(const XwaFlightCamera* camera, int target_w, int target_h,
@@ -547,6 +587,10 @@ int XwaRemasterFlight_ProjectWorldI32(const XwaRemasterFlightView* view, const i
 									  float* out_y, float* out_depth);
 int XwaRemasterFlight_ProjectView(const XwaRemasterFlightView* view, const float eye[3], float* out_x,
 								  float* out_y);
+/* Writes the position of a world point in the view's eye space: X right, Y
+ * down, Z forward. */
+void XwaRemasterFlight_WorldToEyeI32(const XwaRemasterFlightView* view, const int32_t world[3],
+									 float out_eye[3]);
 /* Clips an eye-space segment to the near plane (moving the endpoint behind
  * it) and projects both ends; returns 0 when it lies wholly behind. */
 int XwaRemasterFlight_ClipProjectLine(const XwaRemasterFlightView* view, float a[3], float b[3], float* ax,
@@ -571,6 +615,19 @@ int XwaRemasterFlight_ObjectModelMatrixForCameraDelta(const XwaFlightObject* obj
 /* Transform a model-space point in native OPT units through a mesh instance's
  * row-major affine matrix (model metres -> scene units). Works with both the
  * flight render-local and PiP eye-local transforms; translation is not rescaled. */
+/* The matrix that AeronDrawList_RenderPlanes wants for a view of a rig, for
+ * drawings placed in metres around the rig's origin and not in the flight
+ * scene: the points are in the rig's space with Y and Z negated, which is
+ * the eye space of a seat at the origin. `width` and `height` are the
+ * view's size in pixels. */
+/* The scene camera of a view of a rig whose seat is at the scene's origin
+ * and looks along the scene's eye axes: for a small scene around the
+ * player, outside flight. `units_per_meter` is the scene's unit. `out_rows`,
+ * when given, gets the camera's world-to-eye rows. */
+void XwaRemasterFlight_RigViewCamera(const AeronRigView* view, int width, int height, float units_per_meter,
+									 float near_z, AeronSceneCamera* out, float out_rows[9]);
+void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]);
+
 void XwaRemasterFlight_TransformOptPoint(const float model_meters_to_scene[16], const float point_opt[3],
 										 float out_scene[3]);
 
@@ -633,6 +690,52 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
 											const XwaSnapshot* snap, XwaRemasterAssets* assets, int filter,
 											const XwaEnvironmentBackdropRule* hide, float* out_max_tan);
 
+/* Sets the views that the flight scene is rendered into, from the next
+ * XwaRemasterFlight_Render on. With NULL, or a rig of one view, there is one
+ * view that fills the target: the game camera. Otherwise the game camera is
+ * the rig's origin, each view is drawn into its rectangle of the target, and
+ * the HUD is drawn in the primary view. Views replace the temporal
+ * upscaler and the direct presentation, which need a single view. The map
+ * and the hyperspace tunnel are still drawn as one view, in the primary
+ * view's rectangle. */
+void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
+
+/* For a headset: gives each view of the rig its own target, such as an eye
+ * image, for the next XwaRemasterFlight_Render. `targets` has one target of
+ * the view size for each view. The views are then tone mapped into these
+ * targets and not into the composed presentation, motion blur and the
+ * hyperspace camera shake are off, and the map is drawn in the middle of the
+ * composed presentation. The HUD is then drawn in every view, as two
+ * groups: one on planes in 3D and one on a panel in the cockpit (hud.h).
+ * `head_units_per_meter` is the number of scene units that one metre of the
+ * player's head movement covers; the panel's distance uses it. Call it after
+ * XwaRemasterFlight_SetViewRig, which removes the targets. NULL removes them
+ * too. */
+void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
+/* For a headset: how large the cockpit panel that shows the HUD looks. At 1 it
+ * covers the HUD's view as seen from the seat. The panel's distance doesn't
+ * change. Values of 0 or less are ignored. */
+void XwaRemasterFlight_SetHudPanelScale(float scale);
+/* For a headset, after XwaRemasterFlight_SetViewTargets: gives each view's
+ * hidden area, the part of the eye image that the lens never shows, and its
+ * visible area, the rest (AeronXrAreaMesh). The scene shades no pixel under
+ * the hidden area, and the full-screen passes only draw the visible area.
+ * Each array has one entry for each view of the rig, and the meshes must
+ * stay valid until the next render. NULL removes them, and so does
+ * XwaRemasterFlight_SetViewRig. */
+void XwaRemasterFlight_SetViewAreas(const AeronXrAreaMesh* hidden, const AeronXrAreaMesh* visible);
+/* Returns whether the last XwaRemasterFlight_Render drew the views into
+ * their own targets. It is 0 for the map, which is in the texture that the
+ * render returned. */
+int XwaRemasterFlight_ViewTargetsRendered(void);
+/* After a render into the views' own targets: asks Aeron to draw the view
+ * that was rendered last into the window, as the headset's mirror. */
+int XwaRemasterFlight_SubmitViewMirror(void);
+
+/* Writes the number of views of the rig, and the size of one view. Without
+ * a rig, the count is 1 and the size is the one of the last render. */
+void XwaRemasterFlight_GetViewLayout(int* count, int* width, int* height);
+
 /* Returns whether the current full-frame output can use Aeron's direct
  * swapchain render layer at the requested dimensions. */
 int XwaRemasterFlight_CanDirectPresent(int target_w, int target_h);
@@ -657,8 +760,14 @@ AeronRenderTarget* XwaRemasterFlight_ComposedTarget(void);
  * tonemap receives it into the target of the composed presentation: the
  * scene with its bloom, multiplied by the exposure, without the HUD. The
  * target then holds this image instead of the final image, until the next
- * render. Returns 0 if there is no rendered frame. */
+ * render. Returns 0 if there is no rendered frame. It also returns 0 with a
+ * view rig, because the scene then only holds its last view. */
 int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd);
+
+/* For a view rig. While enabled, XwaRemasterFlight_Render composes each view
+ * before the tonemap and without the HUD. The composed target then holds
+ * the image that XwaRemasterFlight_RecordBeforeTonemap gives for one view. */
+void XwaRemasterFlight_SetComposeBeforeTonemap(int enabled);
 
 /* Queues the prepared direct frame into Aeron's swapchain pass. */
 int XwaRemasterFlight_SubmitDirectPresentation(void);

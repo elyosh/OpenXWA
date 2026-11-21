@@ -4,10 +4,11 @@
 /* Surfaces that show by the craft's state, from the `surfaces` group of a
  * model settings file. The keys are tags of the model's materials and
  * lights. A tagged surface or light is hidden when any of its rules hides
+ * it, and dark (its emission and lights off) when any of its rules darkens
  * it. The mod documentation describes the rules.
  *
- * `hidden_when_disabled` uses the game's "disabled" test,
- * CraftData.workingSubsystems == 0. `min_speed_percent` works as in
+ * `hidden_when_disabled` and `dark_when_disabled` use the game's "disabled"
+ * test, CraftData.workingSubsystems == 0. `min_speed_percent` works as in
  * `engine_glows`. `min_ordered_speed_mglt` tests CraftData.commandedSpeed,
  * the speed that the craft's orders set. A model has at most
  * XWA_SURFACES_MAX_RULES rules. Objects without a craft record show every
@@ -38,6 +39,9 @@ void XwaSurfaces_ReadModelSettings(unsigned int objectType, const char* path,
 /* The rules of `objectType` that hide their tag on `craft`, moving at `speed`
    (MobileObject.speed): bit r for rule r. */
 uint32_t XwaSurfaces_HiddenMask(unsigned int objectType, const struct CraftData* craft, uint16_t speed);
+/* The rules of `objectType` that darken their tag on `craft`: bit r for rule
+   r. */
+uint32_t XwaSurfaces_DarkMask(unsigned int objectType, const struct CraftData* craft);
 /* The tag of rule `rule` of `objectType`, or NULL. */
 const char* XwaSurfaces_RuleTag(unsigned int objectType, unsigned int rule);
 

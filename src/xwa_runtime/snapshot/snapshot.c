@@ -25,7 +25,6 @@
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/surfaces.h"
-#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot_camera.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -489,9 +488,9 @@ void XwaSnapshot_Commit(void) {
 		}
 		s->dir_light_count = n;
 	}
-	/* Cursor state, sampled once per tick (read-only observers). */
-	/* The options window has its own cursor, the system one. */
-	s->cursor_visible = (uint8_t)(FrontendCursor_IsVisible() != 0 && !XwaPort_OptionsWindowOpen());
+	/* Cursor state, sampled once per tick (read-only observers). The
+	   remaster hides the cursor under the options window itself. */
+	s->cursor_visible = (uint8_t)(FrontendCursor_IsVisible() != 0);
 	{
 		int cx = 0, cy = 0;
 		FrontendCursor_GetPos(&cx, &cy);
@@ -1491,7 +1490,8 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 static int snapshot_mesh_count(const ObjectRecord* o) {
 	int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
 	const int playerObjIdx = g_players[g_localPlayer].objectIndex;
-	if (g_objectTable != NULL && playerObjIdx >= 0 && o == &g_objectTable[playerObjIdx]) {
+	if (g_objectTable != NULL && playerObjIdx >= 0 && (uint32_t)playerObjIdx < g_objectTableSlotCount &&
+		o == &g_objectTable[playerObjIdx]) {
 		if (g_cockpitModel != 0 && g_cockpitModelMeshCache.meshCount > count) {
 			count = g_cockpitModelMeshCache.meshCount;
 		}
@@ -1709,6 +1709,7 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 			XwaEngineGlows_HiddenMask(o->objectType, m->speed, (uint16_t)cd->aiFlight.maxSpeedCache,
 									  f->eg_hidden_mask);
 			f->surface_hidden_mask = XwaSurfaces_HiddenMask(o->objectType, cd, m->speed);
+			f->surface_dark_mask = XwaSurfaces_DarkMask(o->objectType, cd);
 		} else {
 			snapshot_capture_profile_meshes(s, f, o, m);
 		}
@@ -1943,8 +1944,8 @@ void XwaSnapshot_CaptureFlight(void) {
 	/* During hyperspace the HD renderer gets the camera of ordinary flight
 	 * (XwaSnapshotCamera_NoteHyperspaceOverride). */
 	float hyperspace_eye_offset[3];
-	const int hyperspace_camera = c->hyperspace_phase &&
-								  XwaSnapshotCamera_OrdinaryCamera(c->rows, c->world_pos, hyperspace_eye_offset);
+	const int hyperspace_camera =
+		c->hyperspace_phase && XwaSnapshotCamera_OrdinaryCamera(c->rows, c->world_pos, hyperspace_eye_offset);
 	if (hyperspace_camera) {
 		XwaSnapshotCamera_PositionFraction(c->world_pos, c->world_pos_fraction);
 	}
@@ -2034,8 +2035,12 @@ void XwaSnapshot_CaptureFlight(void) {
 		memset(k, 0, sizeof *k);
 		const int playerObjIdx = g_players[g_localPlayer].objectIndex;
 		if (g_objectTable != NULL && playerObjIdx >= 0) {
-			const ObjectRecord* pobj = &g_objectTable[playerObjIdx];
-			const ModelDefIndex modelIndex = GetModelDefIndexFromType((uint16_t)pobj->objectType);
+			/* The map takes the player out of the craft, so the object index
+			 * is 0xffff while it is open, which is past the object table. */
+			const ObjectRecord* pobj =
+				(uint32_t)playerObjIdx < g_objectTableSlotCount ? &g_objectTable[playerObjIdx] : NULL;
+			const ModelDefIndex modelIndex =
+				pobj != NULL ? GetModelDefIndexFromType((uint16_t)pobj->objectType) : (ModelDefIndex)0xffffu;
 			uint16_t handle = 0;
 			k->seat = (uint8_t)g_players[g_localPlayer].currentSeatIdx;
 			if (k->seat == 0) {

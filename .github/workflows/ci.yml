@@ -211,7 +211,7 @@ jobs:
 
           Download the \`-release\` file for your platform. The \`-debug\` and \`-symbols\` files are for diagnosing problems.
 
-          **macOS:** this build isn't signed by Apple, so macOS blocks it the first time you open it. To allow it, click **Open Anyway** in **System Settings** > **Privacy & Security**. Do this for both OpenXWA and the OpenXWA Mod Importer.
+          **macOS:** this build isn't signed by Apple, so macOS blocks it the first time you open it. To allow it, click **Open Anyway** in **System Settings** > **Privacy & Security**.
           NOTES
           )"
 

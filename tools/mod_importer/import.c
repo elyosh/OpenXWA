@@ -96,7 +96,9 @@ static double overall_fraction(XwaModImportProgress* progress) {
 	return total > 0 ? (double)done / (double)total : 0.0;
 }
 
-int XwaModImport_Overall(XwaModImportProgress* progress) { return (int)(overall_fraction(progress) * 1000.0); }
+int XwaModImport_Overall(XwaModImportProgress* progress) {
+	return (int)(overall_fraction(progress) * 1000.0);
+}
 
 long long XwaModImport_Remaining(XwaModImportProgress* progress, uint64_t elapsed_us) {
 	const double fraction = overall_fraction(progress);
@@ -308,6 +310,10 @@ bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_
 	for (char* c = folder; *c; ++c)
 		if (!isalnum((unsigned char)*c) && *c != '.' && *c != '-')
 			*c = '-';
+	/* Folders whose name starts with '.' hold the staging and trash folders
+	   of the mods (mod_update.h). */
+	if (folder[0] == '.')
+		folder[0] = '-';
 	const size_t end = strlen(mods);
 	const bool separator = end && (mods[end - 1] == '/' || mods[end - 1] == '\\');
 	return PathFormat(out, cap, "%s%s%s", mods, separator ? "" : "/", folder[0] ? folder : "mod");
@@ -366,12 +372,12 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 	XwaModImportInstall install;
 	char path[IMPORT_PATH_CAP], detect[256];
 	if (!XwaModImport_Detect(options->source, &install, detect, sizeof detect)) {
-		snprintf(error, error_cap, "Installation: %s", detect);
+		snprintf(error, error_cap, "%s", detect);
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (!options->game || !IsDir(options->game) ||
 		!Import_FindNoCase(options->game, "FlightModels", true, path, sizeof path)) {
-		snprintf(error, error_cap, "Original game: this isn't an X-Wing Alliance folder.");
+		snprintf(error, error_cap, "The game folder isn't an X-Wing Alliance folder.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (!options->resources || !PathFormat(path, sizeof path, "%s/assets/fonts", options->resources) ||
@@ -400,14 +406,12 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 		case FOLDER_IMPORTED:
 			if (options->replace)
 				return XWA_MOD_IMPORT_CHECK_OK;
-			snprintf(error, error_cap,
-					 "The mod folder has a mod made by the importer. Importing replaces it.");
+			snprintf(error, error_cap, "A mod with this name already exists. Importing replaces it.");
 			return XWA_MOD_IMPORT_CHECK_REPLACE;
 		case FOLDER_OTHER:
 			break;
 	}
-	snprintf(error, error_cap,
-			 "The mod folder already has other files in it. Choose another mod name or mods folder.");
+	snprintf(error, error_cap, "The mods folder already has a folder with this name. Choose another name.");
 	return XWA_MOD_IMPORT_CHECK_INVALID;
 }
 
@@ -458,6 +462,11 @@ static bool write_mod_yaml(ImportContext* ctx, bool complete) {
 	yaml_quoted(f, options->name && options->name[0] ? options->name : "Mod");
 	fprintf(f, "\ncomplete: %s\nsource: ", complete ? "true" : "false");
 	yaml_quoted(f, options->source);
+	/* The Mods tab imports the mod again with the same folders. */
+	if (options->authoring && options->authoring[0]) {
+		fputs("\nauthoring: ", f);
+		yaml_quoted(f, options->authoring);
+	}
 	fprintf(f, "\nimported: \"%04d-%02d-%02d\"\n", date.year, date.month, date.day);
 	return fclose(f) == 0;
 }
@@ -982,6 +991,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_MISSIONS, 0);
 		if (!missions(ctx))
 			return XWA_MOD_IMPORT_STOPPED;
+		ImportVrHands_Run(ctx);
 	}
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_SKYBOXES, 0);

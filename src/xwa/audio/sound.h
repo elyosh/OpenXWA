@@ -26,36 +26,38 @@ typedef struct IDirectSound3DBuffer IDirectSound3DBuffer;
  * wider on 64-bit hosts. It is never serialized, so the exact layout is free. */
 #pragma pack(push, 1)
 typedef struct SoundEffectDef {
-	char                  name[64];
-	char                  fileName[128];
-	IDirectSoundBuffer*   buffer;
+	char name[64];
+	char fileName[128];
+	IDirectSoundBuffer* buffer;
 	IDirectSound3DBuffer* buffer3D;
-	uint8_t               currentPriority;
+	uint8_t currentPriority;
 } SoundEffectDef;
 #pragma pack(pop)
 
 typedef struct IDirectSound3DBufferVtbl {
-	void* QueryInterface;     /* 0 */
-	void* AddRef;             /* 1 */
-	int (XWA_STDCALL* Release)(IDirectSound3DBuffer* self); /* 2 */
-	void* GetAllParameters;   /* 3 */
-	void* GetConeAngles;      /* 4 */
-	void* GetConeOrientation; /* 5 */
-	void* GetConeOutsideVolume; /* 6 */
-	int (XWA_STDCALL* GetMaxDistance)(IDirectSound3DBuffer* self, float* distance); /* 7 */
-	int (XWA_STDCALL* GetMinDistance)(IDirectSound3DBuffer* self, float* distance); /* 8 */
-	void* GetMode;            /* 9 */
-	void* GetPosition;        /* 10 */
-	void* GetVelocity;        /* 11 */
-	void* SetAllParameters;   /* 12 */
-	void* SetConeAngles;      /* 13 */
-	void* SetConeOrientation; /* 14 */
-	void* SetConeOutsideVolume; /* 15 */
-	int (XWA_STDCALL* SetMaxDistance)(IDirectSound3DBuffer* self, float dist, uint32_t apply); /* 16 */
-	int (XWA_STDCALL* SetMinDistance)(IDirectSound3DBuffer* self, float dist, uint32_t apply); /* 17 */
-	int (XWA_STDCALL* SetMode)(IDirectSound3DBuffer* self, uint32_t mode, uint32_t apply);     /* 18 */
-	int (XWA_STDCALL* SetPosition)(IDirectSound3DBuffer* self, float x, float y, float z, uint32_t apply); /* 19 */
-	int (XWA_STDCALL* SetVelocity)(IDirectSound3DBuffer* self, float x, float y, float z, uint32_t apply); /* 20 */
+	void* QueryInterface;                                                                     /* 0 */
+	void* AddRef;                                                                             /* 1 */
+	int(XWA_STDCALL* Release)(IDirectSound3DBuffer* self);                                    /* 2 */
+	void* GetAllParameters;                                                                   /* 3 */
+	void* GetConeAngles;                                                                      /* 4 */
+	void* GetConeOrientation;                                                                 /* 5 */
+	void* GetConeOutsideVolume;                                                               /* 6 */
+	int(XWA_STDCALL* GetMaxDistance)(IDirectSound3DBuffer* self, float* distance);            /* 7 */
+	int(XWA_STDCALL* GetMinDistance)(IDirectSound3DBuffer* self, float* distance);            /* 8 */
+	int(XWA_STDCALL* GetMode)(IDirectSound3DBuffer* self, uint32_t* mode);                    /* 9 */
+	int(XWA_STDCALL* GetPosition)(IDirectSound3DBuffer* self, DS3DVector* position);          /* 10 */
+	void* GetVelocity;                                                                        /* 11 */
+	void* SetAllParameters;                                                                   /* 12 */
+	void* SetConeAngles;                                                                      /* 13 */
+	void* SetConeOrientation;                                                                 /* 14 */
+	void* SetConeOutsideVolume;                                                               /* 15 */
+	int(XWA_STDCALL* SetMaxDistance)(IDirectSound3DBuffer* self, float dist, uint32_t apply); /* 16 */
+	int(XWA_STDCALL* SetMinDistance)(IDirectSound3DBuffer* self, float dist, uint32_t apply); /* 17 */
+	int(XWA_STDCALL* SetMode)(IDirectSound3DBuffer* self, uint32_t mode, uint32_t apply);     /* 18 */
+	int(XWA_STDCALL* SetPosition)(IDirectSound3DBuffer* self, float x, float y, float z,
+								  uint32_t apply); /* 19 */
+	int(XWA_STDCALL* SetVelocity)(IDirectSound3DBuffer* self, float x, float y, float z,
+								  uint32_t apply); /* 20 */
 } IDirectSound3DBufferVtbl;
 
 struct IDirectSound3DBuffer {
@@ -64,25 +66,27 @@ struct IDirectSound3DBuffer {
 
 typedef struct IDirectSound3DListener IDirectSound3DListener;
 typedef struct IDirectSound3DListenerVtbl {
-	void* QueryInterface;    /* 0 */
-	void* AddRef;            /* 1 */
-	int (XWA_STDCALL* Release)(IDirectSound3DListener* self); /* 2 */
-	void* GetAllParameters;  /* 3 */
-	void* GetDistanceFactor; /* 4 */
-	void* GetDopplerFactor;  /* 5 */
-	void* GetOrientation;    /* 6 */
-	void* GetPosition;       /* 7 */
-	void* GetRolloffFactor;  /* 8 */
-	void* GetVelocity;       /* 9 */
-	void* SetAllParameters;  /* 10 */
-	int (XWA_STDCALL* SetDistanceFactor)(IDirectSound3DListener* self, float value, uint32_t apply); /* 11 */
-	int (XWA_STDCALL* SetDopplerFactor)(IDirectSound3DListener* self, float value, uint32_t apply);  /* 12 */
-	int (XWA_STDCALL* SetOrientation)(IDirectSound3DListener* self, float fx, float fy, float fz, float tx,
-									  float ty, float tz, uint32_t apply); /* 13 */
-	int (XWA_STDCALL* SetPosition)(IDirectSound3DListener* self, float x, float y, float z, uint32_t apply); /* 14 */
-	void* SetRolloffFactor; /* 15 */
-	int (XWA_STDCALL* SetVelocity)(IDirectSound3DListener* self, float x, float y, float z, uint32_t apply); /* 16 */
-	int (XWA_STDCALL* CommitDeferredSettings)(IDirectSound3DListener* self); /* 17 */
+	void* QueryInterface;                                                                           /* 0 */
+	void* AddRef;                                                                                   /* 1 */
+	int(XWA_STDCALL* Release)(IDirectSound3DListener* self);                                        /* 2 */
+	void* GetAllParameters;                                                                         /* 3 */
+	void* GetDistanceFactor;                                                                        /* 4 */
+	void* GetDopplerFactor;                                                                         /* 5 */
+	void* GetOrientation;                                                                           /* 6 */
+	int(XWA_STDCALL* GetPosition)(IDirectSound3DListener* self, DS3DVector* position);              /* 7 */
+	void* GetRolloffFactor;                                                                         /* 8 */
+	void* GetVelocity;                                                                              /* 9 */
+	void* SetAllParameters;                                                                         /* 10 */
+	int(XWA_STDCALL* SetDistanceFactor)(IDirectSound3DListener* self, float value, uint32_t apply); /* 11 */
+	int(XWA_STDCALL* SetDopplerFactor)(IDirectSound3DListener* self, float value, uint32_t apply);  /* 12 */
+	int(XWA_STDCALL* SetOrientation)(IDirectSound3DListener* self, float fx, float fy, float fz, float tx,
+									 float ty, float tz, uint32_t apply); /* 13 */
+	int(XWA_STDCALL* SetPosition)(IDirectSound3DListener* self, float x, float y, float z,
+								  uint32_t apply); /* 14 */
+	void* SetRolloffFactor;                        /* 15 */
+	int(XWA_STDCALL* SetVelocity)(IDirectSound3DListener* self, float x, float y, float z,
+								  uint32_t apply);                          /* 16 */
+	int(XWA_STDCALL* CommitDeferredSettings)(IDirectSound3DListener* self); /* 17 */
 } IDirectSound3DListenerVtbl;
 
 struct IDirectSound3DListener {
@@ -91,28 +95,28 @@ struct IDirectSound3DListener {
 
 #pragma pack(push, 1)
 typedef struct ActiveSoundInstance {
-	int                   soundId;
-	int                   sequence;
-	int                   priority;
-	uint32_t              sourceObjOrPointRef;
-	uint16_t              sourceCreationIdx;
-	IDirectSoundBuffer*   buffer;
+	int soundId;
+	int sequence;
+	int priority;
+	uint32_t sourceObjOrPointRef;
+	uint16_t sourceCreationIdx;
+	IDirectSoundBuffer* buffer;
 	IDirectSound3DBuffer* buffer3D;
 } ActiveSoundInstance;
 
 typedef struct SoundQueueEntry {
-	int      soundId;
-	int      volume;
-	int      pan;
-	int      loop;
-	int      param2;
-	int      priority;
-	int      pitch;
+	int soundId;
+	int volume;
+	int pan;
+	int loop;
+	int param2;
+	int priority;
+	int pitch;
 	uint32_t sourceObjOrPointRef;
-	int      worldX;
-	int      worldY;
-	int      worldZ;
-	uint8_t  hasWorldPosition;
+	int worldX;
+	int worldY;
+	int worldZ;
+	uint8_t hasWorldPosition;
 } SoundQueueEntry;
 #pragma pack(pop)
 
@@ -135,41 +139,41 @@ typedef char sound_queue_entry_priority_offset[(offsetof(SoundQueueEntry, priori
 #endif
 
 extern int g_sfxIds[XWA_SFX_SLOT_COUNT];
-extern const int           g_directSoundVolumeMillibelTable[128];
-extern void*               g_directSound;
-extern int                 g_maxActiveSounds;
-extern int                 g_activeSoundCount;
-extern int                 g_nextSoundInstanceSeq;
-extern int                 g_soundQueueCount;
-extern uint8_t             g_sound3DEnabled;
+extern const int g_directSoundVolumeMillibelTable[128];
+extern void* g_directSound;
+extern int g_maxActiveSounds;
+extern int g_activeSoundCount;
+extern int g_nextSoundInstanceSeq;
+extern int g_soundQueueCount;
+extern uint8_t g_sound3DEnabled;
 extern ActiveSoundInstance g_activeSoundInstances[32];
-extern SoundQueueEntry     g_soundQueue[5];
-extern int                 g_soundCount;
+extern SoundQueueEntry g_soundQueue[5];
+extern int g_soundCount;
 extern SoundEffectDef g_soundDefs[XWA_SOUND_EFFECT_COUNT];
-extern IDirectSoundBuffer*     g_primarySoundBuffer;
+extern IDirectSoundBuffer* g_primarySoundBuffer;
 extern IDirectSound3DListener* g_sound3DListener;
-extern uint8_t                 g_soundHardware3DBuffersAvailable;
-extern uint8_t                 g_flightConfAudio22k;
-extern int                     g_sound3DListenerLastGameTime;
+extern uint8_t g_soundHardware3DBuffersAvailable;
+extern uint8_t g_flightConfAudio22k;
+extern int g_sound3DListenerLastGameTime;
 
 uint8_t Sound_Init_Sound_Engine(void* hwnd);
 uint8_t Sound_Shutdown_Sound_Engine(void);
 uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DFlags,
-							uint16_t minDistanceOrRolloff);
+						   uint16_t minDistanceOrRolloff);
 uint8_t Sound_LoadEffect(const char* fileName, const char* name, uint16_t minDistanceOrRolloff);
 void Sound_UnloadAllEffects(void);
-int  Sound_CountPlayingInstances(int soundId);
-int  Sound_FindEffectByName(const char* name);
-int  Sound_QueueEffect(int soundId, int param2, int loop, int priority, int volume, int pan, int pitch,
-					   unsigned int sourceObjOrPointRef);
+int Sound_CountPlayingInstances(int soundId);
+int Sound_FindEffectByName(const char* name);
+int Sound_QueueEffect(int soundId, int param2, int loop, int priority, int volume, int pan, int pitch,
+					  unsigned int sourceObjOrPointRef);
 uint8_t Sound_QueueEffectAtWorldPosition(int soundId, int param2, int loop, int priority, int volume, int pan,
-									 int pitch, int worldX, int worldY, int worldZ);
+										 int pitch, int worldX, int worldY, int worldZ);
 uint8_t Sound_PlayEffectNow(int soundId, int param2, int loop, int priority, int volume, int pan, int pitch,
-							unsigned int sourceObjOrPointRef, uint8_t hasWorldPosition, int worldX, int worldY,
-							int worldZ);
+							unsigned int sourceObjOrPointRef, uint8_t hasWorldPosition, int worldX,
+							int worldY, int worldZ);
 uint8_t Sound_DuplicateOrCreateHardwareBuffer(IDirectSoundBuffer* sourceBuffer,
 											  IDirectSoundBuffer** outBuffer);
-int  Sound_SetEffectCurrentPriority(int soundId, int priority);
+int Sound_SetEffectCurrentPriority(int soundId, int priority);
 uint8_t Sound_SetLatestInstanceFrequency(int soundId, int frequency);
 uint8_t Sound_SetLatestInstancePan(int soundId, int pan);
 uint8_t Sound_SetLatestInstanceVolume(int soundId, int volume);
@@ -177,7 +181,7 @@ uint8_t Sound_StopOldestInstance(int soundId);
 uint8_t Sound_FlushQueuedEffects(void);
 void Sound_Update3DListenerAndSources(void);
 uint8_t Sound_StopAllInstances(void);
-int  DirectSound_VolumeToMillibels(int volume0To127);
+int DirectSound_VolumeToMillibels(int volume0To127);
 int DirectSound_ReloadWaveBuffer(IDirectSoundBuffer* buffer, char* fileName);
 
 #ifdef __cplusplus

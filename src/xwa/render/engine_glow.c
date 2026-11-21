@@ -644,7 +644,16 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamInd
 			patch->effectParam = -1;
 			patch->baseScale = 1.0f;
 
+#ifdef XWA_MODERN
+			/* Craft_DamageComponent passes an object index, not a weapon type.
+			   The original then reads whatever data is at that offset. The
+			   port uses 0, which gives the smallest marks. */
+			damage = effectParamIndex >= OBJ_LaserRebel && effectParamIndex <= OBJ_NoAsset_307
+						 ? (unsigned int)g_projectileDamageByType[effectParamIndex - OBJ_LaserRebel]
+						 : 0u;
+#else
 			damage = (unsigned int)g_projectileDamageByType[effectParamIndex - OBJ_LaserRebel];
+#endif
 			if (damage < 1000u) {
 				frame = (uint16_t)(GameRand2() & 3u);
 				if (frame == 3u) {

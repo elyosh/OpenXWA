@@ -14,9 +14,43 @@ static struct {
 	int dirty;
 } g_modernVideoOptions;
 
+void XwaModernSurroundOptions_Default(XwaModernSurroundOptions* out) {
+	*out = (XwaModernSurroundOptions) {
+		.enabled = 0,
+		.screen_width_mm = 597.0f,
+		.screen_height_mm = 336.0f,
+		.bezel_mm = 8.0f,
+		.distance_mm = 700.0f,
+		.side_angle_deg = 45.0f,
+	};
+}
+
+static int surround_in_range(float value, float min, float max) {
+	return isfinite(value) && value >= min && value <= max;
+}
+
+int XwaModernSurroundOptions_Valid(const XwaModernSurroundOptions* options) {
+	return options &&
+		   surround_in_range(options->screen_width_mm, XWA_MODERN_SURROUND_SIZE_MIN_MM,
+							 XWA_MODERN_SURROUND_SIZE_MAX_MM) &&
+		   surround_in_range(options->screen_height_mm, XWA_MODERN_SURROUND_SIZE_MIN_MM,
+							 XWA_MODERN_SURROUND_SIZE_MAX_MM) &&
+		   surround_in_range(options->bezel_mm, 0.0f, XWA_MODERN_SURROUND_BEZEL_MAX_MM) &&
+		   surround_in_range(options->distance_mm, XWA_MODERN_SURROUND_DISTANCE_MIN_MM,
+							 XWA_MODERN_SURROUND_DISTANCE_MAX_MM) &&
+		   surround_in_range(options->side_angle_deg, 0.0f, XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG);
+}
+
 static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 	return options && options->window_mode >= XWA_MODERN_WINDOW_MODE_WINDOWED &&
-		   options->window_mode <= XWA_MODERN_WINDOW_MODE_FULLSCREEN &&
+		   options->window_mode <= XWA_MODERN_WINDOW_MODE_SPAN &&
+		   XwaModernSurroundOptions_Valid(&options->surround) && options->vr_mode >= XWA_MODERN_VR_OFF &&
+		   options->vr_mode <= XWA_MODERN_VR_ON &&
+		   surround_in_range(options->vr_render_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
+		   surround_in_range(options->vr_world_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
+		   surround_in_range(options->vr_panel_scale, XWA_MODERN_VR_PANEL_SCALE_MIN,
+							 XWA_MODERN_VR_PANEL_SCALE_MAX) &&
+		   surround_in_range(options->vr_screen_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
 		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
@@ -42,7 +76,16 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 		   lhs->msaa == rhs->msaa && lhs->motion_blur_quality == rhs->motion_blur_quality &&
 		   lhs->motion_blur_amount == rhs->motion_blur_amount && lhs->hdr_output == rhs->hdr_output &&
 		   lhs->sdr_gamma == rhs->sdr_gamma && lhs->paper_white == rhs->paper_white &&
-		   lhs->hud_scale == rhs->hud_scale && lhs->smooth_menu_fonts == rhs->smooth_menu_fonts;
+		   lhs->hud_scale == rhs->hud_scale && lhs->surround.enabled == rhs->surround.enabled &&
+		   lhs->surround.screen_width_mm == rhs->surround.screen_width_mm &&
+		   lhs->surround.screen_height_mm == rhs->surround.screen_height_mm &&
+		   lhs->surround.bezel_mm == rhs->surround.bezel_mm &&
+		   lhs->surround.distance_mm == rhs->surround.distance_mm &&
+		   lhs->surround.side_angle_deg == rhs->surround.side_angle_deg && lhs->vr_mode == rhs->vr_mode &&
+		   lhs->vr_render_scale == rhs->vr_render_scale && lhs->vr_world_scale == rhs->vr_world_scale &&
+		   lhs->vr_mirror == rhs->vr_mirror && lhs->vr_panel_scale == rhs->vr_panel_scale &&
+		   lhs->vr_screen_scale == rhs->vr_screen_scale &&
+		   lhs->smooth_menu_fonts == rhs->smooth_menu_fonts;
 }
 
 void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaModernVideoOptionsApplyFn apply,
@@ -55,6 +98,8 @@ void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaMo
 
 	g_modernVideoOptions.options = *options;
 	g_modernVideoOptions.options.hdr_output = options->hdr_output != 0;
+	g_modernVideoOptions.options.surround.enabled = options->surround.enabled != 0;
+	g_modernVideoOptions.options.vr_mirror = options->vr_mirror != 0;
 	g_modernVideoOptions.apply = apply;
 	g_modernVideoOptions.persist = persist;
 	g_modernVideoOptions.configured = 1;
@@ -74,6 +119,8 @@ int XwaModernVideoOptions_Set(const XwaModernVideoOptions* options) {
 	}
 	normalized = *options;
 	normalized.hdr_output = normalized.hdr_output != 0;
+	normalized.surround.enabled = normalized.surround.enabled != 0;
+	normalized.vr_mirror = normalized.vr_mirror != 0;
 	if (XwaModernVideoOptions_AreEqual(&normalized, &g_modernVideoOptions.options)) {
 		return 1;
 	}

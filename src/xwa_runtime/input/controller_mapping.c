@@ -5,6 +5,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/frontend/flight_loading.h"
 #include "xwa_runtime/input/capture.h"
+#include "xwa_runtime/input/vr_stick.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include <math.h>
@@ -19,6 +20,9 @@ typedef struct ControllerInstance {
 	int model;
 	bool down[XWA_CONTROLLER_BINDING_CAP], armed[XWA_CONTROLLER_BINDING_CAP],
 		dispatched[XWA_CONTROLLER_BINDING_CAP];
+	/* The binding's source was turned off by the source mask and hasn't been
+	 * released since. */
+	bool masked[XWA_CONTROLLER_BINDING_CAP];
 	bool primed;
 } ControllerInstance;
 
@@ -32,6 +36,18 @@ static struct {
 	bool resume;
 	int axes[3];
 	uint16_t holds[XWA_INPUT_ACTION_COUNT], throttle;
+	/* Presses of host actions that the host hasn't taken yet, and what
+	 * XwaControllerMapping_UpdateHostActions remembers about each device: its
+	 * id, and which of its bindings were down. */
+	bool host_pressed[XWA_INPUT_ACTION_COUNT];
+	/* Changes each time the holds are cleared (XwaControllerMapping_PressAction). */
+	uint32_t hold_epoch;
+	uint32_t host_id[AERON_CONTROLLER_MAX];
+	bool host_down[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
+	bool host_masked[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
+	/* XwaControllerMapping_SetSourceMask, for each VR hand. */
+	uint32_t mask_buttons[2], mask_axes[2];
+	uint64_t host_frame;
 	uint32_t throttle_instance, generation;
 	uint32_t rumble_instance;
 	bool rumble_changed, rumble_enabled;
@@ -75,6 +91,10 @@ static void XwaControllerMapping_DispatchAction(XwaInputAction action) {
  * command. */
 static void XwaControllerMapping_Dispatch(XwaInputAction action, bool pressed) {
 	const XwaInputActionKind kind = XwaInputActions_Kind(action);
+	/* The host reads the buttons of its actions itself, in flight and
+	 * outside it (XwaControllerMapping_UpdateHostActions). */
+	if (kind == XWA_INPUT_ACTION_KIND_HOST)
+		return;
 	if (kind == XWA_INPUT_ACTION_KIND_HELD || kind == XWA_INPUT_ACTION_KIND_LOOK ||
 		kind == XWA_INPUT_ACTION_KIND_ROLL) {
 		if (!pressed) {
@@ -179,6 +199,8 @@ void XwaControllerMapping_Suspend(void) {
 	/* Drop the entire route without dispatching synthetic gameplay releases. */
 	memset(g_controller.instances, 0, sizeof g_controller.instances);
 	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	++g_controller.hold_epoch;
+	memset(g_controller.host_pressed, 0, sizeof g_controller.host_pressed);
 	memset(g_controller.axes, 0, sizeof g_controller.axes);
 	g_controller.read = g_controller.write = 0;
 	g_controller.resume = false;
@@ -221,13 +243,38 @@ static void LogUnavailableControls(const XwaControllerModel* model, const AeronC
 					  missing, device->controls_truncated ? ", hardware controls truncated" : "");
 }
 
+void XwaControllerMapping_SetSourceMask(int hand, uint32_t buttons, uint32_t axes) {
+	if (hand < 0 || hand > 1)
+		return;
+	g_controller.mask_buttons[hand] = buttons;
+	g_controller.mask_axes[hand] = axes;
+}
+
+/* Reads a binding's source through the source mask. `masked` remembers that
+ * the mask turned the source off: it then stays off until it is released. */
+static bool SourceDown(const AeronControllerSnapshot* device, const AeronControllerDigitalSource* source,
+					   bool was_down, bool* masked) {
+	const bool down = Aeron_ControllerDigitalSourceDown(device, source, was_down || *masked);
+	if (device->kind == AERON_CONTROLLER_KIND_VR_HAND) {
+		const int hand = device->instance_id == AERON_VR_HAND_INSTANCE_RIGHT;
+		const uint32_t bits = source->kind == AERON_CONTROLLER_DIGITAL_BUTTON
+								  ? g_controller.mask_buttons[hand]
+								  : g_controller.mask_axes[hand];
+		if (bits & (1u << source->index))
+			*masked = true;
+	}
+	if (!down)
+		*masked = false;
+	return down && !*masked;
+}
+
 static void SampleDigital(ControllerInstance* state, const AeronControllerSnapshot* device) {
 	const XwaControllerModel* model = &g_controller.options.models[state->model];
 	const XwaControllerProfile* profile = &model->profile;
 	if (!state->primed)
 		LogUnavailableControls(model, device);
 	for (size_t i = 0; i < profile->binding_count; ++i) {
-		bool down = Aeron_ControllerDigitalSourceDown(device, &profile->bindings[i].source, state->down[i]);
+		bool down = SourceDown(device, &profile->bindings[i].source, state->down[i], &state->masked[i]);
 		if (!state->primed)
 			state->armed[i] = !down;
 		else if (!down) {
@@ -249,7 +296,9 @@ uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind 
 	const uint32_t end_tolerance = (uint32_t)ceilf(0.5f * UINT16_MAX / 100.0f);
 	const uint32_t range = UINT16_MAX - 2 * end_tolerance;
 	uint32_t position = (int32_t)raw + 32768;
-	if (kind == AERON_CONTROLLER_KIND_GAMEPAD && source >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER)
+	/* A trigger goes from 0 to the full value, not from one end to the other. */
+	if ((kind == AERON_CONTROLLER_KIND_GAMEPAD && source >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER) ||
+		(kind == AERON_CONTROLLER_KIND_VR_HAND && source <= AERON_VR_HAND_AXIS_SQUEEZE))
 		position = ((uint32_t)(raw < 0 ? 0 : raw) * UINT16_MAX + 16383u) / 32767u;
 	if (invert)
 		position = UINT16_MAX - position;
@@ -320,18 +369,30 @@ static uint32_t XwaControllerMapping_ModelRumbleInstance(size_t model, const Aer
 	return best;
 }
 
-/* The device that rumbles: one of the first model that binds pitch, then yaw,
- * then of the first gamepad model. */
+/* The device that rumbles: the hand that last held the virtual stick, then
+ * one of the first model that binds pitch, then yaw, then of the first
+ * gamepad or VR hand model. */
 static uint32_t XwaControllerMapping_FindRumbleInstance(const AeronInputSnapshot* input) {
 	static const XwaInputAxis owners[] = { XWA_INPUT_AXIS_PITCH, XWA_INPUT_AXIS_YAW };
 	uint32_t instance;
+	/* The virtual stick isn't a binding, so no model binds pitch for it. */
+	const int stick_hand = XwaVrStick_RumbleHand();
+	if (stick_hand >= 0) {
+		instance = stick_hand ? AERON_VR_HAND_INSTANCE_RIGHT : AERON_VR_HAND_INSTANCE_LEFT;
+		for (int j = 0; j < AERON_CONTROLLER_MAX; ++j) {
+			const AeronControllerSnapshot* d = &input->controllers[j];
+			if (d->connected && d->has_rumble && d->kind == AERON_CONTROLLER_KIND_VR_HAND &&
+				d->instance_id == instance)
+				return instance;
+		}
+	}
 	for (size_t i = 0; i < sizeof owners / sizeof owners[0]; ++i)
 		for (size_t model = 0; model < g_controller.options.count; ++model)
 			if (g_controller.options.models[model].profile.mapping.axes[owners[i]].source >= 0 &&
 				(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
 				return instance;
 	for (size_t model = 0; model < g_controller.options.count; ++model)
-		if (g_controller.options.models[model].kind == AERON_CONTROLLER_KIND_GAMEPAD &&
+		if (g_controller.options.models[model].kind != AERON_CONTROLLER_KIND_JOYSTICK &&
 			(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
 			return instance;
 	return 0;
@@ -450,6 +511,55 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side) {
 										  : 0;
 }
 
+void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input, int in_flight) {
+	if (!input || input->frame_id == g_controller.host_frame)
+		return;
+	g_controller.host_frame = input->frame_id;
+	/* The same rules as the flight bindings: nothing is read while the window
+	 * has no focus, or while the options window or the debug UI has the input.
+	 * A button that is already down when reading starts again doesn't count as
+	 * a press. */
+	if (!input->has_focus || XwaInput_IsCaptured() || Aeron_DebugUiVisible()) {
+		memset(g_controller.host_id, 0, sizeof g_controller.host_id);
+		return;
+	}
+	for (int slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
+		const AeronControllerSnapshot* device = &input->controllers[slot];
+		const int model = device->connected ? XwaControllerMapping_DeviceModel(device) : -1;
+		if (model < 0) {
+			g_controller.host_id[slot] = 0;
+			continue;
+		}
+		const XwaControllerProfile* profile = &g_controller.options.models[model].profile;
+		const bool known = g_controller.host_id[slot] == device->instance_id;
+		for (size_t i = 0; i < profile->binding_count; ++i) {
+			const XwaInputAction action = profile->bindings[i].action;
+			const bool host = XwaInputActions_Kind(action) == XWA_INPUT_ACTION_KIND_HOST;
+			/* In flight, the flight bindings open the options. The button is
+			 * followed there too, so that one held when the flight ends
+			 * isn't a press in the menus. */
+			if (!host && action != XWA_INPUT_ACTION_OPTIONS_MENU)
+				continue;
+			const bool was_down = known && g_controller.host_down[slot][i];
+			if (!known)
+				g_controller.host_masked[slot][i] = false;
+			const bool down = SourceDown(device, &profile->bindings[i].source, was_down,
+										 &g_controller.host_masked[slot][i]);
+			if (known && down && !was_down && (host || !in_flight))
+				g_controller.host_pressed[action] = true;
+			g_controller.host_down[slot][i] = down;
+		}
+		g_controller.host_id[slot] = device->instance_id;
+	}
+}
+
+int XwaControllerMapping_TakeHostAction(XwaInputAction action) {
+	if ((unsigned)action >= XWA_INPUT_ACTION_COUNT || !g_controller.host_pressed[action])
+		return 0;
+	g_controller.host_pressed[action] = false;
+	return 1;
+}
+
 int XwaControllerMapping_TakeResume(void) {
 	const bool resume = g_controller.resume;
 	g_controller.resume = false;
@@ -460,6 +570,7 @@ void XwaControllerMapping_ReleaseCommands(void) {
 	g_controller.read = g_controller.write = 0;
 	g_controller.resume = false;
 	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	++g_controller.hold_epoch;
 	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
 		ControllerInstance* state = &g_controller.instances[i];
 		for (size_t j = 0; j < XWA_CONTROLLER_BINDING_CAP; ++j) {
@@ -467,6 +578,23 @@ void XwaControllerMapping_ReleaseCommands(void) {
 			state->armed[j] = !state->down[j];
 		}
 	}
+}
+
+uint32_t XwaControllerMapping_PressAction(XwaInputAction action) {
+	if (XwaInputActions_KeyboardBindable(action) && !g_controller.suspended)
+		XwaControllerMapping_Dispatch(action, true);
+	return g_controller.hold_epoch;
+}
+
+void XwaControllerMapping_ReleaseAction(XwaInputAction action, uint32_t press) {
+	if (XwaInputActions_KeyboardBindable(action) && press == g_controller.hold_epoch)
+		XwaControllerMapping_Dispatch(action, false);
+}
+
+void XwaControllerMapping_PressHostAction(XwaInputAction action) {
+	if (XwaInputActions_KeyboardBindable(action) &&
+		XwaInputActions_Kind(action) == XWA_INPUT_ACTION_KIND_HOST && !g_controller.suspended)
+		g_controller.host_pressed[action] = true;
 }
 
 uint32_t XwaControllerMapping_RumbleInstance(void) { return g_controller.rumble_instance; }

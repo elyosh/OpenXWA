@@ -18,13 +18,17 @@
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/frontend/frontend_flight.h"
 #include "xwa/frontend/frontend_input.h"
+#include "xwa/frontend/frontend_mission_session.h"
 #include "xwa/frontend/frontend_resources.h"
+#include "xwa/frontend/mission_setup.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/input/forcefeedback.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/camera/camera_motion.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
@@ -55,6 +59,8 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/flight_config.h"
+#include "xwa_runtime/models/formations.h"
+#include "xwa_runtime/models/hangar_crafts.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mag_pulse.h"
@@ -63,18 +69,20 @@
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/particle_lights.h"
+#include "xwa_runtime/models/projectiles.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/turret_ignore.h"
+#include "xwa_runtime/models/vr_hands.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
-#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
 #include "xwa_runtime/runtime/game_files.h"
 #include "xwa_runtime/runtime/movie_task.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_runtime/text/text_overrides.h"
@@ -104,7 +112,7 @@ static int g_xwaPortHostCursorVisible = -1;
  * 640x480 surfaces, 16:9 for the 1920x1080 flight screen. */
 static AeronDx5Rect XwaPort_Dx5PresentationRect(void* context, int surfaceWidth, int surfaceHeight) {
 	XwaPresentationRect rect =
-		XwaPresentation_AspectFit(surfaceWidth, surfaceHeight, XwaPresentation_Frame());
+		XwaPresentation_AspectFit(surfaceWidth, surfaceHeight, XwaPresentation_Frame2D());
 	(void)context;
 	if (rect.width <= 0 || rect.height <= 0) {
 		rect = XwaPresentation_ClassicSafeFrame();
@@ -187,6 +195,8 @@ int XwaPort_Init(void) {
 	XwaMissionSettings_Init();
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
+	XwaFormations_Init();
+	XwaProjectiles_Init();
 	XwaOriginalFilm_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
@@ -194,9 +204,11 @@ int XwaPort_Init(void) {
 	XwaOptionSection_ReadMod(XwaModernSpeedEffectOptions_Section(), XwaFlightConfig_Root());
 	XwaOptionSection_ReadMod(XwaModernCameraShakeOptions_Section(), XwaFlightConfig_Root());
 	XwaCockpitLights_Init();
+	XwaVrHands_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
 	XwaHangars_Init();
+	XwaHangarCrafts_Init();
 	XwaCraftHud_Init();
 	XwaCraftWeapons_Init();
 	XwaShieldRecharge_Init();
@@ -302,6 +314,26 @@ int XwaPort_ConsumeOptionsWindowCloseRequest(void) {
 void XwaPort_SetOptionsWindowOpen(int open) { g_xwaPortOptionsWindowOpen = open != 0; }
 
 int XwaPort_OptionsWindowOpen(void) { return g_xwaPortOptionsWindowOpen; }
+
+int XwaPort_InNetworkSession(void) {
+	return g_netDirectPlayInterface != NULL ||
+		   g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_CLIENT ||
+		   g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_HOST;
+}
+
+int XwaPort_OptionsWindowPausesGame(void) {
+	return g_xwaPortOptionsWindowOpen && !XwaPort_InNetworkSession();
+}
+
+int XwaPort_InFlight(void) { return XwaFlightTask_IsActive(); }
+
+int XwaPort_HasPilot(void) { return g_pilotData.name[0] != '\0'; }
+
+static int g_xwaPortCockpitLookSuppressed;
+
+void XwaPort_SetCockpitLookSuppressed(int suppressed) { g_xwaPortCockpitLookSuppressed = suppressed != 0; }
+
+int XwaPort_CockpitLookSuppressed(void) { return g_xwaPortCockpitLookSuppressed; }
 
 void XwaPort_SetShortcutsCaptured(int captured) { g_xwaPortShortcutsCaptured = captured != 0; }
 
@@ -529,6 +561,7 @@ void XwaPort_Shutdown(void) {
 	Aeron_SetRelativeMouseMode(0);
 	XwaPort_SetHostCursorVisible(1);
 	XwaModernVideoOptions_Flush();
+	XwaModernAudioOptions_Flush();
 	XwaModernInputOptions_Flush();
 	XwaOptionSection_FlushAll();
 	/* TODO: Run recovered shutdown paths in original-compatible order. */
@@ -536,6 +569,12 @@ void XwaPort_Shutdown(void) {
 		XwaFlightTask_Shutdown();
 	}
 	XwaMovieTask_Shutdown();
+	/* As the original does when it quits (Frontend_SavePersistentState), but
+	   only once a pilot is loaded: before that, config.cfg may not be read
+	   yet, and writing it would lose the player's settings. */
+	if (XwaPort_HasPilot()) {
+		Config_Write();
+	}
 	Pilot_Save(0);
 	XwaFrontendTask_Shutdown();
 	XwaSnapshot_Shutdown();

@@ -5,8 +5,8 @@
 #include "aeron/scene/ui.h"
 #include <stdbool.h>
 
-/* The AeronUi context of the game's own windows, with the font that the
- * mod importer also uses (resources/assets/fonts/menu.{fnt,ktx2}). */
+/* The AeronUi context of the game's own windows, with their font
+ * (resources/assets/fonts/menu.{fnt,ktx2}). */
 typedef struct XwaAppUi {
 	AeronUiContext* context;
 	AeronFontAtlas font;

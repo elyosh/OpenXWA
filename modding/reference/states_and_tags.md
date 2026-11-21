@@ -100,5 +100,5 @@ A control is a part of a cockpit model that the game moves, such as the flight s
 
 ## Material and light tags
 
-Material and light tags have no fixed names. The `surfaces` group of the model settings file names them, and hides the materials and lights with a tag while the craft is disabled or slow. For example, a tag `engine_glow` on the engine materials can hide them when the craft stops. A model can use up to 32 different material and light tags.
+Material and light tags have no fixed names. The `surfaces` group of the model settings file names them. It hides the materials and lights with a tag while the craft is disabled or slow, or turns their light off while the craft is disabled. For example, a tag `engine_glow` on the engine materials can hide them when the craft stops. A model can use up to 32 different material and light tags.
 

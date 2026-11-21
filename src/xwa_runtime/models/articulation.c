@@ -117,12 +117,14 @@ static uint32_t s_mergedCapacity;
 
 /* The group of variant entry `articulation` of variant `variant`, or NULL
    for an entry of another variant or of no variant. */
-static const char* Articulation_VariantGroup(const AeronFlightArticulation* articulation, const char* variant) {
+static const char* Articulation_VariantGroup(const AeronFlightArticulation* articulation,
+											 const char* variant) {
 	const size_t prefix = strlen(ARTICULATION_VARIANT_PREFIX);
 	const size_t length = strlen(variant);
 
 	if (variant[0] == '\0' || strncmp(articulation->group, ARTICULATION_VARIANT_PREFIX, prefix) != 0 ||
-		strncmp(articulation->group + prefix, variant, length) != 0 || articulation->group[prefix + length] != '.') {
+		strncmp(articulation->group + prefix, variant, length) != 0 ||
+		articulation->group[prefix + length] != '.') {
 		return NULL;
 	}
 	return articulation->group + prefix + length + 1;
@@ -145,7 +147,8 @@ static void Articulation_BuildMerged(ArticulationMerged* merged, const XwaOptSyn
 	}
 	if (!hasVariants) {
 		if (variant[0] != '\0') {
-			Aeron_LogWarn("xwa.models", "replacement '%s' has no articulation variant '%s'", synth->key, variant);
+			Aeron_LogWarn("xwa.models", "replacement '%s' has no articulation variant '%s'", synth->key,
+						  variant);
 		}
 		return;
 	}
@@ -159,7 +162,8 @@ static void Articulation_BuildMerged(ArticulationMerged* merged, const XwaOptSyn
 
 		if (group != NULL) {
 			merged->entries[merged->count] = synth->articulations[index];
-			snprintf(merged->entries[merged->count].group, sizeof merged->entries[merged->count].group, "%s", group);
+			snprintf(merged->entries[merged->count].group, sizeof merged->entries[merged->count].group, "%s",
+					 group);
 			++merged->count;
 		}
 	}
@@ -170,7 +174,8 @@ static void Articulation_BuildMerged(ArticulationMerged* merged, const XwaOptSyn
 	for (index = 0; index < synth->articulationCount; ++index) {
 		const AeronFlightArticulation* articulation = &synth->articulations[index];
 
-		if (strncmp(articulation->group, ARTICULATION_VARIANT_PREFIX, strlen(ARTICULATION_VARIANT_PREFIX)) == 0) {
+		if (strncmp(articulation->group, ARTICULATION_VARIANT_PREFIX, strlen(ARTICULATION_VARIANT_PREFIX)) ==
+			0) {
 			continue;
 		}
 		for (other = 0; other < variantCount; ++other) {
@@ -229,7 +234,8 @@ static const ArticulationModel* Articulation_Model(unsigned int objIdx, Articula
 	MemoryHandle handle;
 	const OptimizedPolyObject* optModel;
 	const XwaOptSynthData* synth;
-	const uint16_t objectType = Articulation_Craft(objIdx) != NULL ? (uint16_t)g_objectTable[objIdx].objectType : 0;
+	const uint16_t objectType =
+		Articulation_Craft(objIdx) != NULL ? (uint16_t)g_objectTable[objIdx].objectType : 0;
 	const char* variant;
 
 	handle = objectType != 0 && objectType < OBJ_Count ? g_loadedModels.byObjectType[objectType] : 0;
@@ -429,7 +435,8 @@ static void Articulation_StepGroupToward(const ArticulationModel* model, CraftDa
 	}
 }
 
-static void Articulation_SetGroup(const ArticulationModel* model, CraftData* craft, const char* group, int toAngle) {
+static void Articulation_SetGroup(const ArticulationModel* model, CraftData* craft, const char* group,
+								  int toAngle) {
 	uint32_t index;
 
 	for (index = 0; index < model->articulationCount; ++index) {
@@ -441,14 +448,13 @@ static void Articulation_SetGroup(const ArticulationModel* model, CraftData* cra
 }
 
 /* No hatches in multiplayer. */
-static int Articulation_HatchesActive(void) {
-	return g_flightPlayerCount <= 1;
-}
+static int Articulation_HatchesActive(void) { return g_flightPlayerCount <= 1; }
 
 int XwaArticulation_HasSFoilsOrLandingGear(unsigned int objIdx) {
 	ArticulationModel view;
 
-	return Articulation_Has(Articulation_Model(objIdx, &view), ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR);
+	return Articulation_Has(Articulation_Model(objIdx, &view),
+							ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR);
 }
 
 int XwaArticulation_InitLeavingHangar(unsigned int objIdx) {
@@ -621,8 +627,9 @@ void XwaArticulation_StepSFoils(unsigned int objIdx) {
 		lists = ARTICULATION_SFOILS;
 	} else if (craft->articulationMotion == ARTICULATION_MOTION_LANDING_GEAR) {
 		lists = ARTICULATION_LANDING_GEAR;
-	} else if (craft->sFoilState == 3 && (craft->aiController.maneuverMode == ARTICULATION_INTO_HYPERSPACE_MANEUVER ||
-										  object->playerOwnerIdx != -1)) {
+	} else if (craft->sFoilState == 3 &&
+			   (craft->aiController.maneuverMode == ARTICULATION_INTO_HYPERSPACE_MANEUVER ||
+				object->playerOwnerIdx != -1)) {
 		lists = ARTICULATION_SFOILS;
 	} else {
 		lists = ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR;
@@ -647,8 +654,8 @@ void XwaArticulation_StepSFoils(unsigned int objIdx) {
 	   with the landing-gear texts after Ctrl+L, before the key motion
 	   ends. */
 	if ((craft->sFoilState & 1) != 0 && !moved) {
-		const uint16_t messageId = XwaArticulation_Message(objIdx, (craft->sFoilState & 2) != 0 ? MSG_SFOILS_CLOSED
-																								 : MSG_SFOILS_OPEN);
+		const uint16_t messageId = XwaArticulation_Message(
+			objIdx, (craft->sFoilState & 2) != 0 ? MSG_SFOILS_CLOSED : MSG_SFOILS_OPEN);
 
 		if (object->playerOwnerIdx != -1) {
 			craft->articulationMotion = ARTICULATION_MOTION_BOTH;
@@ -665,7 +672,7 @@ static void Articulation_SetMessage(uint16_t* message, uint16_t value) {
 }
 
 XwaArticulationTriggerResult XwaArticulation_Trigger(unsigned int objIdx, XwaArticulationTrigger trigger,
-													  uint16_t* message) {
+													 uint16_t* message) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
@@ -730,7 +737,7 @@ XwaArticulationTriggerResult XwaArticulation_Trigger(unsigned int objIdx, XwaArt
 	}
 	if (trigger == XWA_ARTICULATION_HYPERSPACE_DEPARTURE) {
 		return Articulation_Setting(model, "sfoils.close_in_hyperspace", 0) != 0 ? XWA_ARTICULATION_PASS
-																				  : XWA_ARTICULATION_SKIP;
+																				 : XWA_ARTICULATION_SKIP;
 	}
 	if (trigger == XWA_ARTICULATION_HYPERSPACE_ARRIVAL) {
 		if (craft->sFoilState == 0) {
@@ -772,7 +779,6 @@ uint16_t XwaArticulation_Message(unsigned int objIdx, uint16_t messageId) {
 			return messageId;
 	}
 }
-
 
 int XwaArticulation_TriggerPasses(unsigned int objIdx, XwaArticulationTrigger trigger, int stockTest) {
 	const XwaArticulationTriggerResult result = XwaArticulation_Trigger(objIdx, trigger, NULL);
@@ -841,7 +847,8 @@ void XwaArticulation_AiOutOfHyperspaceStep(unsigned int objIdx, int maneuverTime
 		Articulation_Setting(model, "sfoils.close_in_hyperspace", 0) == 0) {
 		return;
 	}
-	if (maneuverTimer != 0 && maneuverTimer <= ARTICULATION_OUT_OF_HYPERSPACE_OPEN_TIMER && craft->sFoilState != 0) {
+	if (maneuverTimer != 0 && maneuverTimer <= ARTICULATION_OUT_OF_HYPERSPACE_OPEN_TIMER &&
+		craft->sFoilState != 0) {
 		craft->sFoilState = 1;
 	}
 }
@@ -906,7 +913,8 @@ void XwaArticulation_AiEnterHangarOrder(unsigned int objIdx) {
 	for (follower = g_activeRegionObjectSlotStart; follower < g_activeRegionCraftObjectSlotEnd; ++follower) {
 		CraftData* craft = Articulation_Craft(follower);
 
-		if (craft != NULL && craft->leader_obj_idx == (int)objIdx && XwaArticulation_HasSFoilsOrLandingGear(follower)) {
+		if (craft != NULL && craft->leader_obj_idx == (int)objIdx &&
+			XwaArticulation_HasSFoilsOrLandingGear(follower)) {
 			craft->sFoilState = 3;
 		}
 	}
@@ -968,7 +976,8 @@ static void Articulation_StepCrewEntry(uint8_t* byte, const AeronFlightArticulat
 static int Articulation_IsCrew(const AeronFlightArticulation* articulation) {
 	return strcmp(articulation->group, "crew") == 0 &&
 		   (articulation->behavior[0] == '\0' || strcmp(articulation->behavior, "swing") == 0 ||
-			strcmp(articulation->behavior, "random") == 0 || strcmp(articulation->behavior, "random_pause") == 0);
+			strcmp(articulation->behavior, "random") == 0 ||
+			strcmp(articulation->behavior, "random_pause") == 0);
 }
 
 int XwaArticulation_AnimateCrew(unsigned int objIdx, int resetToNeutral) {
@@ -1332,7 +1341,8 @@ static void Articulation_CarriedGroup(const ArticulationModel* model, unsigned i
 	length = strlen(group);
 	for (cursor = (const unsigned char*)(name != NULL ? name : ""); *cursor != '\0' && length + 4 < size;
 		 ++cursor) {
-		const unsigned char c = *cursor >= 'A' && *cursor <= 'Z' ? (unsigned char)(*cursor - 'A' + 'a') : *cursor;
+		const unsigned char c =
+			*cursor >= 'A' && *cursor <= 'Z' ? (unsigned char)(*cursor - 'A' + 'a') : *cursor;
 
 		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
 			group[length++] = (char)c;
@@ -1449,7 +1459,8 @@ static void Articulation_StepHangarDoors(unsigned int objIdx, HangarDoorCraft* l
 		return;
 	}
 	object = &g_objectTable[objIdx];
-	if (object->genusId != GENUS_Starship && object->genusId != GENUS_Platform && object->genusId != GENUS_Freighter) {
+	if (object->genusId != GENUS_Starship && object->genusId != GENUS_Platform &&
+		object->genusId != GENUS_Freighter) {
 		return;
 	}
 	model = Articulation_Model(objIdx, &view);
@@ -1583,7 +1594,8 @@ static int Articulation_ReadFlightGroup(const AeronConfigNode* entry, Articulati
 				return 0;
 			}
 			for (cursor = variant; *cursor != '\0'; ++cursor) {
-				if (!((*cursor >= 'a' && *cursor <= 'z') || (*cursor >= '0' && *cursor <= '9') || *cursor == '_')) {
+				if (!((*cursor >= 'a' && *cursor <= 'z') || (*cursor >= '0' && *cursor <= '9') ||
+					  *cursor == '_')) {
 					*error = "'variant' has a character outside [a-z0-9_]";
 					return 0;
 				}
@@ -1615,8 +1627,8 @@ static int Articulation_ReadFlightGroup(const AeronConfigNode* entry, Articulati
 	return 1;
 }
 
-void XwaArticulation_LoadMission(const char* missionPath, const struct XwaFlightGroup* flightGroups, size_t stride,
-								 int count) {
+void XwaArticulation_LoadMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
+								 size_t stride, int count) {
 	char path[300];
 	AeronConfigFile* config = NULL;
 	const AeronConfigNode* section;
@@ -1665,7 +1677,8 @@ void XwaArticulation_InitMissionStart(unsigned int objIdx) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
-	const unsigned int fgIdx = craft != NULL ? g_objectTable[objIdx].flightGroupIdx : ARTICULATION_FLIGHT_GROUPS;
+	const unsigned int fgIdx =
+		craft != NULL ? g_objectTable[objIdx].flightGroupIdx : ARTICULATION_FLIGHT_GROUPS;
 
 	/* The start lines set the meshes at their angle;
 	   sFoilState stays as it is. */

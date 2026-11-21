@@ -1,7 +1,6 @@
 # Shared helpers for the macOS packaging scripts. Sourced by
 # build-package.sh and sign-package.sh after they define the globals used
-# here: application, importer (the mod importer's bundle, left out of the DMG
-# when it doesn't exist), artifact_dir, dmg, dmg_extras, dmg_volume_name,
+# here: application, artifact_dir, dmg, dmg_extras, dmg_volume_name,
 # sign_identity, notary_profile, notary_apple_id, notary_team_id,
 # notary_password, notary_key, notary_key_id, notary_issuer, work_root, and
 # optionally dsym_bundle (a debug-symbol bundle packaged beside the
@@ -84,9 +83,6 @@ create_dmg() {
     rm -rf "${staging}" "${dmg}"
     mkdir -p "${staging}" "${artifact_dir}"
     ditto "${application}" "${staging}/OpenXWA.app"
-    if [[ -d "${importer}" ]]; then
-        ditto "${importer}" "${staging}/OpenXWA Mod Importer.app"
-    fi
     ln -s /Applications "${staging}/Applications"
 
     if [[ -n "${dsym_bundle}" ]]; then

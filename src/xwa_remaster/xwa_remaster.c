@@ -17,11 +17,14 @@
 #include "xwa_remaster/xwa_remaster.h"
 
 #include "aeron/aeron.h"
+#include "aeron/asset/opt_model.h"
 #include "aeron/debug.h"
 #include "aeron/image.h"
 #include "aeron/scene/blend_ramp.h"
+#include "aeron/scene/view_rig.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/captured_lighting.h"
+#include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/cutscene.h"
 #include "xwa_remaster/debug_tools.h"
 #include "xwa_remaster/env_capture.h"
@@ -29,8 +32,12 @@
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/frontend.h"
 #include "xwa_remaster/hud.h"
+#include "xwa_remaster/menu_beam.h"
+#include "xwa_remaster/menu_hands.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
+#include "xwa_remaster/vr_hands.h"
+#include "xwa_remaster/vr_keyboard.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
@@ -57,6 +64,9 @@ typedef enum {
 	RM_VIEW_SPLIT,
 	RM_VIEW_CLASSIC
 } RmViewMode;
+
+/* What the flight scene is rendered into: one view, or a rig of views. */
+typedef enum { RM_RIG_NONE = 0, RM_RIG_SURROUND, RM_RIG_DEBUG_STEREO, RM_RIG_HEADSET } RmRigKind;
 
 static struct {
 	int initialized;
@@ -97,6 +107,47 @@ static struct {
 	int flight_render_suspended;
 	int hyperspace_preview_last;
 	AeronSampleCount msaa_samples;
+	XwaModernSurroundOptions surround;
+	/* --flight-views surround: surround is on for this run. */
+	int surround_forced;
+	XwaRemasterDebugStereo debug_stereo;
+	/* The rig given to the flight renderer, and whether its poses change
+	 * from frame to frame. */
+	RmRigKind rig_kind;
+	int rig_view_width;
+	int rig_view_height;
+	int rig_tracked;
+	uint64_t rig_generation;
+	/* The surround settings that couldn't be used, so the reason is logged
+	 * once and not on every frame. */
+	XwaModernSurroundOptions surround_refused;
+	/* The headset: how far the view moves for one metre of head movement,
+	 * and whether the window shows what the headset shows. */
+	float vr_world_scale;
+	int vr_mirror;
+	/* The headset: how large the HUD's cockpit panel and the virtual
+	 * screen look. */
+	float vr_panel_scale;
+	float vr_screen_scale;
+	/* This frame has eye images from Aeron (Aeron_XrBeginViews). */
+	int xr_views_ready;
+	/* The flight scene gave its eye images to the headset in this frame. */
+	int xr_views_submitted;
+	AeronViewRig headset_rig;
+	uint64_t headset_generation;
+	AeronRenderTarget* xr_targets[AERON_MAX_VIEWS];
+	AeronXrAreaMesh xr_hidden_areas[AERON_MAX_VIEWS];
+	AeronXrAreaMesh xr_visible_areas[AERON_MAX_VIEWS];
+	/* The last flight frame went to the headset's eye images. */
+	int scene_is_headset;
+	/* The last frame could not be rendered yet: models are still loading,
+	 * or the headset gave no eye images. */
+	int frame_waits;
+	int surround_refused_width;
+	/* The mouse position in the window, from -1 at the left and top edges to
+	 * 1 at the right and bottom edges. */
+	float mouse_x;
+	float mouse_y;
 	int smooth_menu_fonts;
 } g;
 
@@ -239,8 +290,14 @@ static float XwaRemaster_PaperWhiteToNits(XwaModernPaperWhite paper_white) {
 }
 
 static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
-	return options && options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
-		   options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
+	return options && XwaModernSurroundOptions_Valid(&options->surround) &&
+		   options->vr_world_scale >= XWA_MODERN_VR_SCALE_MIN &&
+		   options->vr_world_scale <= XWA_MODERN_VR_SCALE_MAX &&
+		   options->vr_panel_scale >= XWA_MODERN_VR_PANEL_SCALE_MIN &&
+		   options->vr_panel_scale <= XWA_MODERN_VR_PANEL_SCALE_MAX &&
+		   options->vr_screen_scale >= XWA_MODERN_VR_SCALE_MIN &&
+		   options->vr_screen_scale <= XWA_MODERN_VR_SCALE_MAX &&
+		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
 		   options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&
@@ -286,6 +343,15 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->sdr_gamma = XwaRemaster_SdrGammaFromDecode(Aeron_OutputSdrContentGamma());
 	out->paper_white = XwaRemaster_PaperWhiteFromNits(Aeron_OutputPaperWhiteNits());
 	out->hud_scale = XwaRemasterHud_UserScale();
+	out->surround = g.surround;
+	/* The mode and the eye images' scale apply at startup only, and the
+	 * application keeps them. */
+	out->vr_mode = XWA_MODERN_VR_OFF;
+	out->vr_render_scale = 1.0f;
+	out->vr_world_scale = g.vr_world_scale;
+	out->vr_mirror = g.vr_mirror;
+	out->vr_panel_scale = g.vr_panel_scale;
+	out->vr_screen_scale = g.vr_screen_scale;
 	out->smooth_menu_fonts = g.smooth_menu_fonts;
 }
 
@@ -330,9 +396,19 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 
 	XwaRemaster_SetHdrDesired(options->hdr_output);
 	XwaRemasterHud_SetUserScale(options->hud_scale);
+	g.surround = options->surround;
+	g.surround.enabled = options->surround.enabled != 0;
+	g.vr_world_scale = options->vr_world_scale;
+	g.vr_mirror = options->vr_mirror != 0;
+	g.vr_panel_scale = options->vr_panel_scale;
+	g.vr_screen_scale = options->vr_screen_scale;
+	XwaRemasterFlight_SetHudPanelScale(g.vr_panel_scale);
+	Aeron_XrSetScreenScale(g.vr_screen_scale);
 	g.smooth_menu_fonts = options->smooth_menu_fonts;
 	XwaRemasterAssets_SetSmoothMenuFonts(g.assets, g.smooth_menu_fonts);
 }
+
+static void XwaRemaster_SetFakeHands(const XwaRemasterStereoHand hands[2]);
 
 int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	XwaModernVideoOptions video_options;
@@ -360,6 +436,24 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		return 0;
 	}
 	XwaRemasterFlight_GetPresentationDefaults(&g.msaa_samples, &g.hdr_desired);
+	XwaModernSurroundOptions_Default(&g.surround);
+	g.vr_world_scale = 1.0f;
+	g.vr_mirror = 1;
+	g.vr_panel_scale = 1.0f;
+	g.vr_screen_scale = 1.0f;
+	XwaRemasterFlight_GetDebugStereoDefaults(&g.debug_stereo.ipd_m, &g.debug_stereo.fov_deg);
+	g.debug_stereo.mouse_yaw_deg = 90.0f;
+	g.debug_stereo.mouse_pitch_deg = 60.0f;
+	g.surround_forced = options->flight_views == 1;
+	/* A test run keeps the head still, so that its frames can be compared. */
+	g.debug_stereo.enabled = options->flight_views == 2;
+	g.debug_stereo.mouse_head = !g.debug_stereo.enabled;
+	g.debug_stereo.yaw_deg = options->stereo_head[0];
+	g.debug_stereo.pitch_deg = options->stereo_head[1];
+	g.debug_stereo.roll_deg = options->stereo_head[2];
+	if (g.debug_stereo.enabled) {
+		XwaRemaster_SetFakeHands(options->stereo_hands);
+	}
 	if (!XwaRemasterHud_Init(Aeron_GetVfs())) {
 		return 0;
 	}
@@ -405,6 +499,36 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_HUD_SCALE) {
 		video_options.hud_scale = options->video_options.hud_scale;
 	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND) {
+		video_options.surround.enabled = options->video_options.surround.enabled;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_WIDTH) {
+		video_options.surround.screen_width_mm = options->video_options.surround.screen_width_mm;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_HEIGHT) {
+		video_options.surround.screen_height_mm = options->video_options.surround.screen_height_mm;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND_BEZEL) {
+		video_options.surround.bezel_mm = options->video_options.surround.bezel_mm;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND_DISTANCE) {
+		video_options.surround.distance_mm = options->video_options.surround.distance_mm;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE) {
+		video_options.surround.side_angle_deg = options->video_options.surround.side_angle_deg;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_WORLD_SCALE) {
+		video_options.vr_world_scale = options->video_options.vr_world_scale;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR) {
+		video_options.vr_mirror = options->video_options.vr_mirror;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE) {
+		video_options.vr_panel_scale = options->video_options.vr_panel_scale;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE) {
+		video_options.vr_screen_scale = options->video_options.vr_screen_scale;
+	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS) {
 		video_options.smooth_menu_fonts = options->video_options.smooth_menu_fonts;
 	}
@@ -429,7 +553,8 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		g.render_size_fixed = 1;
 		g.render_pixel_width = options->render_width;
 		g.render_pixel_height = options->render_height;
-		Aeron_LogInfo("xwa.remaster", "render size fixed at %dx%d", g.render_pixel_width, g.render_pixel_height);
+		Aeron_LogInfo("xwa.remaster", "render size fixed at %dx%d", g.render_pixel_width,
+					  g.render_pixel_height);
 	} else if (!Aeron_GetPresentationPixelSize(&g.render_pixel_width, &g.render_pixel_height)) {
 		g.render_pixel_width = XWA_PRESENTATION_WIDTH;
 		g.render_pixel_height = XWA_PRESENTATION_HEIGHT;
@@ -487,7 +612,8 @@ static void XwaRemaster_RequestViewMode(RmViewMode mode, int fade) {
  * can be loaded, the classic and split views stay off and only the HD view
  * is shown. */
 static void XwaRemaster_ToggleSplitView(void) {
-	if (XwaModelSource_HasReplacements()) {
+	/* The comparison with the original renderer shows one view. */
+	if (XwaModelSource_HasReplacements() || g.rig_kind != RM_RIG_NONE) {
 		return;
 	}
 	const RmViewMode selected_mode = g.pending_mode_valid ? g.pending_mode : g.mode;
@@ -496,7 +622,7 @@ static void XwaRemaster_ToggleSplitView(void) {
 }
 
 static void XwaRemaster_TogglePrimaryView(void) {
-	if (XwaModelSource_HasReplacements()) {
+	if (XwaModelSource_HasReplacements() || g.rig_kind != RM_RIG_NONE) {
 		return;
 	}
 	const RmViewMode selected_mode = g.pending_mode_valid ? g.pending_mode : g.mode;
@@ -525,6 +651,247 @@ static int XwaRemaster_CanPresentFlightDirect(const XwaSnapshot* snap) {
 }
 
 static void XwaRemaster_FatalGpu(const char* operation) { Aeron_RequestFatalRendererError(operation); }
+
+/* out = a * b, for quaternions stored as (x, y, z, w). */
+static void XwaRemaster_QuatMultiply(const float a[4], const float b[4], float out[4]) {
+	out[0] = a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1];
+	out[1] = a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0];
+	out[2] = a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3];
+	out[3] = a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2];
+}
+
+void XwaRemaster_GetDebugStereo(XwaRemasterDebugStereo* out) {
+	if (out) {
+		*out = g.debug_stereo;
+	}
+}
+
+void XwaRemaster_SetDebugStereo(const XwaRemasterDebugStereo* in) {
+	if (in) {
+		g.debug_stereo = *in;
+	}
+}
+
+/* Builds the surround rig for the render target. Returns 0, and logs why
+ * once, when the settings or the screens can't be used. */
+static int XwaRemaster_BuildSurroundRig(AeronViewRig* rig) {
+	const char* problem = NULL;
+	AeronRectI displays[4];
+	const int display_count = Aeron_GetWindowDisplayRects(displays, 4);
+	/* Three screens of different sizes can't be one surround setup. One
+	 * screen is a wide screen, or a driver's surround display. */
+	if (display_count == 3 &&
+		(displays[0].width != displays[1].width || displays[1].width != displays[2].width ||
+		 displays[0].height != displays[1].height || displays[1].height != displays[2].height)) {
+		problem = "the three screens under the window don't have the same resolution";
+	}
+	/* Each view is a third of the render target. */
+	const int view_width = g.render_pixel_width / 3;
+	const int view_height = g.render_pixel_height;
+	const AeronRectI rects[3] = {
+		{ 0, 0, view_width, view_height },
+		{ view_width, 0, view_width, view_height },
+		{ 2 * view_width, 0, view_width, view_height },
+	};
+	const AeronSurroundDesc desc = {
+		.screen_width_m = g.surround.screen_width_mm * 0.001f,
+		.screen_height_m = g.surround.screen_height_mm * 0.001f,
+		.bezel_m = g.surround.bezel_mm * 0.001f,
+		.distance_m = g.surround.distance_mm * 0.001f,
+		.side_angle_rad = g.surround.side_angle_deg * (3.14159265f / 180.0f),
+	};
+	if (!problem && !AeronViewRig_FromSurround(&desc, rects, rig)) {
+		problem = "with these sizes and this angle, a side screen faces away from the player";
+	}
+	if (!problem) {
+		g.surround_refused_width = 0;
+		return 1;
+	}
+	if (memcmp(&g.surround_refused, &g.surround, sizeof g.surround) != 0 ||
+		g.surround_refused_width != g.render_pixel_width) {
+		g.surround_refused = g.surround;
+		g.surround_refused_width = g.render_pixel_width;
+		Aeron_LogWarn("xwa.remaster", "surround is off: %s", problem);
+	}
+	return 0;
+}
+
+/* Builds the orientation of a head or a hand from its yaw, pitch and roll, in
+ * radians. The rig's axes are X right, Y up and -Z forward, so turning right
+ * is a negative turn around Y, turning up a positive turn around X, and a
+ * clockwise roll a negative turn around Z. The turns are around Y first,
+ * then X, then Z: orientation = qy * qx * qz. */
+static void XwaRemaster_QuatFromAngles(float yaw, float pitch, float roll, float out[4]) {
+	const float qy[4] = { 0.0f, sinf(-0.5f * yaw), 0.0f, cosf(-0.5f * yaw) };
+	const float qx[4] = { sinf(0.5f * pitch), 0.0f, 0.0f, cosf(0.5f * pitch) };
+	const float qz[4] = { 0.0f, 0.0f, sinf(-0.5f * roll), cosf(-0.5f * roll) };
+	float qyx[4];
+	XwaRemaster_QuatMultiply(qy, qx, qyx);
+	XwaRemaster_QuatMultiply(qyx, qz, out);
+}
+
+/* Gives Aeron the hands of the debug stereo view. They stay where the
+ * launch options put them. */
+static void XwaRemaster_SetFakeHands(const XwaRemasterStereoHand hands[2]) {
+	const float degrees = 3.14159265f / 180.0f;
+	AeronXrFakeHand fake[2];
+	memset(fake, 0, sizeof fake);
+	for (int hand = 0; hand < 2; hand++) {
+		if (!hands[hand].set) {
+			continue;
+		}
+		fake[hand].active = 1;
+		fake[hand].buttons = hands[hand].buttons;
+		fake[hand].pose.position_m[0] = hands[hand].position_m[0];
+		fake[hand].pose.position_m[1] = hands[hand].position_m[1];
+		fake[hand].pose.position_m[2] = -hands[hand].position_m[2];
+		XwaRemaster_QuatFromAngles(hands[hand].angles_deg[0] * degrees, hands[hand].angles_deg[1] * degrees,
+								   hands[hand].angles_deg[2] * degrees, fake[hand].pose.orientation);
+	}
+	if (fake[0].active || fake[1].active) {
+		Aeron_XrSetFakeHands(fake);
+	}
+}
+
+/* Builds the debug UI's stereo rig: two eyes side by side in the render
+ * target. */
+static int XwaRemaster_BuildDebugStereoRig(AeronViewRig* rig) {
+	const XwaRemasterDebugStereo* d = &g.debug_stereo;
+	const int view_width = g.render_pixel_width / 2;
+	const int view_height = g.render_pixel_height;
+	if (view_width <= 0 || view_height <= 0) {
+		return 0;
+	}
+	const float degrees = 3.14159265f / 180.0f;
+	/* The vertical field of view that makes the eye's pixels square. */
+	const float half_width = 0.5f * d->fov_deg * degrees;
+	const float half_height = atanf(tanf(half_width) * (float)view_height / (float)view_width);
+	const AeronViewFov fov = { -half_width, half_width, half_height, -half_height };
+	const float yaw = (d->mouse_head ? g.mouse_x * d->mouse_yaw_deg : d->yaw_deg) * degrees;
+	const float pitch = (d->mouse_head ? -g.mouse_y * d->mouse_pitch_deg : d->pitch_deg) * degrees;
+	const float roll = d->roll_deg * degrees;
+	AeronViewPose head;
+	XwaRemaster_QuatFromAngles(yaw, pitch, roll, head.orientation);
+	head.position_m[0] = d->position_m[0];
+	head.position_m[1] = d->position_m[1];
+	head.position_m[2] = -d->position_m[2];
+	return AeronViewRig_DebugStereo(d->ipd_m, &fov, &head, view_width, view_height, rig);
+}
+
+/* Builds the headset's rig for a flight frame: asks Aeron for the eyes'
+ * poses and images. Returns 0 when no VR session runs. While a session runs
+ * and Aeron has no eye images for this frame, the last rig is kept, so the
+ * flight scene keeps its size, and g.xr_views_ready says that the frame
+ * can't be rendered for the headset. */
+static int XwaRemaster_BuildHeadsetRig(const XwaSnapshot* snap, AeronViewRig* rig) {
+	AeronXrFrame frame;
+
+	g.xr_views_ready = 0;
+	if (!Aeron_XrSessionRunning() || !snap || snap->scene_kind != XWA_SCENE_FLIGHT ||
+		!snap->flight_camera_valid) {
+		return 0;
+	}
+	if (!Aeron_XrBeginViews(&frame)) {
+		if (g.rig_kind != RM_RIG_HEADSET) {
+			return 0;
+		}
+		*rig = g.headset_rig;
+		return 1;
+	}
+	/* The head's movement in the game's world. */
+	for (int i = 0; i < frame.rig.count; i++) {
+		for (int axis = 0; axis < 3; axis++) {
+			frame.rig.views[i].pose.position_m[axis] *= g.vr_world_scale;
+		}
+		g.xr_targets[i] = frame.color[i];
+		g.xr_hidden_areas[i] = frame.hidden_area[i];
+		g.xr_visible_areas[i] = frame.visible_area[i];
+	}
+	for (int axis = 0; axis < 3; axis++) {
+		frame.rig.center.position_m[axis] *= g.vr_world_scale;
+	}
+	/* A recentre moves the views in one step. */
+	if (frame.rig.generation != g.headset_generation) {
+		g.headset_generation = frame.rig.generation;
+		g.rig_generation++;
+	}
+	*rig = frame.rig;
+	g.headset_rig = frame.rig;
+	g.xr_views_ready = 1;
+	return 1;
+}
+
+/* Chooses the views of the flight scene for this frame and gives them to the
+ * flight renderer and to the presentation. */
+static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
+	AeronViewRig rig;
+	RmRigKind kind = RM_RIG_NONE;
+	/* The head turns the view, so the cockpit look keys don't. */
+	XwaPort_SetCockpitLookSuppressed(Aeron_XrSessionRunning());
+	if (XwaRemaster_BuildHeadsetRig(snap, &rig)) {
+		kind = RM_RIG_HEADSET;
+	} else if (g.debug_stereo.enabled && XwaRemaster_BuildDebugStereoRig(&rig)) {
+		kind = RM_RIG_DEBUG_STEREO;
+	} else if ((g.surround.enabled || g.surround_forced) && XwaRemaster_BuildSurroundRig(&rig)) {
+		kind = RM_RIG_SURROUND;
+	}
+	const int view_width = kind != RM_RIG_NONE ? rig.width : 0;
+	const int view_height = kind != RM_RIG_NONE ? rig.height : 0;
+	if (kind != g.rig_kind || view_width != g.rig_view_width || view_height != g.rig_view_height) {
+		/* The last flight frame has another layout. */
+		g.rig_generation++;
+		g.force_scene_render = 1;
+		if (g.scene_kind == XWA_SCENE_FLIGHT) {
+			g.scene_tex = NULL;
+			g.scene_is_direct = 0;
+		}
+		if (kind != RM_RIG_NONE) {
+			Aeron_LogInfo("xwa.remaster", "flight views: %s, %d views of %dx%d",
+						  kind == RM_RIG_SURROUND       ? "surround"
+						  : kind == RM_RIG_DEBUG_STEREO ? "debug stereo"
+														: "headset",
+						  rig.count, view_width, view_height);
+			/* The comparison with the original renderer shows one view. */
+			g.pending_mode_valid = 0;
+			g.primary_mode = RM_VIEW_HD;
+			XwaRemaster_SetViewMode(RM_VIEW_HD, 0);
+		} else {
+			Aeron_LogInfo("xwa.remaster", "flight views: one view");
+		}
+	}
+	g.rig_kind = kind;
+	g.rig_view_width = view_width;
+	g.rig_view_height = view_height;
+	g.rig_tracked = kind != RM_RIG_NONE && rig.tracked;
+	if (kind != RM_RIG_NONE) {
+		rig.generation = g.rig_generation;
+	}
+	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
+	/* The hands follow the head: the headset's world scale moves both. The
+	 * debug stereo view has no world scale. */
+	AeronXrHand hands[2];
+	/* Outside flight the headset has no rig, and the menus still show the
+	 * hands. */
+	const int has_hands =
+		((kind != RM_RIG_NONE && rig.tracked) || Aeron_XrSessionRunning()) && Aeron_XrHands(hands);
+	XwaRemasterVrHands_SetHands(has_hands ? hands : NULL, kind == RM_RIG_HEADSET ? g.vr_world_scale : 1.0f);
+	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL,
+									 AERON_OPT_UNITS_PER_METER * g.vr_world_scale);
+	const int headset_areas = kind == RM_RIG_HEADSET && g.xr_views_ready;
+	XwaRemasterFlight_SetViewAreas(headset_areas ? g.xr_hidden_areas : NULL,
+								   headset_areas ? g.xr_visible_areas : NULL);
+	if (kind == RM_RIG_SURROUND) {
+		const AeronRectI center = rig.views[rig.primary].rect;
+		XwaPresentation_SetSurround(center.x, center.width, g.render_pixel_width);
+	} else {
+		XwaPresentation_SetSurround(0, 0, 0);
+	}
+	/* A tracked rig renders on every frame, because the head moves between
+	 * the game's ticks. */
+	if (g.rig_tracked && snap && snap->scene_kind == XWA_SCENE_FLIGHT) {
+		g.force_scene_render = 1;
+	}
+}
 
 static void XwaRemaster_UpdateRenderSize(void) {
 	int width;
@@ -566,6 +933,12 @@ void XwaRemaster_BeginFrame(const AeronInputSnapshot* input) {
 		return;
 	}
 	XwaRemaster_UpdateRenderSize();
+	if (input && input->window_width > 0 && input->window_height > 0) {
+		g.mouse_x = 2.0f * (float)input->mouse.raw_x / (float)input->window_width - 1.0f;
+		g.mouse_y = 2.0f * (float)input->mouse.raw_y / (float)input->window_height - 1.0f;
+		g.mouse_x = g.mouse_x < -1.0f ? -1.0f : (g.mouse_x > 1.0f ? 1.0f : g.mouse_x);
+		g.mouse_y = g.mouse_y < -1.0f ? -1.0f : (g.mouse_y > 1.0f ? 1.0f : g.mouse_y);
+	}
 
 	/* Deferred HDR composition flip (see XwaRemaster_SetHdrDesired). */
 	if (g.hdr_apply_pending) {
@@ -600,20 +973,70 @@ void XwaRemaster_BeginFrame(const AeronInputSnapshot* input) {
 	XwaPort_SetClassicFlightRenderingEnabled(!g.classic_suppressed_this_frame);
 }
 
+/* Draws the beam of the hand that points at the virtual screen, in a frame
+ * whose eye images the flight scene didn't use: the menus, the map, a
+ * paused game, the options window. The headset shows these eye images over
+ * the screen. */
+static void XwaRemaster_RenderMenuBeam(void) {
+	if (g.xr_views_submitted || !XwaRemasterMenuBeam_Wanted()) {
+		return;
+	}
+	AeronViewRig rig;
+	AeronRenderTarget* targets[AERON_MAX_VIEWS];
+	if (g.xr_views_ready) {
+		/* The flight renderer asked for the eye images and left them, as
+		 * for the map. Its rig has the VR world scale. */
+		rig = g.headset_rig;
+		const float scale = g.vr_world_scale > 0.0f ? 1.0f / g.vr_world_scale : 1.0f;
+		for (int i = 0; i < rig.count; i++) {
+			for (int axis = 0; axis < 3; axis++) {
+				rig.views[i].pose.position_m[axis] *= scale;
+			}
+			targets[i] = g.xr_targets[i];
+		}
+		for (int axis = 0; axis < 3; axis++) {
+			rig.center.position_m[axis] *= scale;
+		}
+	} else {
+		AeronXrFrame frame;
+		if (!Aeron_XrBeginViews(&frame)) {
+			return;
+		}
+		rig = frame.rig;
+		for (int i = 0; i < rig.count; i++) {
+			targets[i] = frame.color[i];
+		}
+	}
+	if (XwaRemasterMenuBeam_Render(&rig, targets)) {
+		Aeron_XrSubmitViewsOver();
+	}
+}
+
+static void XwaRemaster_FrameScene(int32_t delta_us);
+
 void XwaRemaster_Frame(int32_t delta_us) {
 	if (!g.initialized || !g.assets) {
 		return;
 	}
+	g.xr_views_submitted = 0;
+	XwaRemaster_FrameScene(delta_us);
+	XwaRemasterVrKeyboard_Frame(g.assets);
+	XwaRemaster_RenderMenuBeam();
+}
+
+static void XwaRemaster_FrameScene(int32_t delta_us) {
 	if (g.pending_mode_valid && XwaPort_GetClassicFlightFrameSerial() != g.pending_classic_frame_serial) {
 		XwaRemaster_SetViewMode(g.pending_mode, g.pending_mode_fade);
 		g.pending_mode_valid = 0;
 	}
 
 	const XwaSnapshot* snap = XwaSnapshot_Current();
+	XwaRemaster_UpdateViewRig(snap);
 	if (!snap) {
 		return;
 	}
-	const int hyperspace_preview = XwaRemasterFlight_GetHyperspacePreview() != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
+	const int hyperspace_preview =
+		XwaRemasterFlight_GetHyperspacePreview() != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
 	const int hyperspace_preview_visible = hyperspace_preview && snap->scene_kind == XWA_SCENE_FLIGHT &&
 										   snap->flight_camera_valid && !snap->flight_camera.map_mode &&
 										   !snap->flight_camera.hyperspace_phase;
@@ -692,11 +1115,17 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	/* Authored environments are prepared when the mission key changes
 	 * (or a debug reload is pending), never from the flight render. */
 	const int environment_needs_prepare = flight_render_needed && XwaRemasterEnvironment_NeedsPrepare(snap);
+	const int hand_assets_need_sync = flight_render_needed && XwaRemasterVrHands_NeedSync();
 	const int assets_need_sync =
 		!retain_invalid_flight_frame &&
 		(frontend_assets_need_sync || ship_assets_need_sync || texture_assets_need_sync ||
-		 process_assets_need_prepare || environment_needs_prepare);
-	const int render_snapshot = snap->tick_index != g.last_tick || g.force_scene_render;
+		 hand_assets_need_sync || process_assets_need_prepare || environment_needs_prepare);
+	/* A headset's flight frame can only be rendered into this frame's eye
+	 * images. Without them, the frame is rendered on a later host frame. */
+	const int headset_waits =
+		g.rig_kind == RM_RIG_HEADSET && !g.xr_views_ready && snap->scene_kind == XWA_SCENE_FLIGHT;
+	const int render_snapshot =
+		!headset_waits && (snap->tick_index != g.last_tick || g.force_scene_render);
 	const int frontend_scene = snap->scene_kind == XWA_SCENE_FRONTEND ||
 							   snap->scene_kind == XWA_SCENE_FRONTEND_MODAL ||
 							   snap->scene_kind == XWA_SCENE_LOADING;
@@ -729,6 +1158,9 @@ void XwaRemaster_Frame(int32_t delta_us) {
 												   RM_ASSET_UPLOAD_COPY_BUDGET);
 			if (ship_sync == XWA_REMASTER_SHIP_SYNC_FAILED)
 				Aeron_CommandBufferSetFailure(upload_cmd, "Ship model asset preparation failed");
+		}
+		if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE && hand_assets_need_sync) {
+			XwaRemasterVrHands_Sync(upload_cmd);
 		}
 		if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE) {
 			if (!XwaRemasterAssets_SyncFlightTextures(g.assets, upload_cmd, snap)) {
@@ -784,6 +1216,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 	}
 
+	g.frame_waits = assets_pending || headset_waits;
 	/* Required classic output is re-submitted on idle game ticks. Opaque HD
 	 * flight frames omit that layer; the remaster texture below then owns the
 	 * complete presentation frame. */
@@ -792,6 +1225,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		AeronTexture* next_scene_tex = g.scene_tex;
 		int next_scene_is_direct = g.scene_is_direct;
 		int next_scene_is_tonemapped = g.scene_is_tonemapped;
+		int next_scene_is_headset = 0;
 		int render_output_required = retain_scene_frame;
 		/* A pending environment capture renders and reads back its own scenes
 		 * before this frame's command buffer exists; the frame then renders
@@ -841,6 +1275,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 										 : NULL;
 					next_scene_is_direct = next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
 					next_scene_is_tonemapped = next_scene_tex != NULL;
+					next_scene_is_headset = next_scene_tex && XwaRemasterFlight_ViewTargetsRendered();
 					Aeron_GpuDebugPop(cmd);
 					break;
 				case XWA_SCENE_CUTSCENE:
@@ -885,6 +1320,17 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 		g.scene_is_direct = next_scene_is_direct;
 		g.scene_is_tonemapped = next_scene_is_tonemapped;
+		g.scene_is_headset = next_scene_is_headset;
+		/* The command buffer that draws the eye images is submitted, so
+		 * Aeron can give them to the headset. */
+		if (next_scene_is_headset) {
+			Aeron_XrSubmitViews();
+			g.xr_views_submitted = 1;
+			if (g.vr_mirror && !XwaRemasterFlight_SubmitViewMirror()) {
+				XwaRemaster_FatalGpu("headset mirror presentation");
+				return;
+			}
+		}
 		g.last_tick = snap->tick_index;
 		g.force_scene_render = 0;
 	} else if (!assets_pending && flight_render_needed && render_snapshot && retain_scene_frame) {
@@ -932,6 +1378,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 		return; /* classic only — submit nothing */
 	}
+	/* The flight frame is in the headset's eye images. Nothing of it goes on
+	 * the virtual screen. */
+	if (g.scene_is_headset && g.scene_kind == XWA_SCENE_FLIGHT) {
+		return;
+	}
 	if (g.scene_is_direct) {
 		if ((g.scene_kind != snap->scene_kind || direct_present) &&
 			!XwaRemasterFlight_SubmitDirectPresentation()) {
@@ -966,9 +1417,20 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!Aeron_SubmitTextureLayer(&layer)) {
 		XwaRemaster_FatalGpu("HD texture-layer presentation");
 	}
-	if (g.scene_kind == XWA_SCENE_FRONTEND || g.scene_kind == XWA_SCENE_FRONTEND_MODAL ||
-		g.scene_kind == XWA_SCENE_LOADING)
+	/* The cursor follows the mouse every frame, and the snapshot only says
+	   whether it shows. The options window has the system cursor, and the
+	   game doesn't take snapshots while the window pauses it, so the last
+	   snapshot can still show the game's cursor. */
+	if ((g.scene_kind == XWA_SCENE_FRONTEND || g.scene_kind == XWA_SCENE_FRONTEND_MODAL ||
+		 g.scene_kind == XWA_SCENE_LOADING) &&
+		!XwaPort_OptionsWindowOpen())
 		XwaRemasterFrontend_PresentCursor(g.ramp.alpha, g.mode == RM_VIEW_SPLIT);
+}
+
+int XwaRemaster_FrameWaits(void) {
+	/* The exposure in the capture's and the benchmark's logs is the meter's,
+	 * which comes back from the GPU two frames after the first render. */
+	return g.frame_waits || (g.scene_kind == XWA_SCENE_FLIGHT && XwaRemasterFlight_ExposureReadoutPending());
 }
 
 #define RM_BENCHMARK_WARMUP_RENDERS 30
@@ -1082,9 +1544,13 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 	/* The exposure sets the range of the point lights, so it changes the cost. */
 	char exposure_text[64];
 	rm_exposure_text(exposure_text, sizeof exposure_text);
-	Aeron_LogInfo("xwa.benchmark", "film benchmark: measuring %d renders at %dx%d, exposure %s",
+	int view_count, view_width, view_height;
+	XwaRemasterFlight_GetViewLayout(&view_count, &view_width, &view_height);
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: measuring %d renders at %dx%d, %d %s of %dx%d, exposure %s",
 				  RM_BENCHMARK_WARMUP_RENDERS + RM_BENCHMARK_SAMPLES * RM_BENCHMARK_SAMPLE_RENDERS,
-				  g.render_pixel_width, g.render_pixel_height, exposure_text);
+				  g.render_pixel_width, g.render_pixel_height, view_count, view_count == 1 ? "view" : "views",
+				  view_width, view_height, exposure_text);
 	uint64_t wall_us;
 	uint64_t cpu_us;
 	if (!Aeron_WaitForGpuIdle() || !rm_benchmark_run(snap, RM_BENCHMARK_WARMUP_RENDERS, &wall_us, &cpu_us)) {
@@ -1092,17 +1558,38 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 		return 0;
 	}
 	XwaRemasterFlight_LogLodStats();
+	XwaRemasterFlight_LogFrameStats();
 	double frame_ms[RM_BENCHMARK_SAMPLES];
 	double cpu_ms[RM_BENCHMARK_SAMPLES];
 	for (int i = 0; i < RM_BENCHMARK_SAMPLES; ++i) {
+		/* The counters are only reset at the start of a host frame, and all
+		 * these renders are in one host frame. So the increase over the
+		 * first sample, divided by its renders, gives the counts for one
+		 * render. */
+		AeronRenderDataStats before;
+		Aeron_GetRenderDataStats(&before);
 		if (!rm_benchmark_run(snap, RM_BENCHMARK_SAMPLE_RENDERS, &wall_us, &cpu_us)) {
 			Aeron_LogError("xwa.benchmark", "film benchmark: the renders of sample %d failed", i + 1);
 			return 0;
 		}
+		if (i == 0) {
+			AeronRenderDataStats after;
+			Aeron_GetRenderDataStats(&after);
+			const double renders = RM_BENCHMARK_SAMPLE_RENDERS;
+			Aeron_LogInfo(
+				"xwa.benchmark",
+				"film benchmark: each render: %.0f draws in %.0f render passes, %.1f command buffers "
+				"submitted, %.1f KiB uploaded",
+				(double)(after.draw_count - before.draw_count) / renders,
+				(double)(after.render_pass_count - before.render_pass_count) / renders,
+				(double)(after.command_buffer_submission_count - before.command_buffer_submission_count) /
+					renders,
+				(double)(after.upload_staged_bytes - before.upload_staged_bytes) / renders / 1024.0);
+		}
 		frame_ms[i] = (double)wall_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
 		cpu_ms[i] = (double)cpu_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
-		Aeron_LogInfo("xwa.benchmark", "film benchmark: sample %d: %.3f ms per frame, %.3f ms recording", i + 1,
-					  frame_ms[i], cpu_ms[i]);
+		Aeron_LogInfo("xwa.benchmark", "film benchmark: sample %d: %.3f ms per frame, %.3f ms recording",
+					  i + 1, frame_ms[i], cpu_ms[i]);
 	}
 	qsort(frame_ms, RM_BENCHMARK_SAMPLES, sizeof frame_ms[0], rm_benchmark_compare_double);
 	qsort(cpu_ms, RM_BENCHMARK_SAMPLES, sizeof cpu_ms[0], rm_benchmark_compare_double);
@@ -1161,6 +1648,10 @@ static int rm_read_rgb(AeronRenderTarget* target, int width, int height, uint16_
 int XwaRemaster_CaptureFlightFrame(const char* name) {
 	const XwaSnapshot* snap = XwaSnapshot_Current();
 	const char* reason = rm_frozen_frame_problem(snap);
+	/* A headset's frame is in the eye images, which can't be read back. */
+	if (!reason && g.rig_kind == RM_RIG_HEADSET) {
+		reason = "the frame is drawn for the headset; start with --no-vr to capture";
+	}
 	if (reason) {
 		Aeron_LogError("xwa.benchmark", "film capture: can't capture: %s", reason);
 		return 0;
@@ -1204,17 +1695,30 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 		/* The image holds linear display values. The PNG stores them in sRGB. */
 		for (size_t i = 0; i < pixels * 3u; ++i) {
 			const float value = fminf(rgb[i], 1.0f);
-			const float srgb = value <= 0.0031308f ? 12.92f * value : 1.055f * powf(value, 1.0f / 2.4f) - 0.055f;
+			const float srgb =
+				value <= 0.0031308f ? 12.92f * value : 1.055f * powf(value, 1.0f / 2.4f) - 0.055f;
 			bytes[i] = (uint8_t)(srgb * 255.0f + 0.5f);
 		}
 		if (!Aeron_ImageWritePngRgb8(Aeron_GetVfs(), AERON_VFS_ROOT_USER, png_path, width, height, bytes)) {
 			failure = "the PNG couldn't be written";
 		}
 	}
-	/* The same frame, before the tonemap. */
+	/* The same frame, before the tonemap. With several views the scene only
+	 * holds its last view, so the frame is rendered again, with each view
+	 * composed before the tonemap. */
+	int view_count;
+	XwaRemasterFlight_GetViewLayout(&view_count, NULL, NULL);
 	if (!failure) {
 		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
-		const int recorded = cmd && XwaRemasterFlight_RecordBeforeTonemap(cmd);
+		int recorded = 0;
+		if (cmd && view_count > 1) {
+			XwaRemasterFlight_SetComposeBeforeTonemap(1);
+			recorded =
+				XwaRemasterFlight_Render(cmd, snap, g.assets, width, height, /*direct_present=*/0) != NULL;
+			XwaRemasterFlight_SetComposeBeforeTonemap(0);
+		} else if (cmd) {
+			recorded = XwaRemasterFlight_RecordBeforeTonemap(cmd);
+		}
 		if (cmd && !recorded) {
 			Aeron_CancelCommandBuffer(cmd);
 		}
@@ -1234,8 +1738,14 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 	}
 	char exposure_text[64];
 	rm_exposure_text(exposure_text, sizeof exposure_text);
-	Aeron_LogInfo("xwa.benchmark", "film capture: wrote %s and %s in the user folder, %dx%d, exposure %s",
-				  png_path, hdr_path, width, height, exposure_text);
+	if (view_count == 1) {
+		Aeron_LogInfo("xwa.benchmark", "film capture: wrote %s and %s in the user folder, %dx%d, exposure %s",
+					  png_path, hdr_path, width, height, exposure_text);
+	} else {
+		Aeron_LogInfo("xwa.benchmark",
+					  "film capture: wrote %s and %s in the user folder, %dx%d with %d views, exposure %s",
+					  png_path, hdr_path, width, height, view_count, exposure_text);
+	}
 	return 1;
 }
 
@@ -1245,6 +1755,11 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterFrontend_Shutdown();
 	XwaRemasterCapturedLighting_Shutdown();
 	XwaRemasterFlight_Shutdown();
+	XwaRemasterVrHands_Shutdown();
+	XwaRemasterCockpitButtons_Shutdown();
+	XwaRemasterMenuBeam_Shutdown();
+	XwaRemasterMenuHands_Shutdown();
+	XwaRemasterVrKeyboard_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {
 		XwaRemasterAssets_Destroy(g.assets);

@@ -57,11 +57,14 @@ static bool XwaControllerOptions_ValidationError(char* error, size_t capacity, c
 
 bool XwaControllerOptions_ValidateProfile(const XwaControllerProfile* profile, AeronControllerKind kind,
 										  char* error, size_t capacity) {
-	const int axis_limit =
-		kind == AERON_CONTROLLER_KIND_GAMEPAD ? AERON_GAMEPAD_AXIS_COUNT : AERON_CONTROLLER_AXIS_MAX;
-	const int button_limit =
-		kind == AERON_CONTROLLER_KIND_GAMEPAD ? AERON_GAMEPAD_BUTTON_COUNT : AERON_CONTROLLER_BUTTON_MAX;
-	if (!profile || (kind != AERON_CONTROLLER_KIND_GAMEPAD && kind != AERON_CONTROLLER_KIND_JOYSTICK))
+	const int axis_limit = kind == AERON_CONTROLLER_KIND_GAMEPAD   ? AERON_GAMEPAD_AXIS_COUNT
+						   : kind == AERON_CONTROLLER_KIND_VR_HAND ? AERON_VR_HAND_AXIS_COUNT
+																   : AERON_CONTROLLER_AXIS_MAX;
+	const int button_limit = kind == AERON_CONTROLLER_KIND_GAMEPAD   ? AERON_GAMEPAD_BUTTON_COUNT
+							 : kind == AERON_CONTROLLER_KIND_VR_HAND ? AERON_VR_HAND_BUTTON_COUNT
+																	 : AERON_CONTROLLER_BUTTON_MAX;
+	if (!profile || (kind != AERON_CONTROLLER_KIND_GAMEPAD && kind != AERON_CONTROLLER_KIND_JOYSTICK &&
+					 kind != AERON_CONTROLLER_KIND_VR_HAND))
 		return XwaControllerOptions_ValidationError(error, capacity, "invalid controller profile");
 	if (profile->binding_count > XWA_CONTROLLER_BINDING_CAP)
 		return XwaControllerOptions_ValidationError(error, capacity, "controller binding capacity exceeded");
@@ -87,8 +90,8 @@ bool XwaControllerOptions_ValidateProfile(const XwaControllerProfile* profile, A
 		if (!isfinite(source->threshold) || source->threshold <= 0.0f || source->threshold > 1.0f)
 			return XwaControllerOptions_ValidationError(error, capacity,
 														"controller digital threshold is invalid");
-		/* Only joystick axes can rest at an end; gamepad axes are measured
-		 * from the center. */
+		/* Only joystick axes can rest at an end. The axes of gamepads and VR
+		 * hands are measured from the center. */
 		if (source->full_range && (source->full_range != 1 || kind != AERON_CONTROLLER_KIND_JOYSTICK ||
 								   (source->kind != AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE &&
 									source->kind != AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE)))
@@ -239,8 +242,19 @@ void XwaControllerOptions_KeepConfigured(XwaControllerOptions* options) {
 			XwaControllerOptions_RemoveModel(options, i);
 }
 
-bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
-											 const XwaControllerProfile* defaults,
+const XwaControllerProfile* XwaControllerDefaults_ForDevice(const XwaControllerDefaults* defaults,
+															const AeronControllerSnapshot* device) {
+	if (!defaults || !device)
+		return NULL;
+	if (device->kind == AERON_CONTROLLER_KIND_GAMEPAD)
+		return &defaults->gamepad;
+	if (device->kind == AERON_CONTROLLER_KIND_VR_HAND)
+		return device->instance_id == AERON_VR_HAND_INSTANCE_LEFT ? &defaults->vr_left : &defaults->vr_right;
+	return NULL;
+}
+
+bool XwaControllerOptions_InitializeDefaults(XwaControllerOptions* options,
+											 const XwaControllerDefaults* defaults,
 											 const AeronInputSnapshot* input, char* error, size_t capacity) {
 	const AeronControllerSnapshot* sorted[AERON_CONTROLLER_MAX];
 	int count = 0;
@@ -248,7 +262,7 @@ bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
 		return true;
 	for (int slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
 		const AeronControllerSnapshot* d = &input->controllers[slot];
-		if (!d->connected || d->kind != AERON_CONTROLLER_KIND_GAMEPAD)
+		if (!d->connected || !XwaControllerDefaults_ForDevice(defaults, d))
 			continue;
 		int j = count++;
 		while (j > 0 && strcmp(sorted[j - 1]->guid, d->guid) > 0) {
@@ -263,7 +277,7 @@ bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
 		if (!XwaControllerOptions_AddModel(options, sorted[i], input, error, capacity))
 			return false;
 		/* Other models may bind the same axes; the mapping merges them. */
-		options->models[options->count - 1].profile = *defaults;
+		options->models[options->count - 1].profile = *XwaControllerDefaults_ForDevice(defaults, sorted[i]);
 	}
 	return true;
 }

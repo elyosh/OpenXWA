@@ -126,9 +126,9 @@ static void xwa_tool_pbr(int* open, void* user) {
 	XwaFlightLodParams lod;
 	XwaRemasterFlight_GetLod(&lod);
 	bool lod_changed = ImGui::SliderFloat("Largest error (px at 1080p)", &lod.max_error, 0.0f, 4.0f, "%.2f");
-	bool lod_tint    = lod.tint != 0;
+	bool lod_tint = lod.tint != 0;
 	if (ImGui::Checkbox("Tint by level", &lod_tint)) {
-		lod.tint    = lod_tint ? 1 : 0;
+		lod.tint = lod_tint ? 1 : 0;
 		lod_changed = true;
 	}
 	ImGui::TextDisabled("Models seen small draw simpler versions of themselves. 0 draws them in full.\n"
@@ -148,20 +148,21 @@ static void xwa_tool_pbr(int* open, void* user) {
 	projectiles_changed |=
 		ImGui::SliderFloat("Fade below width (px)", &projectiles.fade_width_px, 0.0f, 16.0f, "%.1f");
 	projectiles_changed |= ImGui::SliderFloat("Fade power", &projectiles.fade_power, 0.0f, 3.0f, "%.2f");
-	projectiles_changed |= ImGui::SliderFloat("Emission scale", &projectiles.emission_scale, 0.0f, 1.0f, "%.4f",
+	projectiles_changed |= ImGui::SliderFloat("Emission scale", &projectiles.emission_scale, 0.0f, 1.0f,
+											  "%.4f", ImGuiSliderFlags_Logarithmic);
+	projectiles_changed |= ImGui::SliderFloat("Bloom scale", &projectiles.bloom_scale, 0.0f, 4.0f, "%.3f",
 											  ImGuiSliderFlags_Logarithmic);
-	projectiles_changed |=
-		ImGui::SliderFloat("Bloom scale", &projectiles.bloom_scale, 0.0f, 4.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
 	bool bloom_from_scene = projectiles.bloom_from_scene != 0;
 	if (ImGui::Checkbox("Bloom from the scene", &bloom_from_scene)) {
 		projectiles.bloom_from_scene = bloom_from_scene ? 1 : 0;
-		projectiles_changed          = true;
+		projectiles_changed = true;
 	}
-	ImGui::TextDisabled("Bolts thinner than the minimum width are drawn that wide, as a steady line.\n"
-						"Bolts thinner than the fade width get dimmer. 0 turns either off.\n"
-						"Projectiles are drawn at the emission scale; the bloom gets the bloom scale.\n"
-						"Bloom from the scene draws them at the bloom scale, with no bloom draw of their own.\n"
-						"Edits are not persisted; copy them into remaster/config.yaml.");
+	ImGui::TextDisabled(
+		"Bolts thinner than the minimum width are drawn that wide, as a steady line.\n"
+		"Bolts thinner than the fade width get dimmer. 0 turns either off.\n"
+		"Projectiles are drawn at the emission scale; the bloom gets the bloom scale.\n"
+		"Bloom from the scene draws them at the bloom scale, with no bloom draw of their own.\n"
+		"Edits are not persisted; copy them into remaster/config.yaml.");
 	if (ImGui::Button("Reset far laser bolts")) {
 		XwaRemasterFlight_GetProjectilesDefault(&projectiles);
 		projectiles_changed = true;
@@ -372,7 +373,8 @@ static void xwa_tool_shadows(int* open, void* user) {
 	changed |= ImGui::SliderFloat("Depth bias", &p.depth_bias_texels, 0.0f, 4.0f, "%.2f texels");
 	changed |= ImGui::SliderFloat("Cascade transition", &p.transition_fraction, 0.0f, 0.5f, "%.2f");
 	changed |= ImGui::SliderFloat("Distance fade", &p.distance_fade_fraction, 0.0f, 0.5f, "%.2f");
-	changed |= ImGui::SliderFloat("Cockpit near tile", &p.receiver_local_near_distance_m, 0.0f, 4.0f, "%.2f m");
+	changed |=
+		ImGui::SliderFloat("Cockpit near tile", &p.receiver_local_near_distance_m, 0.0f, 4.0f, "%.2f m");
 	ImGui::TextDisabled("Camera distance the cockpit's finer shadow tile covers; 0 = off.");
 	bool debug_cascades = p.debug_cascades != 0;
 	if (ImGui::Checkbox("Visualize cascades", &debug_cascades)) {
@@ -551,6 +553,13 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		changed = true;
 	}
 	changed |= ImGui::SliderInt("Depth slices", &p.cluster_depth_slices, 4, 64);
+	bool merge_spot_lights = p.merge_spot_lights != 0;
+	if (ImGui::Checkbox("Merge distant spot lights", &merge_spot_lights)) {
+		p.merge_spot_lights = merge_spot_lights ? 1 : 0;
+		changed = true;
+	}
+	ImGui::TextDisabled("Spot lights close together that point the same way, such as\n"
+						"a ship's engines, are shaded as one light away from them.");
 	XwaFlightPointLightStats stats;
 	XwaRemasterFlight_GetPointLightStats(&stats);
 	ImGui::Text("Candidates %u, valid %u, invalid %u, overflow %u", stats.generated_count, stats.valid_count,
@@ -560,6 +569,8 @@ static void xwa_tool_point_lights(int* open, void* user) {
 				stats.model_dropped_count);
 	ImGui::Text("Scene %u accepted, %u dropped", stats.scene.submitted_light_count,
 				stats.scene.dropped_light_count);
+	ImGui::Text("Spot lights: %u merged into %u", stats.scene.grouped_spot_light_count,
+				stats.scene.merged_spot_light_count);
 	ImGui::Text("%s, tile %u, grid %ux%ux%u (%.1f MiB)",
 				stats.scene.clustered_active ? "Clustered" : "No lights", stats.scene.effective_tile_size,
 				stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
@@ -778,8 +789,7 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	ImGui::Separator();
 	ImGui::TextUnformatted("Mesh lighting");
 	changed |= ImGui::SliderFloat("Mesh ambient strength", &p.mesh_ambient_strength, 0.0f, 4.0f, "%.2f");
-	changed |=
-		ImGui::SliderFloat("Environment roughness", &p.mesh_environment_roughness, 0.0f, 1.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Environment roughness", &p.mesh_environment_roughness, 0.0f, 1.0f, "%.2f");
 	changed |= ImGui::SliderFloat("Mesh key strength", &p.mesh_key_strength, 0.0f, 4.0f, "%.2f");
 	ImGui::TextDisabled("Ambient controls diffuse tunnel color on the cockpit.\n"
 						"Roughness controls angular blur: 0 is sharp, 1 is diffuse.\n"
@@ -823,11 +833,11 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  (double)p.brightness, (double)p.highlight_strength, (double)p.focal_length,
 					  (double)p.twist, (double)p.cap_radius, (double)p.cap_falloff,
 					  (double)p.mesh_ambient_strength, (double)p.mesh_environment_roughness,
-					  (double)p.mesh_key_strength, (double)p.dark_color[0],
-					  (double)p.dark_color[1], (double)p.dark_color[2], (double)p.body_color[0],
-					  (double)p.body_color[1], (double)p.body_color[2], (double)p.highlight_color[0],
-					  (double)p.highlight_color[1], (double)p.highlight_color[2], (double)p.cap_color[0],
-					  (double)p.cap_color[1], (double)p.cap_color[2]);
+					  (double)p.mesh_key_strength, (double)p.dark_color[0], (double)p.dark_color[1],
+					  (double)p.dark_color[2], (double)p.body_color[0], (double)p.body_color[1],
+					  (double)p.body_color[2], (double)p.highlight_color[0], (double)p.highlight_color[1],
+					  (double)p.highlight_color[2], (double)p.cap_color[0], (double)p.cap_color[1],
+					  (double)p.cap_color[2]);
 		ImGui::SetClipboardText(yaml);
 	}
 	ImGui::TextDisabled("Edits apply immediately and are not saved.");
@@ -872,7 +882,8 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	jump_changed |= ImGui::SliderFloat("Cockpit light start (s)", &j.mesh_light_start, 0.0f, 2.0f, "%.2f");
 	jump_changed |= ImGui::SliderFloat("Cockpit light curve", &j.mesh_light_curve, 0.25f, 8.0f, "%.2f",
 									   ImGuiSliderFlags_Logarithmic);
-	jump_changed |= ImGui::ColorEdit3("Streak tint", j.tint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	jump_changed |=
+		ImGui::ColorEdit3("Streak tint", j.tint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 	{
 		bool exit_forward = j.exit_forward != 0;
 		if (ImGui::Checkbox("Forward exit", &exit_forward)) {
@@ -937,62 +948,61 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	ImGui::SameLine();
 	if (ImGui::Button("Copy jump YAML")) {
 		char yaml[2048];
-		std::snprintf(yaml, sizeof yaml,
-					  "hyperspace_jump:\n"
-					  "  star_count: %d\n"
-					  "  streak_brightness: %.4g\n"
-					  "  whiteout_brightness: %.4g\n"
-					  "  brightness_range: %.4g\n"
-					  "  streak_width_px: %.4g\n"
-					  "  width_from_brightness: %.4g\n"
-					  "  width_variation: %.4g\n"
-					  "  head_widening: %.4g\n"
-					  "  radial_widening: %.4g\n"
-					  "  tail_taper: %.4g\n"
-					  "  head_taper: %.4g\n"
-					  "  taper_variation: %.4g\n"
-					  "  glow_strength: %.4g\n"
-					  "  glow_width: %.4g\n"
-					  "  tail_brightness: %.4g\n"
-					  "  tail_color_r: %.4g\n"
-					  "  tail_color_g: %.4g\n"
-					  "  tail_color_b: %.4g\n"
-					  "  stretch_scale: %.4g\n"
-					  "  white_fade_seconds: %.4g\n"
-					  "  tunnel_entry_brightness: %.4g\n"
-					  "  tunnel_settle_seconds: %.4g\n"
-					  "  mesh_light_strength: %.4g\n"
-					  "  mesh_light_start: %.4g\n"
-					  "  mesh_light_curve: %.4g\n"
-					  "  tint_r: %.4g\n"
-					  "  tint_g: %.4g\n"
-					  "  tint_b: %.4g\n"
-					  "  exit_forward: %s\n"
-					  "  warp_start: %.4g\n"
-					  "  warp_end: %.4g\n"
-					  "  warp_curve: %.4g\n"
-					  "  warp_distance_m: %.6g\n"
-					  "  warp_sky_zoom: %.4g\n"
-					  "  warp_smear: %.4g\n"
-					  "  warp_sky_highlights: %.4g\n"
-					  "  warp_reveal_softness: %.4g\n"
-					  "  warp_taps: %d\n"
-					  "  warp_sky_taps: %d\n"
-					  "  warp_sky_half_resolution: %s\n",
-					  j.star_count, (double)j.streak_brightness, (double)j.whiteout_brightness,
-					  (double)j.brightness_range, (double)j.streak_width_px, (double)j.width_from_brightness,
-					  (double)j.width_variation, (double)j.head_widening, (double)j.radial_widening,
-					  (double)j.tail_taper, (double)j.head_taper, (double)j.taper_variation,
-					  (double)j.glow_strength, (double)j.glow_width, (double)j.tail_brightness,
-					  (double)j.tail_color[0], (double)j.tail_color[1], (double)j.tail_color[2],
-					  (double)j.stretch_scale,
-					  (double)j.white_fade_seconds, (double)j.tunnel_entry_brightness,
-					  (double)j.tunnel_settle_seconds, (double)j.mesh_light_strength,
-					  (double)j.mesh_light_start, (double)j.mesh_light_curve, (double)j.tint[0],
-					  (double)j.tint[1], (double)j.tint[2], j.exit_forward ? "true" : "false", (double)j.warp_start, (double)j.warp_end,
-					  (double)j.warp_curve, (double)j.warp_distance_m, (double)j.warp_sky_zoom,
-					  (double)j.warp_smear, (double)j.warp_sky_highlights, (double)j.warp_reveal_softness,
-					  j.warp_taps, j.warp_sky_taps, j.warp_sky_half_resolution ? "true" : "false");
+		std::snprintf(
+			yaml, sizeof yaml,
+			"hyperspace_jump:\n"
+			"  star_count: %d\n"
+			"  streak_brightness: %.4g\n"
+			"  whiteout_brightness: %.4g\n"
+			"  brightness_range: %.4g\n"
+			"  streak_width_px: %.4g\n"
+			"  width_from_brightness: %.4g\n"
+			"  width_variation: %.4g\n"
+			"  head_widening: %.4g\n"
+			"  radial_widening: %.4g\n"
+			"  tail_taper: %.4g\n"
+			"  head_taper: %.4g\n"
+			"  taper_variation: %.4g\n"
+			"  glow_strength: %.4g\n"
+			"  glow_width: %.4g\n"
+			"  tail_brightness: %.4g\n"
+			"  tail_color_r: %.4g\n"
+			"  tail_color_g: %.4g\n"
+			"  tail_color_b: %.4g\n"
+			"  stretch_scale: %.4g\n"
+			"  white_fade_seconds: %.4g\n"
+			"  tunnel_entry_brightness: %.4g\n"
+			"  tunnel_settle_seconds: %.4g\n"
+			"  mesh_light_strength: %.4g\n"
+			"  mesh_light_start: %.4g\n"
+			"  mesh_light_curve: %.4g\n"
+			"  tint_r: %.4g\n"
+			"  tint_g: %.4g\n"
+			"  tint_b: %.4g\n"
+			"  exit_forward: %s\n"
+			"  warp_start: %.4g\n"
+			"  warp_end: %.4g\n"
+			"  warp_curve: %.4g\n"
+			"  warp_distance_m: %.6g\n"
+			"  warp_sky_zoom: %.4g\n"
+			"  warp_smear: %.4g\n"
+			"  warp_sky_highlights: %.4g\n"
+			"  warp_reveal_softness: %.4g\n"
+			"  warp_taps: %d\n"
+			"  warp_sky_taps: %d\n"
+			"  warp_sky_half_resolution: %s\n",
+			j.star_count, (double)j.streak_brightness, (double)j.whiteout_brightness,
+			(double)j.brightness_range, (double)j.streak_width_px, (double)j.width_from_brightness,
+			(double)j.width_variation, (double)j.head_widening, (double)j.radial_widening,
+			(double)j.tail_taper, (double)j.head_taper, (double)j.taper_variation, (double)j.glow_strength,
+			(double)j.glow_width, (double)j.tail_brightness, (double)j.tail_color[0], (double)j.tail_color[1],
+			(double)j.tail_color[2], (double)j.stretch_scale, (double)j.white_fade_seconds,
+			(double)j.tunnel_entry_brightness, (double)j.tunnel_settle_seconds, (double)j.mesh_light_strength,
+			(double)j.mesh_light_start, (double)j.mesh_light_curve, (double)j.tint[0], (double)j.tint[1],
+			(double)j.tint[2], j.exit_forward ? "true" : "false", (double)j.warp_start, (double)j.warp_end,
+			(double)j.warp_curve, (double)j.warp_distance_m, (double)j.warp_sky_zoom, (double)j.warp_smear,
+			(double)j.warp_sky_highlights, (double)j.warp_reveal_softness, j.warp_taps, j.warp_sky_taps,
+			j.warp_sky_half_resolution ? "true" : "false");
 		ImGui::SetClipboardText(yaml);
 	}
 	if (jump_changed) {
@@ -1097,50 +1107,50 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 			char camera_keys[1024];
 			char yaml[3072];
 			xwa_hyperspace_camera_yaml(&look.camera, "      ", camera_keys, sizeof camera_keys);
-			std::snprintf(
-				yaml, sizeof yaml,
-				"  %s:\n"
-				"    tunnel:\n"
-				"      dark_color_r: %.4g\n"
-				"      dark_color_g: %.4g\n"
-				"      dark_color_b: %.4g\n"
-				"      body_color_r: %.4g\n"
-				"      body_color_g: %.4g\n"
-				"      body_color_b: %.4g\n"
-				"      highlight_color_r: %.4g\n"
-				"      highlight_color_g: %.4g\n"
-				"      highlight_color_b: %.4g\n"
-				"      cap_color_r: %.4g\n"
-				"      cap_color_g: %.4g\n"
-				"      cap_color_b: %.4g\n"
-				"      edge_color_r: %.4g\n"
-				"      edge_color_g: %.4g\n"
-				"      edge_color_b: %.4g\n"
-				"      edge_width: %.4g\n"
-				"      front_noise: %.4g\n"
-				"      front_noise_scale: %.4g\n"
-				"      front_warp: %.4g\n"
-				"    jump:\n"
-				"      tint_r: %.4g\n"
-				"      tint_g: %.4g\n"
-				"      tint_b: %.4g\n"
-				"      tail_color_r: %.4g\n"
-				"      tail_color_g: %.4g\n"
-				"      tail_color_b: %.4g\n"
-				"    blend_start: %.4g\n"
-				"    blend_end: %.4g\n"
-				"    camera:\n"
-				"%s",
-				XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
-				(double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
-				(double)look.body_color[1], (double)look.body_color[2], (double)look.highlight_color[0],
-				(double)look.highlight_color[1], (double)look.highlight_color[2], (double)look.cap_color[0],
-				(double)look.cap_color[1], (double)look.cap_color[2], (double)look.edge_color[0],
-				(double)look.edge_color[1], (double)look.edge_color[2], (double)look.edge_width,
-				(double)look.front_noise, (double)look.front_noise_scale, (double)look.front_warp,
-				(double)look.tint[0], (double)look.tint[1], (double)look.tint[2], (double)look.tail_color[0],
-				(double)look.tail_color[1], (double)look.tail_color[2], (double)look.blend_start,
-				(double)look.blend_end, camera_keys);
+			std::snprintf(yaml, sizeof yaml,
+						  "  %s:\n"
+						  "    tunnel:\n"
+						  "      dark_color_r: %.4g\n"
+						  "      dark_color_g: %.4g\n"
+						  "      dark_color_b: %.4g\n"
+						  "      body_color_r: %.4g\n"
+						  "      body_color_g: %.4g\n"
+						  "      body_color_b: %.4g\n"
+						  "      highlight_color_r: %.4g\n"
+						  "      highlight_color_g: %.4g\n"
+						  "      highlight_color_b: %.4g\n"
+						  "      cap_color_r: %.4g\n"
+						  "      cap_color_g: %.4g\n"
+						  "      cap_color_b: %.4g\n"
+						  "      edge_color_r: %.4g\n"
+						  "      edge_color_g: %.4g\n"
+						  "      edge_color_b: %.4g\n"
+						  "      edge_width: %.4g\n"
+						  "      front_noise: %.4g\n"
+						  "      front_noise_scale: %.4g\n"
+						  "      front_warp: %.4g\n"
+						  "    jump:\n"
+						  "      tint_r: %.4g\n"
+						  "      tint_g: %.4g\n"
+						  "      tint_b: %.4g\n"
+						  "      tail_color_r: %.4g\n"
+						  "      tail_color_g: %.4g\n"
+						  "      tail_color_b: %.4g\n"
+						  "    blend_start: %.4g\n"
+						  "    blend_end: %.4g\n"
+						  "    camera:\n"
+						  "%s",
+						  XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
+						  (double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
+						  (double)look.body_color[1], (double)look.body_color[2],
+						  (double)look.highlight_color[0], (double)look.highlight_color[1],
+						  (double)look.highlight_color[2], (double)look.cap_color[0],
+						  (double)look.cap_color[1], (double)look.cap_color[2], (double)look.edge_color[0],
+						  (double)look.edge_color[1], (double)look.edge_color[2], (double)look.edge_width,
+						  (double)look.front_noise, (double)look.front_noise_scale, (double)look.front_warp,
+						  (double)look.tint[0], (double)look.tint[1], (double)look.tint[2],
+						  (double)look.tail_color[0], (double)look.tail_color[1], (double)look.tail_color[2],
+						  (double)look.blend_start, (double)look.blend_end, camera_keys);
 			ImGui::SetClipboardText(yaml);
 		}
 		ImGui::TextDisabled("Copy writes the look's block of hyperspace_looks.");
@@ -1455,8 +1465,7 @@ static void xwa_tool_hdr(int* open, void* user) {
 			AeronScenePresent_SetAgxPunchyPower(punchy_power);
 		}
 		float punchy_saturation = AeronScenePresent_AgxPunchySaturation();
-		if (ImGui::SliderFloat("Punchy saturation", &punchy_saturation, 0.0f, 2.0f,
-						   "%.2f")) {
+		if (ImGui::SliderFloat("Punchy saturation", &punchy_saturation, 0.0f, 2.0f, "%.2f")) {
 			AeronScenePresent_SetAgxPunchySaturation(punchy_saturation);
 		}
 		float highlight_saturation = AeronScenePresent_AgxHighlightSaturation();
@@ -1501,7 +1510,8 @@ static void xwa_tool_hdr(int* open, void* user) {
 	}
 	ImGui::TextDisabled("Fraction of the light scattered; 0 disables bloom (chain is skipped entirely).");
 	float emissive_scale = AeronScene_EmissiveScale();
-	if (ImGui::SliderFloat("Emissive scale", &emissive_scale, 0.25f, 32.0f, "%.2f", ImGuiSliderFlags_Logarithmic)) {
+	if (ImGui::SliderFloat("Emissive scale", &emissive_scale, 0.25f, 32.0f, "%.2f",
+						   ImGuiSliderFlags_Logarithmic)) {
 		AeronScene_SetEmissiveScale(emissive_scale);
 	}
 	ImGui::TextDisabled("Scales all emitted light: illumination, screens, lasers, glows, explosions.");
@@ -1869,6 +1879,56 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 
 /* ---- Dynamic cockpit ----------------------------------------------- */
 
+/* ---- Flight views ----------------------------------------------------- */
+
+static void xwa_tool_flight_views(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(440, 380), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Flight Views", &b)) {
+		ImGui::End();
+		*open = b ? 1 : 0;
+		return;
+	}
+	int count = 1, width = 0, height = 0;
+	XwaRemasterFlight_GetViewLayout(&count, &width, &height);
+	ImGui::Text("%d %s of %dx%d", count, count == 1 ? "view" : "views", width, height);
+	ImGui::Separator();
+	XwaRemasterDebugStereo stereo;
+	XwaRemaster_GetDebugStereo(&stereo);
+	bool enabled = stereo.enabled != 0, mouse = stereo.mouse_head != 0;
+	bool changed = ImGui::Checkbox("Stereo view", &enabled);
+	ImGui::TextWrapped("Draws the two eyes of a headset side by side, to test the renderer without a "
+					   "headset. The game camera is the seat, and the head moves from it.");
+	changed |= ImGui::SliderFloat("Eye distance (m)", &stereo.ipd_m, 0.0f, 0.2f, "%.3f");
+	changed |= ImGui::SliderFloat("Field of view (deg)", &stereo.fov_deg, 30.0f, 150.0f, "%.0f");
+	changed |= ImGui::Checkbox("The mouse turns the head", &mouse);
+	if (mouse) {
+		changed |=
+			ImGui::SliderFloat("Yaw at the window's edge", &stereo.mouse_yaw_deg, 0.0f, 180.0f, "%.0f");
+		changed |=
+			ImGui::SliderFloat("Pitch at the window's edge", &stereo.mouse_pitch_deg, 0.0f, 90.0f, "%.0f");
+	} else {
+		changed |= ImGui::SliderFloat("Yaw (deg, right)", &stereo.yaw_deg, -180.0f, 180.0f, "%.1f");
+		changed |= ImGui::SliderFloat("Pitch (deg, up)", &stereo.pitch_deg, -90.0f, 90.0f, "%.1f");
+	}
+	changed |= ImGui::SliderFloat("Roll (deg, clockwise)", &stereo.roll_deg, -90.0f, 90.0f, "%.1f");
+	changed |=
+		ImGui::SliderFloat3("Head position (m: right, up, forward)", stereo.position_m, -1.0f, 1.0f, "%.3f");
+	if (ImGui::Button("Centre the head")) {
+		stereo.yaw_deg = stereo.pitch_deg = stereo.roll_deg = 0.0f;
+		stereo.position_m[0] = stereo.position_m[1] = stereo.position_m[2] = 0.0f;
+		changed = true;
+	}
+	if (changed) {
+		stereo.enabled = enabled ? 1 : 0;
+		stereo.mouse_head = mouse ? 1 : 0;
+		XwaRemaster_SetDebugStereo(&stereo);
+	}
+	ImGui::End();
+	*open = b ? 1 : 0;
+}
+
 static void xwa_tool_dynamic_cockpit(int* open, void* user) {
 	(void)user;
 	ImGui::SetNextWindowSize(ImVec2(520, 520), ImGuiCond_FirstUseEver);
@@ -1951,8 +2011,7 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	if (ImGui::Checkbox("Authored environments", &authored)) {
 		XwaRemasterEnvironment_SetAuthoredEnvironments(authored ? 1 : 0);
 	}
-	ImGui::TextDisabled(
-		"When off, all regions use the classic path (for comparison and profiling).");
+	ImGui::TextDisabled("When off, all regions use the classic path (for comparison and profiling).");
 	XwaEnvironmentSelection selection;
 	char mission[128];
 	if (XwaRemasterEnvironment_LastSelection(&selection, mission, sizeof mission)) {
@@ -2079,5 +2138,6 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("Film Benchmark", xwa_tool_film_benchmark, nullptr);
 	Aeron_DebugRegisterTool("Cockpit Eye", xwa_tool_cockpit_eye, nullptr);
 	Aeron_DebugRegisterTool("Dynamic Cockpit", xwa_tool_dynamic_cockpit, nullptr);
+	Aeron_DebugRegisterTool("Flight Views", xwa_tool_flight_views, nullptr);
 	Aeron_DebugRegisterTool("Material Animation", xwa_tool_material_animation, nullptr);
 }

@@ -2,7 +2,8 @@
 #define XWA_APP_INSTALL_PATHS_H
 
 /* The paths.* keys of the user's config.yaml: the game data folder and the
- * mods. The game and the mod importer both read and change them. */
+ * mods. The game reads them at startup, and the Mods tab of its options
+ * window changes them. */
 
 #include "aeron/config_file.h"
 #include "aeron/vfs.h"

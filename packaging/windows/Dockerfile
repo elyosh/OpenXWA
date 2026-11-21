@@ -26,7 +26,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # The versions and patches of aeron's dependencies come from
-# aeron/packaging/dependencies; set these to build another version.
+# aeron/packaging/dependencies; set these to build another version. With
+# another SDL_VERSION, aeron's CMake only warns that SDL is not the pinned one.
 ARG SDL_VERSION=
 ARG ZSTD_VERSION=
 ARG FFMPEG_VERSION=
@@ -34,21 +35,15 @@ ARG SHADERCROSS_COMMIT=
 
 FROM build-base AS host-tools
 
+# build-sdl.sh clones SDL at aeron's pinned version, applies aeron's patches,
+# and builds and installs it. Every build of OpenXWA uses this script.
 COPY aeron/packaging/dependencies/apply-patches.sh /tmp/aeron/apply-patches.sh
+COPY aeron/packaging/dependencies/build-sdl.sh /tmp/aeron/build-sdl.sh
 COPY aeron/packaging/dependencies/sdl /tmp/aeron/sdl
 
-RUN git clone --branch "release-${SDL_VERSION:-$(cat /tmp/aeron/sdl/version)}" --depth 1 \
-        https://github.com/libsdl-org/SDL.git /deps/SDL \
-    && /tmp/aeron/apply-patches.sh /tmp/aeron/sdl /deps/SDL \
-    && cmake -S /deps/SDL -B /build/sdl-host -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/opt/xwa-host \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF \
-        -DSDL_UNIX_CONSOLE_BUILD=ON \
-    && cmake --build /build/sdl-host --parallel \
-    && cmake --install /build/sdl-host
+RUN SDL_VERSION="${SDL_VERSION}" /tmp/aeron/build-sdl.sh \
+        --source /deps/SDL --build /build/sdl-host /opt/xwa-host \
+        -DSDL_UNIX_CONSOLE_BUILD=ON
 
 COPY aeron/packaging/dependencies/shadercross /tmp/aeron/shadercross
 
@@ -111,20 +106,12 @@ COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
 # aeron's SDL patches fix the D3D12 backend: HDR swapchain compositions and
 # descriptor heap overflows (aeron/packaging/dependencies/README.md).
 COPY aeron/packaging/dependencies/apply-patches.sh /tmp/aeron/apply-patches.sh
+COPY aeron/packaging/dependencies/build-sdl.sh /tmp/aeron/build-sdl.sh
 COPY aeron/packaging/dependencies/sdl /tmp/aeron/sdl
 
-RUN git clone --branch "release-${SDL_VERSION:-$(cat /tmp/aeron/sdl/version)}" --depth 1 \
-        https://github.com/libsdl-org/SDL.git /deps/SDL \
-    && /tmp/aeron/apply-patches.sh /tmp/aeron/sdl /deps/SDL \
-    && cmake -S /deps/SDL -B /build/sdl-windows -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/opt/xwa-windows \
-        -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF \
-    && cmake --build /build/sdl-windows --parallel \
-    && cmake --install /build/sdl-windows
+RUN SDL_VERSION="${SDL_VERSION}" /tmp/aeron/build-sdl.sh \
+        --source /deps/SDL --build /build/sdl-windows /opt/xwa-windows \
+        -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake
 
 FROM build-base AS zstd-windows
 
@@ -202,6 +189,24 @@ RUN mkdir -p /deps/winpix /opt/winpix/bin \
     && install -m 644 /deps/winpix/bin/x64/WinPixEventRuntime.dll \
         /opt/winpix/bin/
 
+FROM build-base AS openxr-windows
+
+ARG OPENXR_LOADER_VERSION=1.1.65
+ARG OPENXR_LOADER_NUPKG_SHA256=05638c526f07ba3a5f1084bbc3308d654d5167f844ffa1e35515325cb72e0c34
+
+# VR needs the OpenXR loader, openxr_loader.dll. SDL loads it by name at run
+# time, so nothing links it. This is the Khronos OpenXR.Loader NuGet package
+# of the OpenXR SDK release whose headers aeron vendors
+# (aeron/third_party/openxr).
+ADD --checksum=sha256:${OPENXR_LOADER_NUPKG_SHA256} \
+    https://github.com/KhronosGroup/OpenXR-SDK/releases/download/release-${OPENXR_LOADER_VERSION}/OpenXR.Loader.${OPENXR_LOADER_VERSION}.nupkg \
+    /tmp/openxr-loader.nupkg
+
+RUN mkdir -p /deps/openxr-loader /opt/openxr/bin \
+    && unzip -q /tmp/openxr-loader.nupkg -d /deps/openxr-loader \
+    && install -m 644 /deps/openxr-loader/native/x64/release/bin/openxr_loader.dll \
+        /opt/openxr/bin/
+
 FROM build-base AS xwa-host-tools
 
 COPY --from=host-tools /opt/xwa-host /opt/xwa-host
@@ -210,6 +215,7 @@ COPY aeron /src/aeron
 ENV LD_LIBRARY_PATH=/opt/xwa-host/lib
 
 RUN cmake -S /src/aeron -B /build/aeron-host -G Ninja \
+        -DAERON_ALLOW_OTHER_SDL="${SDL_VERSION:+ON}" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/opt/xwa-host \
         -DCMAKE_PREFIX_PATH=/opt/xwa-host \
@@ -270,6 +276,7 @@ COPY --from=sdl-windows /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
 COPY --from=zstd-windows /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
 COPY --from=ffmpeg-windows /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
 COPY --from=winpix-windows /opt/winpix /opt/winpix
+COPY --from=openxr-windows /opt/openxr/bin/openxr_loader.dll /opt/xwa-windows/bin/openxr_loader.dll
 COPY --from=ispc-kernel /opt/ispc-kernel /opt/ispc-kernel
 COPY --from=winpix-windows /deps/winpix/license.txt /opt/xwa-licenses/WinPixEventRuntime.txt
 COPY --from=winpix-windows /deps/winpix/ThirdPartyNotices.txt /opt/xwa-licenses/WinPixEventRuntime-ThirdPartyNotices.txt
@@ -291,6 +298,7 @@ RUN case "${XWA_BUILD_TYPE}" in \
         *) echo "XWA_BUILD_TYPE must be Release or Debug" >&2; exit 2 ;; \
     esac \
     && cmake -S /src -B /build/xwa -G Ninja \
+        -DAERON_ALLOW_OTHER_SDL="${SDL_VERSION:+ON}" \
         -DCMAKE_BUILD_TYPE="${XWA_BUILD_TYPE}" \
         -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
         -DCMAKE_C_FLAGS_RELEASE="${xwa_release_flags}" \
@@ -301,7 +309,7 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DXWA_BUILD_TOOLS=ON \
         -DXWA_ENABLE_DEBUG_UI="${xwa_debug_ui}" \
         -DXWA_VERSION="${XWA_VERSION}" \
-    && cmake --build /build/xwa --target xwa xwa_mod_importer --parallel
+    && cmake --build /build/xwa --target xwa --parallel
 
 # Release builds compile with -g so that crash reports can be symbolized.
 # The debug information goes into a .debug file for each program, which is
@@ -310,12 +318,11 @@ RUN case "${XWA_BUILD_TYPE}" in \
 # file, so the code addresses match the symbols exactly.
 RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         /build/package/openxwa-windows-x86_64/shaders \
-    && cp /build/xwa/OpenXWA.exe "/build/xwa/OpenXWA Mod Importer.exe" \
-        /build/package/openxwa-windows-x86_64/ \
+    && cp /build/xwa/OpenXWA.exe /build/package/openxwa-windows-x86_64/ \
     && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
         mkdir -p /build/symbols \
         && cd /build/package/openxwa-windows-x86_64 \
-        && for program in OpenXWA.exe "OpenXWA Mod Importer.exe"; do \
+        && for program in OpenXWA.exe; do \
             x86_64-w64-mingw32ucrt-objcopy --only-keep-debug "$program" "/build/symbols/${program}.debug" \
             && cp "/build/symbols/${program}.debug" . \
             && x86_64-w64-mingw32ucrt-objcopy --strip-debug --add-gnu-debuglink="${program}.debug" "$program" \
@@ -339,6 +346,8 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         /build/package/openxwa-windows-x86_64/licenses/ISPC-Texture-Compressor.txt \
     && cp /src/aeron/third_party/bcdec/LICENSE \
         /build/package/openxwa-windows-x86_64/licenses/bcdec.txt \
+    && cp /src/aeron/third_party/openxr/LICENSE-Apache-2.0.txt \
+        /build/package/openxwa-windows-x86_64/licenses/OpenXR-Loader.txt \
     && cp -L /usr/share/doc/gcc-mingw-w64-ucrt64-runtime/copyright \
         /build/package/openxwa-windows-x86_64/licenses/GCC-MinGW-w64.txt \
     && cp -L /usr/share/doc/mingw-w64-ucrt64-dev/copyright \
@@ -386,11 +395,9 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && test -f /build/package/openxwa-windows-x86_64/resources/remaster/config.yaml \
     && test -f /build/package/openxwa-windows-x86_64/resources/assets/fonts/menu.fnt \
     && test -f /build/package/openxwa-windows-x86_64/resources/assets/fonts/menu.ktx2 \
+    && test -f /build/package/openxwa-windows-x86_64/openxr_loader.dll \
     && x86_64-w64-mingw32ucrt-objdump -p \
         /build/package/openxwa-windows-x86_64/OpenXWA.exe \
-        | grep -Eq 'Subsystem[[:space:]]+00000002' \
-    && x86_64-w64-mingw32ucrt-objdump -p \
-        "/build/package/openxwa-windows-x86_64/OpenXWA Mod Importer.exe" \
         | grep -Eq 'Subsystem[[:space:]]+00000002' \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         x86_64-w64-mingw32ucrt-objdump -h \
@@ -398,7 +405,7 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
             | grep -q '\.debug_info' \
         && test -f /build/package/openxwa-windows-x86_64/WinPixEventRuntime.dll; \
     else \
-        for program in OpenXWA.exe "OpenXWA Mod Importer.exe"; do \
+        for program in OpenXWA.exe; do \
             ! x86_64-w64-mingw32ucrt-objdump -h \
                 "/build/package/openxwa-windows-x86_64/${program}" \
                 | grep -q '\.debug_info' \
@@ -455,6 +462,7 @@ COPY aeron /src/aeron
 ENV LD_LIBRARY_PATH=/opt/xwa-host/lib
 
 RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
+        -DAERON_ALLOW_OTHER_SDL="${SDL_VERSION:+ON}" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
         -DAERON_FSR3_SHADERGEN_EXECUTABLE=/opt/xwa-host/bin/aeron_fsr3_shadergen \

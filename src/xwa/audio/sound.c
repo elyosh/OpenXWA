@@ -3,6 +3,8 @@
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #include "xwa_runtime/audio/mission_sounds.h"
+#include "xwa_runtime/audio/sound_slots.h"
+#include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
@@ -437,7 +439,27 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 		}
 		def.buffer3D->lpVtbl->SetMinDistance(def.buffer3D,
 											 (float)minDistanceOrRolloff * g_soundMinDistanceScale, 0);
+#ifdef XWA_MODERN
+		/* In 3D mode, fsfx_ComputeDistanceVolume doesn't start a sound beyond
+		   4 times its distance value, as in 2D (the stock 3D range is half of
+		   it). The stock max distance of 131072 lets a sound that starts just
+		   inside play at -18 dB, so sounds appear and vanish with an audible
+		   step at that range. With the max distance at the same range, the
+		   shim fades the sound out over the last quarter of it instead
+		   (DSBCAPS_MUTE3DATMAXDISTANCE). A distance of 0 keeps the stock
+		   value, since a max distance of 0 would always mute.
+
+		   The two ranges match for every positional sound of the stock lists
+		   of slots 0 to 195, where a file has the same distance in each of its
+		   slots. A list that gave one file two distances would get the first
+		   one's here. The sound banks give each distance of a file its own
+		   effect (XwaSoundBanks). Only voice lists load at slot 196 or later,
+		   and voices play without a position. */
+		def.buffer3D->lpVtbl->SetMaxDistance(
+			def.buffer3D, minDistanceOrRolloff != 0 ? 4.0f * (float)minDistanceOrRolloff : 131072.0f, 0);
+#else
 		def.buffer3D->lpVtbl->SetMaxDistance(def.buffer3D, 131072.0f, 0);
+#endif
 	} else {
 		def.buffer3D = NULL;
 	}
@@ -1001,14 +1023,32 @@ uint8_t Sound_PlayEffectNow(int soundId, int param2, int loop, int priority, int
 		if (slot == g_maxActiveSounds) {
 			int lowestPriority = priority;
 			int i;
+#ifdef XWA_MODERN
+			int inaudible;
+#endif
 			for (i = 0; i < g_maxActiveSounds; ++i) {
 				if (lowestPriority > g_activeSoundInstances[i].priority) {
 					slot = i;
 					lowestPriority = g_activeSoundInstances[i].priority;
 				}
 			}
+#ifdef XWA_MODERN
+			/* A sound that is silent past its max distance goes first, whatever
+			   its priority (XwaSoundSlots_FindInaudible). */
+			inaudible = XwaSoundSlots_FindInaudible();
+			if (inaudible >= 0) {
+				slot = inaudible;
+			}
+#endif
 			if (slot != g_maxActiveSounds) {
+#ifdef XWA_MODERN
+				/* A restart keeps the buffer's far position. The 3D update
+				   doesn't move a sound with a world position, so it would stay
+				   silent there. Replace it instead. */
+				if (g_activeSoundInstances[slot].soundId == soundId && slot != inaudible) {
+#else
 				if (g_activeSoundInstances[slot].soundId == soundId) {
+#endif
 					DebugPrintfChannel(128, "Restarting sound %d (%s) (priority).\n",
 									   g_activeSoundInstances[slot].soundId,
 									   g_soundDefs[g_activeSoundInstances[slot].soundId].name);
@@ -1242,12 +1282,22 @@ uint8_t Sound_QueueEffectAtWorldPosition(int soundId, int param2, int loop, int 
 // FUNCTION: XWA 0x4DB440
 uint8_t Sound_FlushQueuedEffects(void) {
 	int index;
+#ifdef XWA_MODERN
+	/* Playing sounds lose 1 per 8 ticks of game time, the original's fixed
+	   flight step, not 1 per flush (XwaModernFlightTiming_SoundPriorityDecay). */
+	const int decay = XwaModernFlightTiming_SoundPriorityDecay(g_gameTime);
+#endif
 
 	for (index = 0; index < g_maxActiveSounds; ++index) {
 		if (g_activeSoundInstances[index].soundId != -1) {
 			int currentPriority = g_activeSoundInstances[index].priority;
 			if (currentPriority > 0 && currentPriority < 126) {
+#ifdef XWA_MODERN
+				g_activeSoundInstances[index].priority =
+					currentPriority > decay ? currentPriority - decay : 0;
+#else
 				g_activeSoundInstances[index].priority = currentPriority - 1;
+#endif
 			}
 		}
 	}

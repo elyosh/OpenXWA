@@ -1,10 +1,10 @@
 # Linux build
 
 This Docker build produces a relocatable OpenXWA package containing the
-OpenXWA and OpenXWA Mod Importer executables, application resources, private
-shared libraries, and Vulkan SPIR-V shaders. SDL3, zstd, FFmpeg, and
-SDL_shadercross are downloaded and built inside Docker; they are not required
-on the host. The ISPC release, which compiles the importer's BC6H encoder, is
+OpenXWA executable, application resources, private shared libraries, and
+Vulkan SPIR-V shaders. SDL3, zstd, FFmpeg, and SDL_shadercross are downloaded
+and built inside Docker; they are not required on the host. The ISPC release,
+which compiles the BC6H encoder of the mod importer built into OpenXWA, is
 downloaded too. That kernel takes minutes to compile, so it has a stage of its
 own, which the build cache keeps until the kernel or the ISPC version changes.
 
@@ -77,13 +77,6 @@ cd openxwa-0.0.0-dev-linux-x86_64-release
 ./OpenXWA
 ```
 
-The mod importer imports a modded X-Wing Alliance installation into an
-OpenXWA mod folder, and chooses the mod that OpenXWA uses. Run it with:
-
-```sh
-./"OpenXWA Mod Importer"
-```
-
 The executable and bundled libraries use relative RPATHs, so the extracted
 directory can be moved as a unit. On first launch, the game asks for the
 original game-data directory and remembers the validated selection. Packaged
@@ -117,8 +110,12 @@ Set a build argument to test another version:
 docker buildx build \
   --platform linux/amd64 \
   --file packaging/linux/Dockerfile \
-  --build-arg SDL_VERSION=3.4.18 \
+  --build-arg ZSTD_VERSION=1.5.6 \
   --target artifact \
   --output type=local,dest=build/artifacts \
   .
 ```
+
+`SDL_VERSION` takes a commit or a release. With an SDL that isn't the pinned
+one, the build only prints a warning, but that SDL must still have the OpenXR
+API.

@@ -27,25 +27,38 @@ typedef struct XwaHudPreparedText {
 	uint16_t readout_glyph_count;
 	XwaHudPane panes[XWA_SNAP_MAX_HUD_PANES];
 	XwaHudGlyph glyphs[XWA_SNAP_MAX_HUD_GLYPHS];
+	/* `box` says what a glyph is drawn next to: the index of a prepared box
+	   (XwaHudPreparedBoxState.boxes), or -1 for the target arrow. In a headset
+	   the glyph goes on that box's plane or on the arrow's. */
 	struct {
 		uint8_t ch;
-		uint8_t reserved[3];
+		uint8_t reserved;
+		int16_t box;
 		float x_ref, y_ref, size_ref;
 		uint32_t argb;
 	} arrow_glyphs[512];
 	struct {
 		uint8_t ch;
+		int16_t box;
 		float x_ref, y_ref, size_ref;
 		uint32_t argb;
 	} readout_glyphs[XWA_HUD_MAX_READOUT_GLYPHS];
 } XwaHudPreparedText;
 
 static AeronDrawList2D* text_list;
+/* The text of the markers, when they are prepared separately (hud.h). */
+static AeronDrawList2D* text_marker_list;
 static XwaHudPreparedText text_prepared;
 /* The target readout's glyphs, made by XwaRemasterHudText_PrepareDrawList
    for XwaRemasterHudText_AddReadoutGlyphs. */
 static AeronDrawList2DSprite text_readout_sprites[XWA_HUD_MAX_READOUT_GLYPHS];
+static int16_t text_readout_sprite_box[XWA_HUD_MAX_READOUT_GLYPHS];
 static uint16_t text_readout_sprite_count;
+/* The box that the glyphs being built are drawn next to, or -1 for the
+   target arrow. */
+static int16_t text_glyph_box = -1;
+/* Whether the marker list was prepared on planes. */
+static int text_markers_on_planes;
 
 static XwaHudLayoutOrigin text_origin_for_pane(uint16_t pane) {
 	switch ((XwaHudPaneId)pane) {
@@ -193,6 +206,7 @@ static void text_append_arrow_glyph(uint8_t ch, float x, float y, float size, ui
 		return;
 	const uint16_t i = text_prepared.arrow_glyph_count++;
 	text_prepared.arrow_glyphs[i].ch = ch;
+	text_prepared.arrow_glyphs[i].box = text_glyph_box;
 	text_prepared.arrow_glyphs[i].x_ref = x;
 	text_prepared.arrow_glyphs[i].y_ref = y;
 	text_prepared.arrow_glyphs[i].size_ref = size;
@@ -259,7 +273,11 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 	const XwaHudLayoutProfile* active = XwaRemasterHudLayout_Profile(layout, profile);
 	if (!active)
 		return;
-	const XwaHudLayoutRect* bounds = &active->anchors[XWA_HUD_ANCHOR_TARGET_EDGE_BOUNDS].rect;
+	/* The rectangle that the arrow is kept on. In a headset it is a part of the
+	   view that follows the head, not of the layout. */
+	const XwaHudLayoutRect arrow_bounds = { (int)arrow.bounds_x_ref, (int)arrow.bounds_y_ref,
+											(int)arrow.bounds_w_ref, (int)arrow.bounds_h_ref };
+	const XwaHudLayoutRect* bounds = &arrow_bounds;
 	/* In pixels of the game's HUD layout. The padding of 6 must match the
 	   arrow's padding in XwaRemasterHudFixed_ProjectTargetArrow. */
 	const float px_x = active->scale.classic_px;
@@ -322,15 +340,18 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 		fabsf(local_x - pad_x) < px_x * 1.5f || fabsf(local_x - (bounds->w - pad_x)) < px_x * 1.5f;
 	if (local_x - name_x >= bounds->w && horizontal_edge && !vertical_edge)
 		name_x = bounds->w + 2.0f * name_x - local_x;
-	text_build_arrow_string(font, face, snapshot->hud.target.name, arrow.center_x_ref + name_x,
-							arrow.center_y_ref + name_y, size_ref, snapshot->hud.hud_colors[0]);
+	/* The text is laid out from where the arrow is in its view, and drawn
+	   from where the arrow is drawn. */
+	text_glyph_box = -1;
+	text_build_arrow_string(font, face, snapshot->hud.target.name, arrow.draw_x_ref + name_x,
+							arrow.draw_y_ref + name_y, size_ref, snapshot->hud.hud_colors[0]);
 	const uint32_t distance_argb = XwaSnapshotExport_FlightPaletteColor(
 		XwaSnapshotExport_FlightColorCodePaletteIndex(arrow.behind ? 0x4d : 0x4e));
 	char whole[4], fraction[4];
 	text_format_decimal(snapshot->hud.target.distance_whole, 2, 1, whole);
 	text_format_decimal(snapshot->hud.target.distance_frac, 2, 2, fraction);
-	const float distance_base_x = arrow.center_x_ref + distance_x;
-	const float distance_base_y = arrow.center_y_ref + distance_y;
+	const float distance_base_x = arrow.draw_x_ref + distance_x;
+	const float distance_base_y = arrow.draw_y_ref + distance_y;
 	const uint32_t whole_argb =
 		snapshot->hud.target.distance_whole == 0xffffu
 			? XwaSnapshotExport_FlightPaletteColor(XwaSnapshotExport_FlightColorCodePaletteIndex('@'))
@@ -380,6 +401,7 @@ static void text_add_readout_string(const AeronFontAtlas* font, const XwaRemaste
 		if (text_prepared.readout_glyph_count < XWA_HUD_MAX_READOUT_GLYPHS) {
 			const uint16_t i = text_prepared.readout_glyph_count++;
 			text_prepared.readout_glyphs[i].ch = *p;
+			text_prepared.readout_glyphs[i].box = text_glyph_box;
 			text_prepared.readout_glyphs[i].x_ref = x;
 			text_prepared.readout_glyphs[i].y_ref = y;
 			text_prepared.readout_glyphs[i].size_ref = size_ref;
@@ -447,6 +469,7 @@ static void text_build_target_readout(const XwaSnapshot* snapshot, XwaHudProfile
 
 	if (boxes->readout.valid) {
 		const XwaHudPreparedBox* box = &boxes->boxes[boxes->readout.box];
+		text_glyph_box = boxes->readout.box;
 		const float center_x = box->x_ref + box->w_ref * 0.5f;
 		float top = box->y_ref;
 		/* A box smaller than 50 points places the text as a 50-point box. */
@@ -469,6 +492,7 @@ static void text_build_target_readout(const XwaSnapshot* snapshot, XwaHudProfile
 
 	if (target->component_line[0] && boxes->readout.component_valid) {
 		const XwaHudPreparedBox* component = &boxes->boxes[boxes->readout.component_box];
+		text_glyph_box = boxes->readout.component_box;
 		const float width = XwaRemasterText_MeasureFlightString(font, face, target->component_line, size_ref);
 		text_add_readout_string(font, face, target->component_line,
 								component->x_ref + component->w_ref * 0.5f - width * 0.5f,
@@ -503,6 +527,7 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot, XwaHudPr
 		const XwaHudPreparedBox* box = &boxes->boxes[i];
 		if (!box->readout)
 			continue;
+		text_glyph_box = (int16_t)i;
 		const float px = active->scale.classic_px;
 		const float size_ref = glyph_size * px;
 		const float line_h = (glyph_size - (glyph_size >> 2)) * px;
@@ -537,15 +562,20 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot, XwaHudPr
 }
 
 int XwaRemasterHudText_Init(void) {
-	if (text_list)
+	if (text_list && text_marker_list)
 		return 1;
-	text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 512); /* + erase-clipped pieces */
-	return text_list != NULL;
+	if (!text_list)
+		text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 512); /* + erase-clipped pieces */
+	if (!text_marker_list)
+		text_marker_list = AeronDrawList_Create(1024);
+	return text_list != NULL && text_marker_list != NULL;
 }
 
 void XwaRemasterHudText_Shutdown(void) {
 	AeronDrawList_Destroy(text_list);
+	AeronDrawList_Destroy(text_marker_list);
 	text_list = NULL;
+	text_marker_list = NULL;
 	memset(&text_prepared, 0, sizeof text_prepared);
 }
 
@@ -592,8 +622,33 @@ void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex pr
 
 /* Builds the atlases of the flight font from flight/fonts/fonts.yaml, for the
  * sizes that the prepared glyphs are drawn at. */
+static int text_bitmap_sprite(const AeronFontAtlas* font, uint8_t ch, float x, float y, float size,
+							  AeronDrawList2DSprite* sprite);
+
+/* The sprite of a glyph `size_px` high whose pen is at (x, y), with the
+   flight font of `tier` or, without it, the bitmap font `font`.
+   `layout_advance` is the width that the text's layout gave the glyph.
+   `atlas_scale` is 1, or, for text on a plane, the pixels of an eye image
+   for one pixel of the drawing: the glyph then comes from the atlas made
+   for its size in the eye image, so it is sampled at about its own size. */
+static int text_glyph_sprite(XwaRemasterAssets* assets, int tier, const AeronFontAtlas* font, uint8_t ch,
+							 float x, float y, float size_px, float layout_advance, float atlas_scale,
+							 AeronDrawList2DSprite* sprite) {
+	XwaRemasterFlightFace face;
+	if (!XwaRemasterText_FlightFace(assets, tier, size_px * atlas_scale, &face))
+		return text_bitmap_sprite(font, ch, x, y, size_px, sprite);
+	if (!XwaRemasterText_FlightFaceSprite(&face, ch, x * atlas_scale, y * atlas_scale,
+										  layout_advance * atlas_scale, sprite))
+		return 0;
+	sprite->dst_x /= atlas_scale;
+	sprite->dst_y /= atlas_scale;
+	sprite->dst_w /= atlas_scale;
+	sprite->dst_h /= atlas_scale;
+	return 1;
+}
+
 static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, const XwaHudLayout* layout,
-							   const XwaHudLayoutProfile* profile, float output_scale) {
+							   const XwaHudLayoutProfile* profile, float output_scale, float world_scale) {
 	XwaRemasterFlightFace face;
 	int last_tier = -1;
 	float last_size = -1.0f;
@@ -612,7 +667,8 @@ static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* asset
 		for (uint16_t i = 0; i < text_prepared.arrow_glyph_count; i++) {
 			const float size_px = text_prepared.arrow_glyphs[i].size_ref * output_scale;
 			if (size_px != last_size) {
-				XwaRemasterText_PrepareFlightFace(cmd, assets, text_prepared.arrow_tier, size_px);
+				XwaRemasterText_PrepareFlightFace(cmd, assets, text_prepared.arrow_tier,
+												  size_px * world_scale);
 				last_size = size_px;
 			}
 		}
@@ -620,7 +676,8 @@ static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* asset
 	/* The target readout's glyphs all have the same size. */
 	if (text_prepared.readout_glyph_count)
 		XwaRemasterText_PrepareFlightFace(cmd, assets, text_prepared.readout_tier,
-										  text_prepared.readout_glyphs[0].size_ref * output_scale);
+										  text_prepared.readout_glyphs[0].size_ref * output_scale *
+											  world_scale);
 	last_size = -1.0f;
 	for (uint16_t i = 0; i < text_prepared.glyph_count; i++) {
 		const XwaHudGlyph* glyph = &text_prepared.glyphs[i];
@@ -631,7 +688,9 @@ static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* asset
 										 text_prepared.screen_h, &mapped) ||
 			!text_mapped_glyph_visible(layout, glyph, (XwaHudProfileIndex)text_prepared.profile, &mapped))
 			continue;
-		const float size_px = mapped.h_ref * output_scale;
+		/* The counts next to the reticle are markers. */
+		const float size_px =
+			mapped.h_ref * output_scale * (glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? world_scale : 1.0f);
 		if (glyph->font_tier != last_tier || size_px != last_size) {
 			XwaRemasterText_PrepareFlightFace(cmd, assets, glyph->font_tier, size_px);
 			last_tier = glyph->font_tier;
@@ -671,34 +730,53 @@ static int text_bitmap_sprite(const AeronFontAtlas* font, uint8_t ch, float x, f
 	return 1;
 }
 
+static void text_prepare_lists(AeronCommandBuffer* cmd) {
+	(void)AeronDrawList_Prepare(text_list, cmd);
+	(void)AeronDrawList_Prepare(text_marker_list, cmd);
+}
+
 void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, int target_w,
 										int target_h) {
 	text_readout_sprite_count = 0;
-	if (!cmd || !text_list || target_w <= 0 || target_h <= 0)
+	if (!cmd || !text_list || !text_marker_list || target_w <= 0 || target_h <= 0)
 		return;
+	const int separate = XwaRemasterHud_SeparateMarkers();
+	AeronDrawList2D* const marker_list = separate ? text_marker_list : text_list;
 	AeronDrawList_Begin(text_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(text_marker_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_SetPlaneHardFills(text_marker_list, XwaRemasterHud_MarkersOnScreens());
+	/* In a headset the markers' text is drawn on planes: the arrow's text on
+	   the arrow's, a box's text on the box's, and the reticle's counts on the
+	   reticle's. `plane_box` is the box whose plane the list uses, or -1. */
+	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
+	const int planes = separate && boxes && boxes->on_planes;
+	int arrow_plane = -1, reticle_plane = -1, plane_box = -1;
+	text_markers_on_planes = planes;
 	if (!text_prepared.valid) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	const XwaHudLayout* layout = XwaRemasterHud_Layout();
 	if (!layout || text_prepared.layout_generation != layout->generation) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	const XwaHudLayoutProfile* profile = text_profile(layout);
 	if (!profile) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	int out_x, out_y;
 	float output_scale;
 	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, &out_x, &out_y, &output_scale);
 	if (output_scale <= 0.0f) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
-	text_prepare_faces(cmd, assets, layout, profile, output_scale);
+	/* The markers' text on planes: it uses the font atlases made for its size
+	   in an eye image. */
+	const float world_scale = planes ? XwaRemasterHudFixed_EyePixelScale() : 1.0f;
+	text_prepare_faces(cmd, assets, layout, profile, output_scale, world_scale);
 	XwaRemasterHud_BeginRenderPhase();
 	if (text_prepared.arrow_glyph_count) {
 		const AeronFontAtlas* font = XwaRemasterHud_FlightFont(text_prepared.arrow_tier, NULL);
@@ -707,41 +785,55 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 			const float x = out_x + text_prepared.arrow_glyphs[i].x_ref * output_scale;
 			const float y = out_y + text_prepared.arrow_glyphs[i].y_ref * output_scale;
 			const float size_px = text_prepared.arrow_glyphs[i].size_ref * output_scale;
-			XwaRemasterFlightFace face;
+			XwaRemasterFlightFace metrics;
 			AeronDrawList2DSprite sprite = { 0 };
-			const int drawn =
-				XwaRemasterText_FlightFace(assets, text_prepared.arrow_tier, size_px, &face)
-					? XwaRemasterText_FlightFaceSprite(
-						  &face, ch, x, y, XwaRemasterText_FlightAdvance(font, &face, ch, size_px), &sprite)
-					: text_bitmap_sprite(font, ch, x, y, size_px, &sprite);
-			if (!drawn)
+			const float advance = XwaRemasterText_FlightAdvance(
+				font, XwaRemasterText_FlightFaceMetrics(text_prepared.arrow_tier, &metrics) ? &metrics : NULL,
+				ch, size_px);
+			if (!text_glyph_sprite(assets, text_prepared.arrow_tier, font, ch, x, y, size_px, advance,
+								   world_scale, &sprite))
 				continue;
 			text_set_tint(&sprite, text_prepared.arrow_glyphs[i].argb);
+			if (planes) {
+				const int box = text_prepared.arrow_glyphs[i].box;
+				if (box >= 0) {
+					if (!XwaRemasterHudBoxes_UsePlane(marker_list, box, &plane_box))
+						continue;
+				} else {
+					const XwaHudProjectedArrow* arrow = XwaRemasterHudFixed_TargetArrow();
+					if (arrow_plane < 0 && arrow && arrow->on_plane)
+						arrow_plane = AeronDrawList_AddPlane(marker_list, arrow->plane, 0.0f);
+					if (arrow_plane < 0)
+						continue;
+					AeronDrawList_UsePlane(marker_list, arrow_plane);
+					plane_box = -1;
+				}
+			}
 			/* The text next to the target arrow and the target box follows
 			 * the target: never captured by the cockpit's screens nor hidden
 			 * by the erased regions. */
-			AeronDrawList_AddSprite(text_list, &sprite);
+			AeronDrawList_AddSprite(marker_list, &sprite);
 		}
 	}
 	if (text_prepared.readout_glyph_count) {
 		const int tier = text_prepared.readout_tier;
 		const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
-		XwaRemasterFlightFace face;
+		XwaRemasterFlightFace metrics;
 		const float size_px = text_prepared.readout_glyphs[0].size_ref * output_scale;
-		const int has_face = XwaRemasterText_FlightFace(assets, tier, size_px, &face);
+		const XwaRemasterFlightFace* face =
+			XwaRemasterText_FlightFaceMetrics(tier, &metrics) ? &metrics : NULL;
 		for (uint16_t i = 0; i < text_prepared.readout_glyph_count; i++) {
 			const uint8_t ch = text_prepared.readout_glyphs[i].ch;
 			const float x = out_x + text_prepared.readout_glyphs[i].x_ref * output_scale;
 			const float y = out_y + text_prepared.readout_glyphs[i].y_ref * output_scale;
 			AeronDrawList2DSprite* sprite = &text_readout_sprites[text_readout_sprite_count];
 			memset(sprite, 0, sizeof *sprite);
-			const int drawn = has_face ? XwaRemasterText_FlightFaceSprite(
-											 &face, ch, x, y,
-											 XwaRemasterText_FlightAdvance(font, &face, ch, size_px), sprite)
-									   : text_bitmap_sprite(font, ch, x, y, size_px, sprite);
-			if (!drawn)
+			if (!text_glyph_sprite(assets, tier, font, ch, x, y, size_px,
+								   XwaRemasterText_FlightAdvance(font, face, ch, size_px), world_scale,
+								   sprite))
 				continue;
 			text_set_tint(sprite, text_prepared.readout_glyphs[i].argb);
+			text_readout_sprite_box[text_readout_sprite_count] = text_prepared.readout_glyphs[i].box;
 			text_readout_sprite_count++;
 		}
 	}
@@ -757,26 +849,34 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 		const float x = out_x + mapped.x_ref * output_scale;
 		const float y = out_y + mapped.y_ref * output_scale;
 		const float size_px = mapped.h_ref * output_scale;
-		XwaRemasterFlightFace face;
 		AeronDrawList2DSprite sprite = { 0 };
-		int drawn;
-		if (XwaRemasterText_FlightFace(assets, glyph->font_tier, size_px, &face)) {
-			/* The game placed the glyph with its width table, so the glyph is
-			   centred in that width. */
-			const float advance = (glyph->classic_w ? glyph->classic_w : glyph->scale) * mapped.w_ref /
-								  glyph->scale * output_scale;
-			drawn = XwaRemasterText_FlightFaceSprite(&face, glyph->ch, x, y, advance, &sprite);
-		} else {
-			drawn = text_bitmap_sprite(XwaRemasterHud_FlightFont(glyph->font_tier, NULL), glyph->ch, x, y,
-									   size_px, &sprite);
-		}
-		if (!drawn)
+		/* The game placed the glyph with its width table, so the glyph is
+		   centred in that width. */
+		const float advance =
+			(glyph->classic_w ? glyph->classic_w : glyph->scale) * mapped.w_ref / glyph->scale * output_scale;
+		if (!text_glyph_sprite(assets, glyph->font_tier, XwaRemasterHud_FlightFont(glyph->font_tier, NULL),
+							   glyph->ch, x, y, size_px, advance,
+							   glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? world_scale : 1.0f, &sprite))
 			continue;
 		text_set_tint(&sprite, glyph->argb);
-		XwaRemasterDc_AddSprite(text_list, XWA_DC_LAYER_TEXT, &sprite);
+		/* The counts next to the reticle go with it. */
+		if (planes && glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS) {
+			float plane[9];
+			if (reticle_plane < 0 && XwaRemasterHudFixed_ReticlePlane(plane))
+				reticle_plane = AeronDrawList_AddPlane(marker_list, plane, 0.0f);
+			if (reticle_plane < 0)
+				continue;
+			AeronDrawList_UsePlane(marker_list, reticle_plane);
+			plane_box = -1;
+			/* Markers aren't shown on the cockpit's screens. */
+			AeronDrawList_AddSprite(marker_list, &sprite);
+			continue;
+		}
+		XwaRemasterDc_AddSprite(glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? marker_list : text_list,
+								XWA_DC_LAYER_TEXT, &sprite);
 	}
 	XwaRemasterHud_EndRenderPhase();
-	(void)AeronDrawList_Prepare(text_list, cmd);
+	text_prepare_lists(cmd);
 }
 
 void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisitor visit, void* context) {
@@ -811,14 +911,28 @@ void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisi
 }
 
 void XwaRemasterHudText_AddReadoutGlyphs(AeronDrawList2D* list, const AeronRectI* scissor) {
+	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
+	const int planes = boxes && boxes->on_planes;
+	int plane_box = -1;
 	for (uint16_t i = 0; list && i < text_readout_sprite_count; i++) {
 		AeronDrawList2DSprite sprite = text_readout_sprites[i];
-		if (scissor)
+		/* On planes, each glyph goes on the plane of its box. */
+		if (planes && !XwaRemasterHudBoxes_UsePlane(list, text_readout_sprite_box[i], &plane_box))
+			continue;
+		if (scissor && !planes)
 			sprite.scissor = *scissor;
 		AeronDrawList_AddSprite(list, &sprite);
 	}
 }
 
+void XwaRemasterHudText_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									 AeronRenderTarget* target, const float view[12]) {
+	if (cmd && pass && target && view && text_marker_list && text_prepared.valid && text_markers_on_planes)
+		AeronDrawList_RenderPlanes(text_marker_list, cmd, pass, target, view, 1.0f);
+}
+
+/* The marker list is empty unless the markers are prepared separately. It is
+   then drawn on planes (XwaRemasterHudText_RenderPlanes). */
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							   int target_w, int target_h) {
 	if (!cmd || !pass || !target || !text_list || !text_prepared.valid || target_w <= 0 || target_h <= 0)

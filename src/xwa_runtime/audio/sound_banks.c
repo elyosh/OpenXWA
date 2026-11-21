@@ -456,16 +456,21 @@ static int SoundBanks_Load(XwaSoundBank bank, int slot) {
 		return 0;
 	}
 	s_tried[slot] = 1;
-	/* The effect's name is the bank's name plus the file name, without the
-	   folder and the extension. So when several entries of a bank use the
-	   same file, it only loads once. */
+	/* The effect's name is the bank's name, the distance and the file name
+	   without the folder and the extension. When several entries of a bank
+	   use the same file at the same distance, it only loads once. The
+	   distance is part of the name because the buffer keeps the distances of
+	   the entry that loaded it: an entry with another distance would get its
+	   min distance and its fade. The distance comes before the file name, so
+	   a long file name can't cut it off. */
 	file = entry->file;
 	stem = file + strlen(file);
 	while (stem > file && stem[-1] != '\\' && stem[-1] != '/') {
 		--stem;
 	}
 	length = (int)(strrchr(stem, '.') != NULL ? strrchr(stem, '.') - stem : (ptrdiff_t)strlen(stem));
-	snprintf(name, sizeof name, "%s_%.*s", s_banks[bank].name, length, stem);
+	snprintf(name, sizeof name, "%s_%u_%.*s", s_banks[bank].name, (unsigned int)entry->distance, length,
+			 stem);
 	if (Sound_LoadEffect(file, name, entry->distance)) {
 		g_sfxIds[XWA_SOUND_BANKS_FIRST_SLOT + slot] = Sound_FindEffectByName(name);
 	}

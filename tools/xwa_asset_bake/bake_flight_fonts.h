@@ -7,9 +7,9 @@
 #include "aeron/vfs.h"
 
 typedef struct BakeFlightFontsOptions {
-	const char*    out_root;
-	int            scale;
-	int            zstd;
+	const char* out_root;
+	int scale;
+	int zstd;
 	Ktx2Bc7Quality bc7_quality;
 } BakeFlightFontsOptions;
 

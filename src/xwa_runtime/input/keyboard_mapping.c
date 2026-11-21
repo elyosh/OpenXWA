@@ -51,8 +51,6 @@ XwaKeyboardShortcut XwaKeyboardMapping_Shortcut(AeronKeyChord source) {
 		return XWA_KEYBOARD_SHORTCUT_MOUSE;
 	if (source.key == AERON_KEY_A + ('l' - 'a') && ctrl && alt)
 		return XWA_KEYBOARD_SHORTCUT_MOUSE_LOOK;
-	if (source.key == AERON_KEY_A + ('h' - 'a') && ctrl && !alt)
-		return XWA_KEYBOARD_SHORTCUT_HOLOGRAMS;
 	if (source.key == AERON_KEY_A + ('p' - 'a') && gui)
 		return XWA_KEYBOARD_SHORTCUT_HOST_PAUSE;
 #if defined(__APPLE__)
@@ -71,6 +69,24 @@ int XwaKeyboardMapping_Trigger(const AeronInputSnapshot* input, XwaKeyboardShort
 	for (uint16_t i = 0; i < input->key_event_count; ++i) {
 		const AeronKeyEvent* event = &input->key_events[i];
 		if (event->down && !event->repeat && XwaKeyboardMapping_Shortcut(event->chord) == shortcut)
+			return event->chord.key;
+	}
+	return -1;
+}
+
+int XwaKeyboardMapping_ActionTrigger(const AeronInputSnapshot* input, XwaInputAction action) {
+	if (!input || !input->has_focus || input->key_events_overflow ||
+		XwaInputActions_Kind(action) != XWA_INPUT_ACTION_KIND_HOST)
+		return -1;
+	for (uint16_t i = 0; i < input->key_event_count; ++i) {
+		const AeronKeyEvent* event = &input->key_events[i];
+		if (!event->down || event->repeat || event->chord.key >= AERON_KEY_COUNT)
+			continue;
+		const uint8_t modifiers =
+			event->chord.modifiers & 15u & (uint8_t)~AeronKey_Modifier((AeronKey)event->chord.key);
+		if (g_keyboard.actions[event->chord.key][modifiers] != (uint16_t)action)
+			continue;
+		if (g_keyboard.enabled || (modifiers & (AERON_KEY_MOD_CTRL | AERON_KEY_MOD_ALT | AERON_KEY_MOD_GUI)))
 			return event->chord.key;
 	}
 	return -1;
@@ -173,6 +189,10 @@ static void Dispatch(XwaInputAction action, bool down) {
 			break;
 		case XWA_INPUT_ACTION_KIND_ROLL:
 			Hold(&g_keyboard.roll_holds[XwaInputActions_Roll(action)], down);
+			return;
+		case XWA_INPUT_ACTION_KIND_HOST:
+			/* The host reads these presses itself
+			 * (XwaKeyboardMapping_ActionTrigger). */
 			return;
 		default:
 			break;

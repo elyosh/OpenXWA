@@ -103,7 +103,8 @@ void XwaOriginalFilm_Init(void) {
 		return;
 	}
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP ||
-		!OriginalFilm_ReadValue(section, "craft_record_size", STOCK_CRAFT_SIZE, 65535, &layout.craftRecordSize) ||
+		!OriginalFilm_ReadValue(section, "craft_record_size", STOCK_CRAFT_SIZE, 65535,
+								&layout.craftRecordSize) ||
 		!OriginalFilm_ReadValue(section, "meshes", 50, XWA_CRAFT_MESH_SLOT_COUNT, &layout.meshes) ||
 		!OriginalFilm_ReadValue(section, "engines", 16, XWA_CRAFT_ENGINE_EMITTER_COUNT, &layout.engines) ||
 		!OriginalFilm_ReadValue(section, "weapon_racks", 16, 65535, &layout.weaponRacks) ||
@@ -119,8 +120,9 @@ void XwaOriginalFilm_Init(void) {
 		layout.componentHp + layout.meshes > layout.craftRecordSize ||
 		layout.engineHealth + layout.engines > layout.craftRecordSize ||
 		layout.weaponRackData + layout.weaponRacks * RACK_SIZE > layout.craftRecordSize) {
-		Aeron_LogError("xwa.film", "%s: the arrays of original_films don't fit craft_record_size; the section is "
-								   "ignored",
+		Aeron_LogError("xwa.film",
+					   "%s: the arrays of original_films don't fit craft_record_size; the section is "
+					   "ignored",
 					   XWA_FLIGHT_CONFIG_PATH);
 		return;
 	}
@@ -374,15 +376,16 @@ int XwaOriginalFilm_ConvertWorldState(uint8_t* ws, int* sizeInOut) {
 			memmove(ws + out, ws + in, MOBILE_SIZE);
 			if (craft != 0) {
 				/* Rewrite the craft's pool offset for stock-size records. */
-				ByteOrder_WriteU32Le(ws + out + MOBILE_CRAFT, (craft - 1u) / craftSize * STOCK_CRAFT_SIZE + 1u);
+				ByteOrder_WriteU32Le(ws + out + MOBILE_CRAFT,
+									 (craft - 1u) / craftSize * STOCK_CRAFT_SIZE + 1u);
 			}
 			in += MOBILE_SIZE;
 			out += MOBILE_SIZE;
 			if (craft != 0) {
 				uint8_t stock[STOCK_CRAFT_SIZE];
 
-				if (OriginalFilm_ConvertCraft(ws + in, (uint16_t)slot, stock, records + recordCount * recordSize,
-											  &droppedRacks)) {
+				if (OriginalFilm_ConvertCraft(ws + in, (uint16_t)slot, stock,
+											  records + recordCount * recordSize, &droppedRacks)) {
 					++recordCount;
 				}
 				memcpy(ws + out, stock, STOCK_CRAFT_SIZE);
@@ -412,7 +415,8 @@ int XwaOriginalFilm_ConvertWorldState(uint8_t* ws, int* sizeInOut) {
 		Aeron_LogWarn("xwa.film", "film: dropped %u weapon racks beyond the port's %d", droppedRacks,
 					  XWA_CRAFT_WEAPON_SLOT_COUNT);
 	}
-	Aeron_LogInfo("xwa.film", "film: %u craft records of %u bytes converted, %u with entries past the stock counts",
+	Aeron_LogInfo("xwa.film",
+				  "film: %u craft records of %u bytes converted, %u with entries past the stock counts",
 				  crafts, craftSize, recordCount);
 	*sizeInOut = (int)out;
 	return 1;

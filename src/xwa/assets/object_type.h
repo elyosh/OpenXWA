@@ -587,6 +587,9 @@ typedef enum ObjectTypeId {
 } ObjectTypeId;
 
 enum {
+	/* The weapon types of the projectile tables, from OBJ_LaserRebel (280) to
+	   OBJ_NoAsset_307. */
+	XWA_PROJECTILE_TYPE_COUNT = OBJ_NoAsset_307 - OBJ_LaserRebel + 1,
 	/* The object types of the stock table. */
 	XWA_STOCK_OBJECT_TYPE_COUNT = 557,
 	/* The craft types of the stock table, 0 to 231. */

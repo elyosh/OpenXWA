@@ -255,7 +255,8 @@ static void CraftHud_ReadRadar(const AeronConfigNode* root) {
 
 /* Reads an [x, y] point of the 640x480 HUD. If the key is missing or wrong,
    `out` keeps its value. */
-static void CraftHud_ReadPoint(const AeronConfigNode* group, const char* name, const char* key, float out[2]) {
+static void CraftHud_ReadPoint(const AeronConfigNode* group, const char* name, const char* key,
+							   float out[2]) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(group, key);
 	double x, y;
 
@@ -266,7 +267,8 @@ static void CraftHud_ReadPoint(const AeronConfigNode* group, const char* name, c
 	y = AeronConfigNode_Float(AeronConfigNode_SequenceGet(node, 1), NAN);
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE || AeronConfigNode_SequenceCount(node) != 2 ||
 		!(x >= 0.0 && x <= 640.0) || !(y >= 0.0 && y <= 480.0)) {
-		Aeron_LogWarn("xwa.hud", "%s:%d: %s.%s must be [x, y], with x from 0 to 640 and y from 0 to 480. It is ignored",
+		Aeron_LogWarn("xwa.hud",
+					  "%s:%d: %s.%s must be [x, y], with x from 0 to 640 and y from 0 to 480. It is ignored",
 					  s_iconsPath, AeronConfigNode_Line(node), name, key);
 		return;
 	}
