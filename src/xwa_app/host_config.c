@@ -769,6 +769,18 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 			}
 		}
 	}
+	/* Optional user preference; absent means the original pixelated look. */
+	{
+		const char* key = "video.smooth_menu_fonts";
+		const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+		if (node) {
+			if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+				return host_config_error(error, error_size, "invalid video setting '%s'", key);
+			}
+			out->smooth_menu_fonts = AeronConfigNode_Bool(node, 0);
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS;
+		}
+	}
 	return 1;
 }
 
@@ -1170,7 +1182,8 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
 		options->paper_white < XWA_MODERN_PAPER_WHITE_AUTO ||
 		options->paper_white > XWA_MODERN_PAPER_WHITE_400 || !isfinite(options->hud_scale) ||
-		options->hud_scale < XWA_MODERN_HUD_SCALE_MIN || options->hud_scale > XWA_MODERN_HUD_SCALE_MAX) {
+		options->hud_scale < XWA_MODERN_HUD_SCALE_MIN || options->hud_scale > XWA_MODERN_HUD_SCALE_MAX ||
+		(options->smooth_menu_fonts != 0 && options->smooth_menu_fonts != 1)) {
 		return 0;
 	}
 	return AeronConfigFile_SetString(document, "video.window_mode", window_mode_names[options->window_mode],
@@ -1208,7 +1221,8 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		   AeronConfigFile_SetFloat(document, "video.vr_world_scale", options->vr_world_scale, error) &&
 		   AeronConfigFile_SetBool(document, "video.vr_mirror", options->vr_mirror, error) &&
 		   AeronConfigFile_SetFloat(document, "video.vr_panel_scale", options->vr_panel_scale, error) &&
-		   AeronConfigFile_SetFloat(document, "video.vr_screen_scale", options->vr_screen_scale, error);
+		   AeronConfigFile_SetFloat(document, "video.vr_screen_scale", options->vr_screen_scale, error) &&
+		   AeronConfigFile_SetBool(document, "video.smooth_menu_fonts", options->smooth_menu_fonts, error);
 }
 
 static int host_config_remove_key(AeronConfigFile* document, const char* key, AeronConfigError* error) {

@@ -43,7 +43,8 @@ static uint32_t assets_next_generation;
 typedef struct FontSlot {
 	int font_size;
 	uint8_t source;       /* AssetSource */
-	AeronFontAtlas atlas; /* loaded == 0 when the load failed */
+	AeronFontAtlas atlas; /* default 4x atlas; loaded == 0 on failure */
+	AeronFontAtlas smooth_atlas; /* optional original 1x atlas */
 } FontSlot;
 
 /* An atlas of a font from frontend/fonts/fonts.yaml or flight/fonts/fonts.yaml
@@ -140,6 +141,7 @@ typedef struct GroupSlot {
 struct XwaRemasterAssets {
 	char root[512];
 	int prefer_original_2d;
+	int smooth_menu_fonts;
 	XwaRemasterOriginal2d* original_reader;
 	AeronImageCache* frontend_images;
 	AeronImageCache* flight_images;
@@ -210,6 +212,7 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 		if (a->fonts[i].atlas.loaded) {
 			AeronFontAtlas_Release(&a->fonts[i].atlas);
 		}
+		AeronFontAtlas_Release(&a->fonts[i].smooth_atlas);
 	}
 	for (int i = 0; i < XWA_ASSETS_MAX_FACE_FONTS; i++) {
 		AeronFontAtlas_Release(&a->face_fonts[i].atlas);
@@ -1491,6 +1494,11 @@ const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a, int tie
 	return slot->atlas.loaded ? &slot->atlas : NULL;
 }
 
+void XwaRemasterAssets_SetSmoothMenuFonts(XwaRemasterAssets* a, int enabled) {
+	if (a)
+		a->smooth_menu_fonts = enabled != 0;
+}
+
 uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a) { return a ? a->generation : 0; }
 
 static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
@@ -1508,6 +1516,11 @@ static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a, 
 								   &slot->atlas)) {
 		Xwa2dFontAtlas_Free(&font);
 		return ASSET_LOAD_FAILED;
+	}
+	/* Load both variants so the menu can switch at once. The 1x atlas is
+	   optional: when it fails, the 4x font is still used. */
+	if (!assets_init_original_font(cmd, &font, 1, 0, "XWA smooth frontend font", &slot->smooth_atlas)) {
+		Aeron_LogWarn("xwa.remaster", "frontend font %d: optional smooth atlas unavailable", font_size);
 	}
 	Xwa2dFontAtlas_Free(&font);
 	return ASSET_LOAD_SUCCESS;
@@ -1658,10 +1671,16 @@ const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int f
 		return NULL;
 	}
 	for (int i = 0; i < a->font_count; i++) {
-		if (a->fonts[i].font_size == font_size) {
+		const FontSlot* slot = &a->fonts[i];
+		if (slot->font_size == font_size) {
+			if (a->smooth_menu_fonts && slot->source == ASSET_SOURCE_ORIGINAL && slot->smooth_atlas.loaded) {
+				if (out_atlas_scale)
+					*out_atlas_scale = 1.0f;
+				return &slot->smooth_atlas;
+			}
 			if (out_atlas_scale)
 				*out_atlas_scale = 4.0f;
-			return a->fonts[i].atlas.loaded ? &a->fonts[i].atlas : NULL;
+			return slot->atlas.loaded ? &slot->atlas : NULL;
 		}
 	}
 	return NULL;

@@ -136,6 +136,7 @@ typedef struct XwaModernVideoOptions {
 	   movies looks in a headset, as a multiple of its size in the game's
 	   files. */
 	float vr_screen_scale;
+	int smooth_menu_fonts; /* original frontend bitmap fonts only */
 } XwaModernVideoOptions;
 
 #define XWA_MODERN_VR_SCALE_MIN 0.5f
@@ -171,6 +172,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR = 1u << 20,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE = 1u << 21,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE = 1u << 22,
+	XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS = 1u << 23,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);
