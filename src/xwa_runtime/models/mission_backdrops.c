@@ -3,6 +3,7 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type_info.h"
+#include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/flight_config.h"
 
 #include <string.h>
@@ -156,4 +157,9 @@ const ObjectTypeBackdropDescriptor* XwaMissionBackdrops_Descriptor(int id) {
 		return &s_extraDescriptors[id - XWA_EXTRA_BACKDROP_FIRST_ID];
 	}
 	return NULL;
+}
+
+int XwaMissionBackdrops_IsBackdropFlightGroup(const XwaFlightGroup* fg) {
+	return fg != NULL && (ObjectTypeId)g_objectTypeTables.craftTypeToObjectType[fg->craftType] ==
+							 OBJ_BackdropTextureGroup9001_Sprite1100_263;
 }

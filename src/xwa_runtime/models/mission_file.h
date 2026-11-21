@@ -22,10 +22,19 @@ struct XwaFlightGroup;
    file's path for diagnostics. */
 int XwaMissionFile_Load(const char* missionPath, struct AeronConfigFile** out, char* path, size_t pathSize);
 
+/* Keeps the names of the loaded mission's flight groups as its .TIE file has
+   them. A translated game's xwa.tab then replaces them with the names it
+   shows, but the `name` check of XwaMissionFile_FlightGroup must see the
+   names that the mod's author saw. Mission_LoadFile calls it before it
+   translates the mission's text. The arguments are as for
+   XwaMissionFile_FlightGroup. */
+void XwaMissionFile_KeepFlightGroupNames(const struct XwaFlightGroup* flightGroups, size_t stride, int count);
+
 /* Returns the flight group index for entry `key` of a `flight_groups` map.
    Logs a warning and returns -1 when `key` isn't an index, `entry` isn't a
    map, the mission has no such flight group, or the flight group fails the
-   entry's optional `name` or `craft` check. `craft` is the object type name
+   entry's optional `name` or `craft` check. `name` is checked against the
+   name in the .TIE file (XwaMissionFile_KeepFlightGroupNames). `craft` is the object type name
    of the flight group's craft type. `flightGroups` points to the loaded
    mission's first flight group, `stride` is the distance between two flight
    groups and `count` is their number. */

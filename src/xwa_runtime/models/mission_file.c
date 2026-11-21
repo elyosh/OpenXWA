@@ -58,6 +58,28 @@ int XwaMissionFile_Load(const char* missionPath, AeronConfigFile** out, char* pa
 #define MISSION_FILE_FLIGHT_GROUPS 192
 #define MISSION_FILE_FLIGHT_GROUP_NAME 20
 
+static char s_tieNames[MISSION_FILE_FLIGHT_GROUPS][MISSION_FILE_FLIGHT_GROUP_NAME];
+static int s_tieNameCount;
+
+void XwaMissionFile_KeepFlightGroupNames(const XwaFlightGroup* flightGroups, size_t stride, int count) {
+	int fgIdx;
+
+	s_tieNameCount = 0;
+	if (flightGroups == NULL || count <= 0) {
+		return;
+	}
+	if (count > MISSION_FILE_FLIGHT_GROUPS) {
+		count = MISSION_FILE_FLIGHT_GROUPS;
+	}
+	for (fgIdx = 0; fgIdx < count; ++fgIdx) {
+		const XwaFlightGroup* fg =
+			(const XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)fgIdx * stride);
+
+		memcpy(s_tieNames[fgIdx], fg->name, MISSION_FILE_FLIGHT_GROUP_NAME);
+	}
+	s_tieNameCount = count;
+}
+
 int XwaMissionFile_FlightGroup(const char* path, const char* key, const AeronConfigNode* entry,
 							   const struct XwaFlightGroup* flightGroups, size_t stride, int count) {
 	const AeronConfigNode* name = AeronConfigNode_MapGet(entry, "name");
@@ -80,14 +102,15 @@ int XwaMissionFile_FlightGroup(const char* path, const char* key, const AeronCon
 	fg = (const XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)fgIdx * stride);
 	if (name != NULL) {
 		const char* expected = AeronConfigNode_String(name, NULL);
+		const char* tieName = fgIdx < s_tieNameCount ? s_tieNames[fgIdx] : fg->name;
 		size_t length = 0;
 
-		while (length < MISSION_FILE_FLIGHT_GROUP_NAME && fg->name[length] != '\0') {
+		while (length < MISSION_FILE_FLIGHT_GROUP_NAME && tieName[length] != '\0') {
 			++length;
 		}
-		if (expected == NULL || strlen(expected) != length || memcmp(expected, fg->name, length) != 0) {
+		if (expected == NULL || strlen(expected) != length || memcmp(expected, tieName, length) != 0) {
 			Aeron_LogWarn("xwa.models", "%s:%d: flight group %s is '%.*s', not '%s'. The entry is ignored",
-						  path, AeronConfigNode_Line(name), key, (int)length, fg->name,
+						  path, AeronConfigNode_Line(name), key, (int)length, tieName,
 						  expected != NULL ? expected : "");
 			return -1;
 		}

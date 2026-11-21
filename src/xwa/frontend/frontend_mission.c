@@ -21,6 +21,8 @@
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/craft_names.h"
+#include "xwa_runtime/models/mission_backdrops.h"
+#include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/object_profiles.h"
@@ -326,6 +328,10 @@ int FrontendMission_Localize(FrontendMission* mission, FrontendBriefingContent* 
 	int i;
 	unsigned int cursor;
 
+	if (mission != NULL) {
+		XwaMissionFile_KeepFlightGroupNames(mission->flightGroups, sizeof mission->flightGroups[0],
+											mission->flightGroupCount);
+	}
 	if (!Linez_IsLoaded()) {
 		return 0;
 	}
@@ -605,17 +611,30 @@ int FrontendMission_Localize(FrontendMission* mission, FrontendBriefingContent* 
 			XwaFlightGroup* flightGroup;
 
 			flightGroup = &mission->flightGroups[i];
-			if (flightGroup->name[0] != '\0') {
+			if (flightGroup->name[0] != '\0'
+#ifdef XWA_MODERN
+				/* Not the game data of a backdrop (XwaMissionBackdrops_IsBackdropFlightGroup). */
+				&& !XwaMissionBackdrops_IsBackdropFlightGroup(flightGroup)
+#endif
+			) {
 				sprintf(key, "!%s_F%d_1!", basename, i + 1);
 				strcat(key, flightGroup->name);
 				FrontendMission_CopyLocalized(flightGroup->name, sizeof(flightGroup->name), key);
 			}
-			if (flightGroup->cargo[0] != '\0') {
+			if (flightGroup->cargo[0] != '\0'
+#ifdef XWA_MODERN
+				&& !XwaMissionBackdrops_IsBackdropFlightGroup(flightGroup)
+#endif
+			) {
 				sprintf(key, "!%s_F%d_3!", basename, i + 1);
 				strcat(key, flightGroup->cargo);
 				FrontendMission_CopyLocalized(flightGroup->cargo, sizeof(flightGroup->cargo), key);
 			}
-			if (flightGroup->specialCargo[0] != '\0') {
+			if (flightGroup->specialCargo[0] != '\0'
+#ifdef XWA_MODERN
+				&& !XwaMissionBackdrops_IsBackdropFlightGroup(flightGroup)
+#endif
+			) {
 				sprintf(key, "!%s_F%d_4!", basename, i + 1);
 				strcat(key, flightGroup->specialCargo);
 				FrontendMission_CopyLocalized(flightGroup->specialCargo, sizeof(flightGroup->specialCargo),

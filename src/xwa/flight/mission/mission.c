@@ -48,6 +48,7 @@
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_art.h"
 #include "xwa_runtime/models/mission_backdrops.h"
+#include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/mission_tie.h"
 #include "xwa_runtime/models/model_settings.h"
@@ -1115,6 +1116,10 @@ int Mission_LoadFile(char* fileName) {
 			break;
 		}
 	}
+#ifdef XWA_MODERN
+	XwaMissionFile_KeepFlightGroupNames(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+										(int16_t)g_missionHeader.numFlightGroups);
+#endif
 	Mission_ApplyStringLocalization(&baseName[pathIndex + 1]);
 	return 1;
 }
@@ -1450,7 +1455,12 @@ int Mission_ApplyStringLocalization(char* fileName) {
 		XwaFlightGroup* fg;
 
 		fg = &g_missionFlightGroups[fgIdx].fg;
-		if (fg->name[0] != '\0') {
+		if (fg->name[0] != '\0'
+#ifdef XWA_MODERN
+			/* Not the game data of a backdrop (XwaMissionBackdrops_IsBackdropFlightGroup). */
+			&& !XwaMissionBackdrops_IsBackdropFlightGroup(fg)
+#endif
+		) {
 			char* resolvedText;
 
 			sprintf(key, "!%s_F%d_1!", baseName, fgIdx + 1);
@@ -1459,7 +1469,11 @@ int Mission_ApplyStringLocalization(char* fileName) {
 			strncpy(fg->name, resolvedText, 0x14u);
 			fg->name[19] = '\0';
 		}
-		if (fg->cargo[0] != '\0') {
+		if (fg->cargo[0] != '\0'
+#ifdef XWA_MODERN
+			&& !XwaMissionBackdrops_IsBackdropFlightGroup(fg)
+#endif
+		) {
 			char* resolvedText;
 
 			sprintf(key, "!%s_F%d_3!", baseName, fgIdx + 1);
@@ -1468,7 +1482,11 @@ int Mission_ApplyStringLocalization(char* fileName) {
 			strncpy(fg->cargo, resolvedText, 0x14u);
 			fg->cargo[19] = '\0';
 		}
-		if (fg->specialCargo[0] != '\0') {
+		if (fg->specialCargo[0] != '\0'
+#ifdef XWA_MODERN
+			&& !XwaMissionBackdrops_IsBackdropFlightGroup(fg)
+#endif
+		) {
 			char* resolvedText;
 
 			sprintf(key, "!%s_F%d_4!", baseName, fgIdx + 1);

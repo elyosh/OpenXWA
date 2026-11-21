@@ -40,6 +40,15 @@ void XwaMissionBackdrops_Init(void);
    extra one for a listed id, or NULL for any other id. */
 const ObjectTypeBackdropDescriptor* XwaMissionBackdrops_Descriptor(int id);
 
+struct XwaFlightGroup;
+
+/* Whether `fg` is a backdrop flight group. The game reads its name, cargo
+   and special cargo as numbers: the colour (or a laser beam's shot delays),
+   the brightness and the size. They are game data, so they aren't
+   translated: a translated game's xwa.tab has the values of the stock
+   missions, which would replace those of a mod's mission. */
+int XwaMissionBackdrops_IsBackdropFlightGroup(const struct XwaFlightGroup* fg);
+
 #ifdef __cplusplus
 }
 #endif
