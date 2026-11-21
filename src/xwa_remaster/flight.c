@@ -2481,9 +2481,10 @@ void XwaRemasterFlight_LogFrameStats(void) {
 				  AeronTemporal_ModeName(s.fsr_mode), s.plight.light_lists ? "on" : "off");
 	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
 		Aeron_LogInfo("xwa.benchmark",
-					  "film benchmark: view %u of %u: %u instances drawn, %u with a light list, %u draws",
+					  "film benchmark: view %u of %u: %u instances drawn, %u with a light list (%u with "
+					  "combined far lights), %u draws",
 					  view + 1, frame.view_count, frame.visible_instances[view], frame.light_lists[view],
-					  frame.view_draws[view]);
+					  frame.far_light_lists[view], frame.view_draws[view]);
 	}
 }
 
