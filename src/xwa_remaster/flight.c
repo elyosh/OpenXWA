@@ -8293,6 +8293,7 @@ static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlScen
 	desc.sky = fog->sky;
 	desc.start = fog->start_m * AERON_OPT_UNITS_PER_METER;
 	desc.lights = fog->lights;
+	desc.lights_start = AERON_ENV_FOG_LIGHTS_START_M * AERON_OPT_UNITS_PER_METER;
 	if (fog->clouds.enabled) {
 		desc.clouds_size       = fog->clouds.size_m * AERON_OPT_UNITS_PER_METER;
 		desc.clouds_opacity    = fog->clouds.opacity;
