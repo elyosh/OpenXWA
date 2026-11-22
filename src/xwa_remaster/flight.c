@@ -8864,13 +8864,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* A headset has no motion blur: the eyes follow what they look at. */
 	const int mb_on =
 		!s.view_targets_set && (s.mb_quality > 0 || (!rig && s.fsr_mode != AERON_TEMPORAL_OFF));
-	/* GTAO averages its AO over frames when nothing else does (no temporal
-	 * upscaler) and the motion vectors include the camera's motion. It
+	/* GTAO averages its AO over frames, with or without the temporal
+	 * upscaler, when the motion vectors include the camera's motion. It
 	 * needs the same motion data as motion blur. Not yet in a headset or
 	 * with several views. */
 	const int ao_history = s.ssao.ssao_method == AERON_SCENE_SSAO_GTAO && s.ssao.ssao_quality > 0 &&
-						   s.ssao.ssao_intensity > 0.0f && s.fsr_mode == AERON_TEMPORAL_OFF &&
-						   s.mb_camera_blur && !rig && !s.view_targets_set;
+						   s.ssao.ssao_intensity > 0.0f && s.mb_camera_blur && !rig && !s.view_targets_set;
 	s.mb_enabled = 0;
 	int mb_regen = 0;
 	int paused = 0;
