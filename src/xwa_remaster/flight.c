@@ -8271,10 +8271,11 @@ static int fl_key_directional_light(const XwaRemasterDirLight* lights, uint32_t 
 	return 1;
 }
 
-/* The region environment's fog. The hangar is indoors, so it has none. The
- * fog takes the sky's colour from the bound specular cube: the
- * environment's, which needs its intensity, or the captured one, which
- * already has it. Its glow is the key light's. */
+/* The region environment's fog. The hangar is indoors, so it has no fog.
+ * The fog reads the sky's colour from the bound specular cube. That is
+ * either the environment's cube, which needs the environment's intensity,
+ * or the captured cube, which already includes it. The glow comes from the
+ * key light. */
 static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlSceneLighting* lighting,
 					   const XwaFlightCamera* cam, const XwaSnapshot* snap) {
 	if (!environment || !environment->settings.fog.enabled || cam->in_hangar) {
@@ -8302,8 +8303,8 @@ static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlScen
 			desc.drift[axis] = fog->clouds.drift_mps[axis] * AERON_OPT_UNITS_PER_METER;
 		}
 	}
-	/* The clumps stay in place in the world and move with the game's
-	 * clock, so they stop when the game is paused. */
+	/* The clouds are fixed in the world and move with the game's clock, so
+	 * they stop when the game is paused. */
 	for (int axis = 0; axis < 3; axis++) {
 		desc.world_origin[axis] = (double)s.origin_world[axis];
 	}

@@ -190,7 +190,7 @@ environments:
 | `visibility` | Required. The distance in metres at which a ship keeps 5% of its own colour, 1 to 1,000,000. At half that distance, it keeps about 22%. |
 | `color` | The fog's colour: `sky`, or `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. The default is `sky`, which needs `specular`. `intensity` doesn't scale an `[r, g, b]` colour. |
 | `sun_glow` | Makes the fog brighter toward the main light, 0 to 16. The default is 0: no glow. |
-| `sky` | How much the fog hides the sky, 0.01 to 1. It's also the most the fog hides anything. The default is 0.8. At 1, the fog hides the sky completely. |
+| `sky` | How much the fog hides the sky, 0.01 to 1. The fog never hides anything more than this. The default is 0.8. At 1, the fog hides the sky completely. |
 
 With `color: sky`, the fog takes the colour of the sky in each direction,
 read from the `specular` cube and heavily blurred. The fog has the
