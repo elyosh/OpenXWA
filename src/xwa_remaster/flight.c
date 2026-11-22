@@ -842,7 +842,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"presentation.vr_screen_width_px", "presentation.vr_screen_height_px",
 		"presentation.vr_hud_width_px", "presentation.vr_hud_height_px",
 		"motion_blur.quality",        "point_lights.cluster_depth_slices", "hyperspace_jump.star_count",
-		"hyperspace_jump.warp_taps",  "hyperspace_jump.warp_sky_taps",
+		"hyperspace_jump.warp_taps",  "hyperspace_jump.warp_sky_taps",     "fog.quality",
 	};
 	static const char* floats[] = {
 		"presentation.cockpit_fov_min_aspect",
@@ -2109,6 +2109,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemasterDc_SetSettings(&dc_settings);
+
+	const int fog_quality = (int)AeronConfigFile_GetInt(cf, "fog.quality", 2);
+	if (fog_quality < 0 || fog_quality > 2) {
+		Aeron_LogError("xwa.remaster", "%s: fog.quality must be between 0 and 2", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	AeronScene_SetFogQuality(fog_quality);
 
 	s.mb_quality = (int)AeronConfigFile_GetInt(cf, "motion_blur.quality", 0);
 	if (s.mb_quality < 0 || s.mb_quality > 2) {
@@ -8268,7 +8276,7 @@ static int fl_key_directional_light(const XwaRemasterDirLight* lights, uint32_t 
  * environment's, which needs its intensity, or the captured one, which
  * already has it. Its glow is the key light's. */
 static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlSceneLighting* lighting,
-					   const XwaFlightCamera* cam) {
+					   const XwaFlightCamera* cam, const XwaSnapshot* snap) {
 	if (!environment || !environment->settings.fog.enabled || cam->in_hangar) {
 		AeronScene_SetFog(s.scene, NULL);
 		return;
@@ -8282,6 +8290,23 @@ static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlScen
 		lighting->captured ? 1.0f : environment->settings.intensity * XwaRemasterEnvironment_IntensityScale();
 	memcpy(desc.color, fog->color_linear, sizeof desc.color);
 	desc.sky_opacity = fog->sky_opacity;
+	desc.start       = fog->start_m * AERON_OPT_UNITS_PER_METER;
+	if (fog->clouds.enabled) {
+		desc.clouds_size       = fog->clouds.size_m * AERON_OPT_UNITS_PER_METER;
+		desc.clouds_visibility = fog->clouds.visibility_m * AERON_OPT_UNITS_PER_METER;
+		desc.clouds_coverage   = fog->clouds.coverage;
+		desc.clouds_range      = fog->clouds.range_m * AERON_OPT_UNITS_PER_METER;
+		desc.clouds_detail     = fog->clouds.detail;
+		for (int axis = 0; axis < 3; axis++) {
+			desc.drift[axis] = fog->clouds.drift_mps[axis] * AERON_OPT_UNITS_PER_METER;
+		}
+	}
+	/* The clumps stay in place in the world and move with the game's
+	 * clock, so they stop when the game is paused. */
+	for (int axis = 0; axis < 3; axis++) {
+		desc.world_origin[axis] = (double)s.origin_world[axis];
+	}
+	desc.time = (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS;
 	const XwaRemasterDirLight* key = fl_key_light(lighting->lights, lighting->light_count, lighting->key_index);
 	if (key && fog->sun_glow > 0.0f) {
 		desc.sun_glow = fog->sun_glow;
@@ -9480,7 +9505,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_SetPbrPreparedEnvironment(
 			s.scene, XwaRemasterEnvironment_ScaleIntensity(scene_lighting.environment, &scaled_environment));
 	}
-	fl_set_fog(region_environment, &scene_lighting, cam);
+	fl_set_fog(region_environment, &scene_lighting, cam, snap);
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates
 	 * mirror the classic draw sites: the hangar draws it whenever the

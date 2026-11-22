@@ -972,6 +972,11 @@ temporal_upscaling:
   mode: "off"
   # Positive values enable FSR's RCAS pass.
   sharpness: 0.0
+fog:
+  # How a mission region's fog is drawn: 0 with a formula, 1 or 2 with a
+  # grid of 80 or 160 cells across the view that the meshes and the sky
+  # read.
+  quality: 2
 motion_blur:
   quality: 2
   shutter: 0.5
