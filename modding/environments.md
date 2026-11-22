@@ -182,7 +182,7 @@ environments:
     directional_lights: []
     fog:
       visibility: 8000
-      sky_opacity: 0.6
+      sky: 0.8
 ```
 
 | Key | Meaning |
@@ -190,18 +190,21 @@ environments:
 | `visibility` | Required. The distance in metres at which a ship keeps 5% of its own colour, 1 to 1,000,000. At half that distance, it keeps about 22%. |
 | `color` | The fog's colour: `sky`, or `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. The default is `sky`, which needs `specular`. `intensity` doesn't scale an `[r, g, b]` colour. |
 | `sun_glow` | Makes the fog brighter toward the main light, 0 to 16. The default is 0: no glow. |
-| `sky_opacity` | How much the fog covers the sky, 0 to 1. The default is 0: the sky stays clear. |
+| `sky` | How much the fog hides the sky, 0.01 to 1. It's also the most the fog hides anything. The default is 0.8. At 1, the fog hides the sky completely. |
 
 With `color: sky`, the fog takes the colour of the sky in each direction,
 read from the `specular` cube and heavily blurred. The fog has the
 nebula's colours, but none of its detail. `color: sky` keeps the fog's
 colour right when you change `intensity` or the sky.
 
-`sky_opacity` covers the sky, the backdrops, the stars and the suns. It
-also fades the lens flares of the suns. A ship deep in fog becomes a smooth
-shape in the fog's colour, so it stands out in front of a sharp, detailed
-sky. Raise `sky_opacity` to haze the sky with the same colour, and far
-ships then fade into it. In a nebula, start with 0.5 to 0.8.
+`sky` covers the sky, the backdrops, the stars and the suns, and fades the
+suns' lens flares. The fog stops growing at the distance where it hides
+that much, so a far ship is never hidden more than the sky behind it and
+never stands out in front of a clearer sky. With `visibility: 8000`, the
+fog stops at about 1,900 m with `sky: 0.5`, 4,300 m with `sky: 0.8` and
+8,000 m with `sky: 0.95`. With `sky: 1`, as deep inside a nebula, the fog
+covers the sky: with `color: sky`, the sky then shows blurred and without
+stars.
 
 `sun_glow` is the sunlight that the fog scatters toward the player, so it
 is brightest when looking toward the sun. It uses the main light, the one

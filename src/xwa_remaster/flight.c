@@ -8289,11 +8289,11 @@ static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlScen
 	desc.sky_radiance_scale =
 		lighting->captured ? 1.0f : environment->settings.intensity * XwaRemasterEnvironment_IntensityScale();
 	memcpy(desc.color, fog->color_linear, sizeof desc.color);
-	desc.sky_opacity = fog->sky_opacity;
+	desc.sky         = fog->sky;
 	desc.start       = fog->start_m * AERON_OPT_UNITS_PER_METER;
 	if (fog->clouds.enabled) {
 		desc.clouds_size       = fog->clouds.size_m * AERON_OPT_UNITS_PER_METER;
-		desc.clouds_visibility = fog->clouds.visibility_m * AERON_OPT_UNITS_PER_METER;
+		desc.clouds_opacity    = fog->clouds.opacity;
 		desc.clouds_coverage   = fog->clouds.coverage;
 		desc.clouds_range      = fog->clouds.range_m * AERON_OPT_UNITS_PER_METER;
 		desc.clouds_detail     = fog->clouds.detail;
