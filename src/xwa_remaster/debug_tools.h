@@ -2,24 +2,21 @@
 #define XWA_REMASTER_DEBUG_TOOLS_H
 
 /*
- * XWA debug tools — registration entry point for the Aeron debug
- * overlay (aeron/debug.h): PBR global tuning, SSAO knobs, and
- * HDR & display. The implementation TU is compiled only when the
- * build enables AERON_DEBUG_UI (XWA_ENABLE_DEBUG_UI); call sites
- * guard with the same define.
+ * The XWA windows and menus of the Aeron debug overlay (aeron/debug.h). The
+ * code is in src/xwa_remaster/debug and is built only with the debug UI
+ * (XWA_ENABLE_DEBUG_UI). Callers check the same define.
  */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Register every XWA inspector with Aeron_DebugRegisterTool. Call
- * once at remaster init (the tools poke remaster process-wide
- * state). No-op when the overlay is unavailable at runtime. */
+/* Adds the XWA windows and menus. Call it once when the remaster starts.
+ * Does nothing when the overlay isn't available. */
 void XwaRemasterDebugTools_Register(void);
 
-/* XWA rows of Aeron's Environment debug tool (selection and the authored
- * flight development switch). */
+/* The XWA rows of Aeron's Environment window: the authored environments
+ * switch, the region's selection, and the sky capture. */
 void XwaRemasterDebugTools_EnvironmentRows(void* user);
 
 #ifdef __cplusplus

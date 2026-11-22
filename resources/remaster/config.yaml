@@ -369,9 +369,6 @@ models:
   opt_emissive_strength: 3.0
   opt_projectile_emissive_strength: 20.0
   engine_emissive_strength: 10.0
-  # Draws the back faces of one-sided meshes in black, to hide the gaps
-  # between their faces.
-  backface_fill: false
 effects:
   explosion_genus_emissive_strength: 10.0
   glow_mark_emissive_strength: 20.0
@@ -820,14 +817,6 @@ point_lights:
   # engines, are shaded as one light away from them. Near them, they stay
   # separate.
   merge_spot_lights: true
-  # Makes large models faster to draw when only a few nearby lights reach
-  # them, for example a cockpit lit by the engines of a far ship or by the
-  # lasers of a battle around it. Lights that are far away compared with
-  # the model's size are combined into one or two lights: their highlights
-  # merge into one softer highlight, and their light changes a little. On
-  # such a model, the spot lights that merge_spot_lights groups are always
-  # drawn as one light. Turn this off to compare the speed and the picture.
-  light_lists: true
   # The game's lights (lasers, explosions, engines) are physical
   # inverse-square sphere lights from the classic intensities. This many
   # metres away they give what the classic law gives, converted by
@@ -911,7 +900,6 @@ classic_lighting:
   # than the images. Above 0, up to 1000.
   image_radiance: 59.2056
 lighting:
-  spec_geom_adapt: true
   # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
   # surface 10% of the white sun's light.
   ambient_r: 3.0

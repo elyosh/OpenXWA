@@ -389,7 +389,15 @@ add_library(xwa_remaster STATIC
 )
 if(XWA_ENABLE_DEBUG_UI)
     target_sources(xwa_remaster PRIVATE
-        src/xwa_remaster/debug_tools.cpp)
+        src/xwa_remaster/debug/cockpit.cpp
+        src/xwa_remaster/debug/debug_tools.cpp
+        src/xwa_remaster/debug/debug_view.cpp
+        src/xwa_remaster/debug/diagnostics.cpp
+        src/xwa_remaster/debug/display.cpp
+        src/xwa_remaster/debug/effects.cpp
+        src/xwa_remaster/debug/image.cpp
+        src/xwa_remaster/debug/lighting.cpp
+        src/xwa_remaster/debug/models.cpp)
 endif()
 target_include_directories(xwa_remaster
     PUBLIC

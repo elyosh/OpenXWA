@@ -87,9 +87,6 @@ static float s_opt_projectile_emissive_strength;
 static float s_engine_emissive_strength;
 static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
-/* AeronScene_SetBackfaceFill: models.backface_fill in remaster/config.yaml,
-   also set by the debug inspector. */
-static int g_backface_fill = 1;
 /* The key light's shadow on the probe light from its side whichever way
  * surfaces face; debug inspector toggle, not persisted. */
 static int g_key_shadow_all_sides = 1;
@@ -603,10 +600,6 @@ void XwaRemasterShip_ConfigurePbrTuning(const XwaShipPbrTuning* in) {
 		g_pbr_tuning = *in;
 	}
 }
-int XwaRemasterShip_BackfaceFill(void) { return g_backface_fill; }
-
-void XwaRemasterShip_SetBackfaceFill(int enabled) { g_backface_fill = enabled != 0; }
-
 int XwaRemasterShip_KeyShadowAllSides(void) { return g_key_shadow_all_sides; }
 
 void XwaRemasterShip_SetKeyShadowAllSides(int enabled) { g_key_shadow_all_sides = enabled != 0; }
@@ -696,13 +689,14 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
 		env.ssao_power = ao->power;
 		env.ssao_direct = ao->direct;
 	}
-	/* Remaining shading knobs come from the required remaster/config.yaml profile
-	 * through the process-wide tuning state. */
-	env.spec_geom_adapt = g_pbr_tuning.spec_geom_adapt;
-	AeronScene_SetPbrDebugViews(scene, env.debug_isolate_term != 0.0f || env.spec_geom_adapt == 0.0f);
+	/* Only the debug view shaders read spec_geom_adapt; the others always
+	 * adapt the specular normal. */
+	env.spec_geom_adapt = 1.0f;
+	AeronScene_SetPbrDebugViews(scene, env.debug_isolate_term != 0.0f);
 	AeronScene_SetPbrDebugMaterial(scene, g_pbr_tuning.debug_material_override != 0.0f,
 								   g_pbr_tuning.debug_metallic, g_pbr_tuning.debug_roughness);
-	AeronScene_SetBackfaceFill(scene, g_backface_fill);
+	/* XWA's models don't need the dark fill behind the gaps between faces. */
+	AeronScene_SetBackfaceFill(scene, 0);
 
 	/* HD relight: authored ambient fill (tuning.ambient, radiance) plus the
 	 * directional lights' illuminance. The game state contributes the art

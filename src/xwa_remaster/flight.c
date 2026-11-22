@@ -983,12 +983,10 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"point_lights.cluster_debug",    "motion_blur.camera_blur",
 		"motion_blur.pause_keep_blur",   "motion_blur.velocity_viz",
 		"texture_filtering.anisotropic", "hangar_lighting.enabled",
-		"lighting.spec_geom_adapt",      "dynamic_cockpit.enabled",
-		"dynamic_cockpit.classic_hud",   "dynamic_cockpit.holograms",
-		"point_lights.model_lights",     "presentation.latency_pacing",
-		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
-		"models.backface_fill",          "point_lights.merge_spot_lights",
-		"point_lights.light_lists",
+		"dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud",
+		"dynamic_cockpit.holograms",     "point_lights.model_lights",
+		"presentation.latency_pacing",   "hyperspace_jump.exit_forward",
+		"hyperspace_jump.warp_sky_half_resolution", "point_lights.merge_spot_lights",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov", "presentation.msaa_depth_prepass",
@@ -1913,7 +1911,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.merge_spot_lights = AeronConfigFile_GetBool(cf, "point_lights.merge_spot_lights", 0);
-	s.plight.light_lists = AeronConfigFile_GetBool(cf, "point_lights.light_lists", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
 	s.plight.cockpit_explosion_light_scale =
@@ -1999,7 +1996,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 
 	XwaShipPbrTuning pbr;
 	memset(&pbr, 0, sizeof pbr);
-	pbr.spec_geom_adapt = AeronConfigFile_GetBool(cf, "lighting.spec_geom_adapt", 0) ? 1.0f : 0.0f;
 	pbr.ambient[0] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_r", 0.0);
 	pbr.ambient[1] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_g", 0.0);
 	pbr.ambient[2] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_b", 0.0);
@@ -2085,7 +2081,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	XwaRemasterShip_SetBackfaceFill(AeronConfigFile_GetBool(cf, "models.backface_fill", 1));
 	if (!XwaRemasterSuns_LoadFlareElements(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -2506,11 +2501,9 @@ void XwaRemasterFlight_LogFrameStats(void) {
 				  shadows.cascade_count, frame.shadow_draws);
 	Aeron_LogInfo(
 		"xwa.benchmark",
-		"film benchmark: settings: MSAA %dx%s, SSAO quality %d, motion blur quality %d, upscaling %s, "
-		"light lists %s",
+		"film benchmark: settings: MSAA %dx%s, SSAO quality %d, motion blur quality %d, upscaling %s",
 		(int)XwaRemaster_MsaaSampleCount(), AeronScene_MsaaDepthPrepass(s.scene) ? " with depth prepass" : "",
-		s.ssao.ssao_quality, s.mb_quality, AeronTemporal_ModeName(s.fsr_mode),
-		s.plight.light_lists ? "on" : "off");
+		s.ssao.ssao_quality, s.mb_quality, AeronTemporal_ModeName(s.fsr_mode));
 	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
 		Aeron_LogInfo("xwa.benchmark",
 					  "film benchmark: view %u of %u: %u instances drawn, %u with a light list (%u with "
@@ -5972,7 +5965,7 @@ static int fl_configure_clustered_lights(AeronScene3D* scene) {
 													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
 													.debug_view = s.plight.cluster_debug,
 													.merge_spot_lights = s.plight.merge_spot_lights,
-													.light_lists = s.plight.light_lists,
+													.light_lists = 1,
 												});
 }
 

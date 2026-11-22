@@ -1,6 +1,5 @@
 #include "xwa/flight/flight.h"
 #include "xwa/flight/fediskio.h"
-#include "xwa/flight/flight_debug.h"
 #include "xwa/flight/flight_map.h"
 #include "xwa/flight/hangar.h"
 
@@ -102,130 +101,12 @@ typedef struct ModernMapCameraStepRemainder {
 	int direction;
 } ModernMapCameraStepRemainder;
 
-typedef struct ModernJoystickInputSample {
-	int timestamp;
-	int captured;
-	int16_t prePackX;
-	int16_t prePackY;
-	int16_t prePackR;
-	int8_t packedX;
-	int8_t packedY;
-	int8_t packedR;
-} ModernJoystickInputSample;
-
-typedef struct ModernJoystickIntegrationTrace {
-	int timestamp;
-	uint16_t elapsedTicks;
-	int16_t scaledYaw;
-	int16_t scaledPitch;
-	int16_t scaledRoll;
-	int targetYaw;
-	int targetPitch;
-	int targetRoll;
-	int16_t smoothedYaw;
-	int16_t smoothedPitch;
-	int16_t smoothedRoll;
-	int stepYaw;
-	int stepPitch;
-	int stepRoll;
-	Q16Angle oldPitch;
-	Q16Angle oldYaw;
-	Q16Angle oldRoll;
-	Q16Angle newPitch;
-	Q16Angle newYaw;
-	Q16Angle newRoll;
-} ModernJoystickIntegrationTrace;
-
-#define MODERN_JOYSTICK_TRACE_HISTORY_COUNT 16
-
 static ModernTurretAngleRemainder g_modernTurretAngleRemainders[XWA_PLAYER_COUNT][2];
 static ModernMapCameraStepRemainder g_modernMapCameraStepRemainders[XWA_PLAYER_COUNT];
-static ModernJoystickInputSample g_modernJoystickInputSamples[MODERN_JOYSTICK_TRACE_HISTORY_COUNT];
-static unsigned int g_modernJoystickInputSampleCursor;
-static int g_modernJoystickTraceEnabled;
-
-int FlightDebug_JoystickTraceEnabled(void) { return g_modernJoystickTraceEnabled; }
-
-void FlightDebug_SetJoystickTraceEnabled(int enabled) {
-	enabled = enabled != 0;
-	if (enabled == g_modernJoystickTraceEnabled) {
-		return;
-	}
-	g_modernJoystickTraceEnabled = enabled;
-	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
-	g_modernJoystickInputSampleCursor = 0;
-	Aeron_LogInfo("xwa.input.trace", "JOYTRACE state=%s", enabled ? "on" : "off");
-}
-
-void FlightDebug_CaptureJoystickInputSample(int timestamp) {
-	ModernJoystickInputSample* sample;
-
-	if (!g_modernJoystickTraceEnabled) {
-		return;
-	}
-
-	sample = &g_modernJoystickInputSamples[g_modernJoystickInputSampleCursor];
-	g_modernJoystickInputSampleCursor =
-		(g_modernJoystickInputSampleCursor + 1) % MODERN_JOYSTICK_TRACE_HISTORY_COUNT;
-	memset(sample, 0, sizeof(*sample));
-	sample->timestamp = timestamp;
-	sample->captured = 1;
-	sample->prePackX = g_ctrlAxisX;
-	sample->prePackY = g_ctrlAxisY;
-	sample->prePackR = g_ctrlAxisR;
-	sample->packedX = g_currentInputFrame.axisX;
-	sample->packedY = g_currentInputFrame.axisY;
-	sample->packedR = g_currentInputFrame.axisR;
-}
-
-static const ModernJoystickInputSample* FlightDebug_FindJoystickInputSample(int timestamp) {
-	unsigned int i;
-
-	for (i = 0; i < MODERN_JOYSTICK_TRACE_HISTORY_COUNT; ++i) {
-		const ModernJoystickInputSample* sample =
-			&g_modernJoystickInputSamples[(g_modernJoystickInputSampleCursor +
-										   MODERN_JOYSTICK_TRACE_HISTORY_COUNT - 1 - i) %
-										  MODERN_JOYSTICK_TRACE_HISTORY_COUNT];
-		if (sample->captured && sample->timestamp == timestamp) {
-			return sample;
-		}
-	}
-	return NULL;
-}
-
-static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTrace* trace) {
-	const ModernJoystickInputSample* sample = FlightDebug_FindJoystickInputSample(trace->timestamp);
-	ModernJoystickInputSample fallback;
-
-	if (!sample) {
-		memset(&fallback, 0, sizeof(fallback));
-		fallback.prePackX = g_ctrlAxisX;
-		fallback.prePackY = g_ctrlAxisY;
-		fallback.prePackR = g_ctrlAxisR;
-		fallback.packedX = (int8_t)g_ctrlAxisX;
-		fallback.packedY = (int8_t)g_ctrlAxisY;
-		fallback.packedR = (int8_t)g_ctrlAxisR;
-		sample = &fallback;
-	}
-
-	Aeron_LogInfo("xwa.input.trace",
-				  "JOYTRACE ts=%d dt=%u xwa=%d,%d,%d "
-				  "pk=%d,%d,%d sc_ypr=%d,%d,%d tgt_ypr=%d,%d,%d sm_ypr=%d,%d,%d step_ypr=%d,%d,%d "
-				  "ang_pyr=%u,%u,%u>%u,%u,%u",
-				  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->prePackX, sample->prePackY,
-				  sample->prePackR, sample->packedX, sample->packedY, sample->packedR, trace->scaledYaw,
-				  trace->scaledPitch, trace->scaledRoll, trace->targetYaw, trace->targetPitch,
-				  trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch, trace->smoothedRoll,
-				  trace->stepYaw, trace->stepPitch, trace->stepRoll, (unsigned int)trace->oldPitch,
-				  (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll, (unsigned int)trace->newPitch,
-				  (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
-}
 
 void Flight_ModernResetHighRateIntegration(void) {
 	memset(g_modernTurretAngleRemainders, 0, sizeof(g_modernTurretAngleRemainders));
 	memset(g_modernMapCameraStepRemainders, 0, sizeof(g_modernMapCameraStepRemainders));
-	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
-	g_modernJoystickInputSampleCursor = 0;
 	Flight_ModernResetAiTurns();
 	XwaAiLead_Reset();
 }
@@ -12798,21 +12679,8 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 		uint16_t rollFrac;
 		int pitchWhole;
 		uint16_t pitchFrac;
-#ifdef XWA_MODERN
-		ModernJoystickIntegrationTrace joystickTrace;
-		int joystickTraceActive;
-#endif
 
 		craft = g_objectTable[g_players[playerIdx].objectIndex].mobj->pCraft;
-#ifdef XWA_MODERN
-		joystickTraceActive = g_modernJoystickTraceEnabled && playerIdx == (unsigned int)g_localPlayer &&
-							  !g_flightSimSideEffectsSuppressed && seatIdx == -1;
-		if (joystickTraceActive) {
-			memset(&joystickTrace, 0, sizeof(joystickTrace));
-			joystickTrace.timestamp = g_players[playerIdx].lockstepTimestamp;
-			joystickTrace.elapsedTicks = g_elapsedTicks;
-		}
-#endif
 
 		if (seatIdx == -1) {
 			throttleScale = craft->throttleSpeed;
@@ -12848,13 +12716,6 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			g_scaledInputRoll = g_scaledInputYaw;
 			g_scaledInputYaw = tmp;
 		}
-#ifdef XWA_MODERN
-		if (joystickTraceActive) {
-			joystickTrace.scaledYaw = g_scaledInputYaw;
-			joystickTrace.scaledPitch = g_scaledInputPitch;
-			joystickTrace.scaledRoll = g_scaledInputRoll;
-		}
-#endif
 
 		powerMargin = craft->laserRedirect;
 		if (craft->systemFlags & 1) {
@@ -12929,13 +12790,6 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			pitchTargetLocal = 0;
 			rollTarget = 0;
 		}
-#ifdef XWA_MODERN
-		if (joystickTraceActive) {
-			joystickTrace.targetYaw = yawTarget;
-			joystickTrace.targetPitch = pitchTargetLocal;
-			joystickTrace.targetRoll = rollTarget;
-		}
-#endif
 
 		if (g_players[playerIdx].gap71_field16 == (int16_t)swappedControls) {
 			uint16_t smoothingStepScale = g_simStepScale;
@@ -12957,13 +12811,6 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			g_players[playerIdx].smoothedInputRoll = 0;
 		}
 		g_players[playerIdx].gap71_field16 = (int16_t)swappedControls;
-#ifdef XWA_MODERN
-		if (joystickTraceActive) {
-			joystickTrace.smoothedYaw = g_players[playerIdx].smoothedInputYaw;
-			joystickTrace.smoothedPitch = g_players[playerIdx].smoothedInputPitch;
-			joystickTrace.smoothedRoll = g_players[playerIdx].smoothedInputRoll;
-		}
-#endif
 
 		yawTarget = MATH2_ABoverC32(g_players[playerIdx].smoothedInputYaw, (uint16_t)g_elapsedTicks, 236);
 		pitchTargetLocal =
@@ -12980,17 +12827,6 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			swappedControls = 0;
 			rollTarget = 0;
 		}
-#ifdef XWA_MODERN
-		if (joystickTraceActive) {
-			uint16_t objectIndex = g_players[playerIdx].objectIndex;
-			joystickTrace.stepYaw = yawTarget;
-			joystickTrace.stepPitch = pitchTargetLocal;
-			joystickTrace.stepRoll = rollTarget;
-			joystickTrace.oldPitch = g_objectTable[objectIndex].pitch;
-			joystickTrace.oldYaw = g_objectTable[objectIndex].yaw;
-			joystickTrace.oldRoll = g_objectTable[objectIndex].roll;
-		}
-#endif
 
 		if ((swappedControls || seatIdx == -1) && !g_players[playerIdx].aiControlledFlag) {
 			if (pitchTargetLocal || yawTarget) {
@@ -13010,15 +12846,6 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 					(Q16Angle)(g_objectTable[g_players[playerIdx].objectIndex].roll - (uint16_t)yawTarget);
 			}
 		}
-#ifdef XWA_MODERN
-		if (joystickTraceActive) {
-			uint16_t objectIndex = g_players[playerIdx].objectIndex;
-			joystickTrace.newPitch = g_objectTable[objectIndex].pitch;
-			joystickTrace.newYaw = g_objectTable[objectIndex].yaw;
-			joystickTrace.newRoll = g_objectTable[objectIndex].roll;
-			FlightDebug_LogJoystickIntegration(&joystickTrace);
-		}
-#endif
 
 		if (seatIdx >= 0 && !swappedControls && !g_players[playerIdx].viewState.externalCameraActive) {
 			ModelDefIndex modelIndex = (ModelDefIndex)GetModelDefIndexFromType(

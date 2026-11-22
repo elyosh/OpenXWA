@@ -15,7 +15,6 @@
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
 #include "aeron/log.h"
-#include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/hooks/orientation_hook.h"
 #include "xwa_runtime/models/gunner_seats.h"
@@ -2715,40 +2714,24 @@ void FlightView_RotateFilmOverlayFreeCameraByInput(int pitchDeltaQ16, int negYaw
 	g_filmOverlayViewState.viewRoll = (uint16_t)(int16_t)-(int16_t)trig2_arctan(g_curMatR0_Y, g_curMatR0_X);
 }
 
-#ifdef XWA_MODERN
-static int g_gimbalLockFixEnabled = 1;
-
-int FlightDebug_GimbalLockFixEnabled(void) { return g_gimbalLockFixEnabled; }
-
-void FlightDebug_SetGimbalLockFixEnabled(int enabled) {
-	enabled = enabled != 0;
-	if (enabled == g_gimbalLockFixEnabled) {
-		return;
-	}
-	g_gimbalLockFixEnabled = enabled;
-	Aeron_LogInfo("xwa.input.orientation", "ORIENTFIX state=%s", enabled ? "on" : "off");
-}
-
-#endif
-
 // FUNCTION: XWA 0x5042F0
 void USER_calcdeltapitch(int16_t pitchQ16, int16_t negYawQ16, uint16_t shipObjIdx) {
 #ifdef XWA_MODERN
-	if (g_gimbalLockFixEnabled) {
-		XwaOrientationAngles current;
-		XwaOrientationAngles updated;
+	/* Turn the craft around its own axes, as the community gimbal lock fix
+	 * does, so it doesn't lock up when it points straight up or down. */
+	XwaOrientationAngles current;
+	XwaOrientationAngles updated;
 
-		current.yaw = g_objectTable[shipObjIdx].yaw;
-		current.pitch = g_objectTable[shipObjIdx].pitch;
-		current.roll = g_objectTable[shipObjIdx].roll;
-		updated = XwaOrientation_ApplyPitchYaw(current, pitchQ16, negYawQ16);
+	current.yaw = g_objectTable[shipObjIdx].yaw;
+	current.pitch = g_objectTable[shipObjIdx].pitch;
+	current.roll = g_objectTable[shipObjIdx].roll;
+	updated = XwaOrientation_ApplyPitchYaw(current, pitchQ16, negYawQ16);
 
-		g_objectTable[shipObjIdx].yaw = updated.yaw;
-		g_objectTable[shipObjIdx].pitch = updated.pitch;
-		g_objectTable[shipObjIdx].roll = updated.roll;
-		g_objectTable[shipObjIdx].angleD = 0;
-		return;
-	}
+	g_objectTable[shipObjIdx].yaw = updated.yaw;
+	g_objectTable[shipObjIdx].pitch = updated.pitch;
+	g_objectTable[shipObjIdx].roll = updated.roll;
+	g_objectTable[shipObjIdx].angleD = 0;
+	return;
 #endif
 	int yawRawQ16;
 	int yawNegQ16;

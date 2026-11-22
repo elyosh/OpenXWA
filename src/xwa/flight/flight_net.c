@@ -3,7 +3,6 @@
 #include "xwa/assets/string_table.h"
 #include "xwa/config/game_config.h"
 #include "xwa/flight/flight.h"
-#include "xwa/flight/flight_debug.h"
 #include "xwa/flight/flight_display.h"
 #include "xwa/flight/flight_sync.h"
 #include "xwa/flight/mission/mission.h"
@@ -1990,9 +1989,6 @@ int FlightNet_SampleAndSendInput(void) {
 	if (inserted != NULL) {
 		inserted->applied = 0;
 		inserted->valid = validFrame;
-#ifdef XWA_MODERN
-		FlightDebug_CaptureJoystickInputSample(g_inputTimestamp);
-#endif
 	}
 
 	return Flight_PumpWindowMessages();

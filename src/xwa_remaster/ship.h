@@ -155,7 +155,6 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
  * environment block). The required remaster/config.yaml profile defines the HD
  * relight baseline. Mutated by the debug inspector; not persisted. */
 typedef struct XwaShipPbrTuning {
-	float spec_geom_adapt;    /* 0/1: blend spec normal toward the face */
 	float debug_isolate_term; /* PbrIsolateMode (0 = off) */
 	float ambient[3];         /* ambient cube fill, radiance in W/m^2/sr */
 	/* Debug material override (debug inspector only): every PBR material
@@ -170,12 +169,6 @@ void XwaRemasterShip_SetPbrTuning(const XwaShipPbrTuning* in);
 /* Installs the required remaster/config.yaml profile and makes it the debug reset target. */
 void XwaRemasterShip_ConfigurePbrTuning(const XwaShipPbrTuning* in);
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out);
-
-/* Dark back-face fill behind hairline cracks (AeronScene_SetBackfaceFill).
- * On by default; the debug inspector toggles it for comparison and
- * profiling. */
-int XwaRemasterShip_BackfaceFill(void);
-void XwaRemasterShip_SetBackfaceFill(int enabled);
 
 /* When the key light is in the probes (a hangar's ceiling light), its
  * shadow takes the probe light from its side whichever way surfaces face.
