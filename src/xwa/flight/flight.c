@@ -7052,6 +7052,13 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					g_filmPlaybackMode = 3;
 				} else {
 					Flight_RestoreWorldState();
+					/* The lights come from the backdrops of the player's
+					   region, and the mission load set them for the region
+					   the mission starts in. A film recorded after a jump
+					   starts in another region, and the original kept the
+					   lights of the first one. Set them as a jump does. */
+					FlightLight_ClearDirectionalLights();
+					FlightLight_AddCurrentRegionBackdropLights();
 				}
 			}
 #else
