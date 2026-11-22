@@ -1108,6 +1108,11 @@ static void XwaRemaster_FrameScene(int32_t delta_us) {
 	if (XwaFilmBenchmark_IsFrozen() && snap->scene_kind == XWA_SCENE_FLIGHT) {
 		g.force_scene_render = 1;
 	}
+	/* While the debug overlay is open, a paused flight is drawn on every frame,
+	 * so that changes made in the overlay show at once. */
+	if (Aeron_DebugUiVisible() && snap->scene_kind == XWA_SCENE_FLIGHT) {
+		g.force_scene_render = 1;
+	}
 	if (g.force_scene_render && snap->scene_kind != XWA_SCENE_FLIGHT &&
 		snap->scene_kind != XWA_SCENE_CUTSCENE) {
 		g.force_scene_render = 0;
