@@ -8263,6 +8263,34 @@ static int fl_key_directional_light(const XwaRemasterDirLight* lights, uint32_t 
 	return 1;
 }
 
+/* The region environment's fog. The hangar is indoors, so it has none. The
+ * fog takes the sky's colour from the bound specular cube: the
+ * environment's, which needs its intensity, or the captured one, which
+ * already has it. Its glow is the key light's. */
+static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlSceneLighting* lighting,
+					   const XwaFlightCamera* cam) {
+	if (!environment || !environment->settings.fog.enabled || cam->in_hangar) {
+		AeronScene_SetFog(s.scene, NULL);
+		return;
+	}
+	const AeronEnvironmentFog* fog = &environment->settings.fog;
+	AeronSceneFogDesc desc;
+	memset(&desc, 0, sizeof desc);
+	desc.visibility = fog->visibility_m * AERON_OPT_UNITS_PER_METER;
+	desc.color_from_sky = fog->color_from_sky;
+	desc.sky_radiance_scale =
+		lighting->captured ? 1.0f : environment->settings.intensity * XwaRemasterEnvironment_IntensityScale();
+	memcpy(desc.color, fog->color_linear, sizeof desc.color);
+	desc.sky_opacity = fog->sky_opacity;
+	const XwaRemasterDirLight* key = fl_key_light(lighting->lights, lighting->light_count, lighting->key_index);
+	if (key && fog->sun_glow > 0.0f) {
+		desc.sun_glow = fog->sun_glow;
+		memcpy(desc.sun_direction, key->world_dir, sizeof desc.sun_direction);
+		memcpy(desc.sun_color, key->color, sizeof desc.sun_color);
+	}
+	AeronScene_SetFog(s.scene, &desc);
+}
+
 /* The procedural lens flare, from the sun that casts the shadows: the
  * environment's primary light when the environment's lights replace the
  * game's, if it asks for a flare; otherwise the backdrop sun that made the
@@ -9452,6 +9480,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_SetPbrPreparedEnvironment(
 			s.scene, XwaRemasterEnvironment_ScaleIntensity(scene_lighting.environment, &scaled_environment));
 	}
+	fl_set_fog(region_environment, &scene_lighting, cam);
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates
 	 * mirror the classic draw sites: the hangar draws it whenever the

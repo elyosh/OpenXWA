@@ -2,7 +2,7 @@
 
 An environment is a named set of lighting for a region of a mission. It
 can have a sky, lighting cubes for the 3D models, an ambient light, up to
-four suns and an overlay drawn over the sky. The file
+four suns, an overlay drawn over the sky and fog. The file
 `flight/environments/environments.yaml` lists the environments and says
 which mission regions use them.
 
@@ -87,6 +87,7 @@ to 256 environments.
 | `rotation_degrees` | Turns the sky and its suns, `[yaw, pitch, roll]`. The default is `[0, 0, 0]`. See [Directions](#directions). |
 | `directional_lights` | The suns, up to four. See [Suns](#suns). It is required with `radiance`. Use `[]` for a sky without suns. |
 | `overlay` | A cube with transparency, drawn over the sky. See [Overlays](#overlays). It needs `radiance`. |
+| `fog` | Fog that hides what is far away. See [Fog](#fog). |
 
 Any other key is an error.
 
@@ -162,6 +163,49 @@ environments:
 |-|-|
 | `cube` | Required. The overlay's cube image, a BC7 sRGB cube made with `environment_bake --overlay-faces`. |
 | `rotation_degrees` | Turns the overlay, `[yaw, pitch, roll]`, as for the sky. The default is `[0, 0, 0]`. The environment's rotation and a region's rotation don't turn it. |
+
+### Fog
+
+Fog hides what is far away, as inside a nebula: ships, laser bolts,
+explosions and other effects. The farther a ship is, the more the fog's
+colour replaces its own, until it disappears.
+
+```yaml
+environments:
+  green_nebula:
+    intensity: 59.2
+    radiance: "flight/environments/green_nebula/sky.ktx2"
+    diffuse: "flight/environments/green_nebula/diffuse.ktx2"
+    diffuse_strength: 1
+    specular: "flight/environments/green_nebula/specular.ktx2"
+    specular_strength: 1
+    directional_lights: []
+    fog:
+      visibility: 8000
+      sky_opacity: 0.6
+```
+
+| Key | Meaning |
+|-|-|
+| `visibility` | Required. The distance in metres at which a ship keeps 5% of its own colour, 1 to 1,000,000. At half that distance, it keeps about 22%. |
+| `color` | The fog's colour: `sky`, or `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. The default is `sky`, which needs `specular`. `intensity` doesn't scale an `[r, g, b]` colour. |
+| `sun_glow` | Makes the fog brighter toward the main light, 0 to 16. The default is 0: no glow. |
+| `sky_opacity` | How much the fog covers the sky, 0 to 1. The default is 0: the sky stays clear. |
+
+With `color: sky`, the fog takes the colour of the sky in each direction,
+read from the `specular` cube and heavily blurred. The fog has the
+nebula's colours, but none of its detail. `color: sky` keeps the fog's
+colour right when you change `intensity` or the sky.
+
+`sky_opacity` covers the sky, the backdrops, the stars and the suns. It
+also fades the lens flares of the suns. A ship deep in fog becomes a smooth
+shape in the fog's colour, so it stands out in front of a sharp, detailed
+sky. Raise `sky_opacity` to haze the sky with the same colour, and far
+ships then fade into it. In a nebula, start with 0.5 to 0.8.
+
+`sun_glow` is the sunlight that the fog scatters toward the player, so it
+is brightest when looking toward the sun. It uses the main light, the one
+that casts the shadows. Start with small values, such as 0.05.
 
 ## Suns
 
@@ -280,6 +324,7 @@ A region's value is one of:
 | `show_backdrops` | `all`, or a list of backdrop images to show, even when `hide_backdrops` hides them. Needs `backdrops: keep`. |
 | `hidden_backdrop_lights` | `keep` or `remove`, for the lights of hidden backdrops. Needs `backdrops: keep`. The default is `keep`. |
 | `backdrop_light_scale` | Multiplies the light of the backdrops that aren't suns, 0 to 4. Needs `backdrops: keep`. The default is 1. |
+| `fog` | Replaces the environment's fog in this region, with the keys of [Fog](#fog), or `none` for no fog. `color: sky` needs the environment's `specular`. |
 
 `xwa.default` can also be a map with these keys.
 
@@ -346,7 +391,7 @@ The groups of planets, nebulae, galaxies and suns are in
 - No environment is used during a hyperspace jump.
 - In a hangar, the game uses the environment of the region where the
   player entered the hangar, but only its sky. The hangar has its own
-  lighting. See [Hangars](hangars.md#hangar-lighting).
+  lighting and no fog. See [Hangars](hangars.md#hangar-lighting).
 - When an environment's textures can't be loaded, the region keeps the
   game's own sky, and the log says why.
 
@@ -670,5 +715,5 @@ lines name the texture and the reason.
 In the debug packages, the **Environment** tool of the debug overlay shows
 the region's environment. **Reload** reads `environments.yaml` and the
 images again without a restart. The tool also has sliders for the values
-of the environment, and **Copy YAML** copies the changed environment, ready
-to paste into the file.
+of the environment, its fog included, and **Copy YAML** copies the changed
+environment, ready to paste into the file.

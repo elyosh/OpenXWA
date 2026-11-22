@@ -83,7 +83,7 @@ OpenXWA --mod "/path/to/my-first-mod"
   model.
 - [Flight](flight.md): `flight.yaml`, `hud.yaml` and `sounds.yaml`.
 - [Environments](environments.md): skies, lighting, suns and lens flares,
-  backdrops.
+  backdrops, fog.
 - [Hangars](hangars.md): `hangars.yaml` and the hangar section of a
   mission.
 - [Missions](missions.md): mission files, mission settings, TIE missions,

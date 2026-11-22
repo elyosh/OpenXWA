@@ -327,14 +327,16 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
 }
 
 /* Adds a reference to an environment. A reference is either an environment
- * name or a map with `environment`, an optional `rotation_degrees` and the
- * optional backdrop fields. */
+ * name or a map with `environment`, an optional `rotation_degrees`, an
+ * optional `fog` that replaces the environment's, and the optional backdrop
+ * fields. */
 static int env_add_reference(const AeronConfigNode* node, const char* what, int32_t* out_index) {
 	static const char* const fields[] = { "environment",         "rotation_degrees", "backdrops",
 										  "hide_backdrops",      "show_backdrops",   "hidden_backdrop_lights",
-										  "backdrop_light_scale" };
+										  "backdrop_light_scale", "fog" };
 	const AeronConfigNode* name_node = node;
 	const AeronConfigNode* rotation_node = NULL;
+	const AeronConfigNode* fog_node = NULL;
 	XwaEnvironmentBackdropRule backdrops;
 	memset(&backdrops, 0, sizeof backdrops);
 	backdrops.light_scale = 1.0f;
@@ -347,6 +349,7 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, int3
 			return env_node_error(node, "%s: missing required field 'environment'", what);
 		}
 		rotation_node = AeronConfigNode_MapGet(node, "rotation_degrees");
+		fog_node = AeronConfigNode_MapGet(node, "fog");
 		if (!env_read_backdrops(node, what, &backdrops)) {
 			return 0;
 		}
@@ -376,6 +379,15 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, int3
 			return 0;
 		}
 		reference->has_rotation = true;
+	}
+	if (fog_node) {
+		AeronConfigError error;
+		memset(&error, 0, sizeof error);
+		if (!AeronEnvironment_ParseFog(fog_node, what, definition->specular_path[0] != '\0', &reference->fog,
+									   &error)) {
+			return env_node_error(fog_node, "%s", error.message);
+		}
+		reference->has_fog = true;
 	}
 	s_env.backdrops[s_env.reference_count] = backdrops;
 	*out_index = (int32_t)s_env.reference_count++;
