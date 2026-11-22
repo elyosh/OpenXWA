@@ -189,6 +189,9 @@ environments:
 | `visibility` | Required. How thick the fog is, in metres, from 1 to 1,000,000: a ship at this distance keeps 5% of its colour. Above 5,000 m, the fog is thin enough that nothing gets down to 5% (see the table below). |
 | `color` | The fog's colour: `sky`, or `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. The default is `sky`, which needs `specular`. `intensity` doesn't scale an `[r, g, b]` colour. |
 | `sun_glow` | Makes the fog brighter toward the main light, 0 to 16. The default is 0: no glow. |
+| `start` | The clear space around the player, in metres, from 0 to 1,000. The fog thickens from nothing to full over this distance, so there is no fog inside the cockpit. The default is 5. |
+| `lights` | How much lasers, explosions and engines light the fog, from 0 to 100. 1 is physically correct, and 0 turns it off. The default is 1. |
+| `clouds` | Thicker patches in the fog. See [Clouds](#clouds). The default is no clouds. |
 
 How much of a ship's own colour still shows, by `visibility`:
 
@@ -217,6 +220,37 @@ change `intensity` or the sky.
 `sun_glow` is the sunlight that the fog scatters toward the player, so it
 is brightest when looking toward the sun. It uses the main light, the one
 that casts the shadows. Start with small values, such as 0.05.
+
+`start`, `lights` and `clouds` need the Fog Quality video option at Low or
+High. At Off, the game ignores them, and the rest of the fog looks the same.
+
+The light from a large ship's engines can reach kilometres, so in thick fog
+it can tint the whole view. Lower `lights` if it does. Lights within 30 m
+of the player light the fog less, so the player's own lasers don't fill the
+screen.
+
+#### Clouds
+
+```yaml
+    fog:
+      visibility: 8000
+      clouds:
+        size: 400
+        coverage: 0.2
+        drift: [0, 0, 4]
+```
+
+| Key | Meaning |
+|-|-|
+| `size` | Required. The width of the large clouds, in metres, from 10 to 100,000. |
+| `opacity` | How much a cloud `size` metres thick hides, from 0 to 0.9999. This adds to the fog around it. The default is 0.9. |
+| `coverage` | The share of space inside clouds, from 0 to 1. The default is 0.2. |
+| `detail` | How ragged the clouds' edges are, from 0 (smooth) to 1. The default is 0.3. |
+| `range` | How far from the player the clouds reach, in metres, from 10 to 1,000,000. They fade out over the last 30% of it. The default is 5,000. |
+| `drift` | How fast the clouds move, `[x, y, z]` in metres per second along the world's axes (see [Directions](#directions)), from -1,000 to 1,000 each. The default is `[0, 0, 0]`. |
+
+In thin fog, you can see the clouds fade out at the end of `range`, and
+that edge moves with the player. If it shows, raise `range`.
 
 ## Suns
 

@@ -660,6 +660,14 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	out->motion_blur_quality = (XwaModernMotionBlurQuality)value;
+
+	value = 0;
+	if (!host_config_named_value(config, "video.fog_quality", quality_names,
+								 sizeof quality_names / sizeof quality_names[0], &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_FOG_QUALITY, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->fog_quality = (XwaModernFogQuality)value;
 	{
 		const char* amount_key = "video.motion_blur_amount";
 		const AeronConfigNode* amount_node = AeronConfigFile_GetNode(config, amount_key);
@@ -1176,8 +1184,8 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		options->msaa > XWA_MODERN_MSAA_8X ||
 		(options->fsr_upscaling != XWA_MODERN_FSR_OFF && options->msaa != XWA_MODERN_MSAA_OFF) ||
 		options->motion_blur_quality < XWA_MODERN_MOTION_BLUR_OFF ||
-		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH ||
-		!isfinite(options->motion_blur_amount) || options->motion_blur_amount < 0.0f ||
+		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH || options->fog_quality < XWA_MODERN_FOG_OFF ||
+		options->fog_quality > XWA_MODERN_FOG_HIGH || !isfinite(options->motion_blur_amount) || options->motion_blur_amount < 0.0f ||
 		options->motion_blur_amount > 1.0f || !isfinite(options->bloom_amount) ||
 		options->bloom_amount < 0.0f || options->bloom_amount > XWA_MODERN_BLOOM_AMOUNT_MAX ||
 		options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 || options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
@@ -1197,6 +1205,8 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		   AeronConfigFile_SetString(document, "video.msaa", msaa_names[options->msaa], error) &&
 		   AeronConfigFile_SetString(document, "video.motion_blur_quality",
 									 quality_names[options->motion_blur_quality], error) &&
+		   AeronConfigFile_SetString(document, "video.fog_quality", quality_names[options->fog_quality],
+									 error) &&
 		   AeronConfigFile_SetFloat(document, "video.motion_blur_amount", options->motion_blur_amount,
 									error) &&
 		   AeronConfigFile_SetFloat(document, "video.bloom_amount", options->bloom_amount, error) &&

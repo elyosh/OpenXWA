@@ -39,6 +39,15 @@ typedef enum XwaModernMotionBlurQuality {
 	XWA_MODERN_MOTION_BLUR_HIGH,
 } XwaModernMotionBlurQuality;
 
+/* Off draws the fog with a formula: no clouds, no clear space around the
+ * cockpit, and lasers and explosions don't light it. Low and High fill a grid
+ * of 80 or 160 cells across the view (AeronScene_SetFogQuality). */
+typedef enum XwaModernFogQuality {
+	XWA_MODERN_FOG_OFF = 0,
+	XWA_MODERN_FOG_LOW,
+	XWA_MODERN_FOG_HIGH,
+} XwaModernFogQuality;
+
 typedef enum XwaModernWindowMode {
 	XWA_MODERN_WINDOW_MODE_WINDOWED = 0,
 	XWA_MODERN_WINDOW_MODE_FULLSCREEN,
@@ -111,6 +120,7 @@ typedef struct XwaModernVideoOptions {
 	XwaModernFsrUpscaling fsr_upscaling;
 	XwaModernMsaa msaa;
 	XwaModernMotionBlurQuality motion_blur_quality;
+	XwaModernFogQuality fog_quality;
 	float motion_blur_amount; /* normalized shutter: 0.5 = 180 degrees */
 	/* The strength of the bloom, from 0 to XWA_MODERN_BLOOM_AMOUNT_MAX. At 1,
 	   it is the shipped bloom. It also scales the glow of projectiles. */
@@ -177,6 +187,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE = 1u << 21,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE = 1u << 22,
 	XWA_MODERN_VIDEO_OVERRIDE_BLOOM_AMOUNT = 1u << 23,
+	XWA_MODERN_VIDEO_OVERRIDE_FOG_QUALITY = 1u << 24,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

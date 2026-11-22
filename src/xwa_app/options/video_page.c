@@ -145,6 +145,12 @@ static bool XwaVideoPage_FlightRendering(AeronUiContext* ui, XwaModernVideoOptio
 			changed = true;
 		}
 	}
+	index = (int)options->fog_quality;
+	if (AeronUi_Selector(ui, "Fog Quality", &index, quality, 3)) {
+		options->fog_quality = (XwaModernFogQuality)index;
+		changed = true;
+	}
+	AeronUi_Help(ui, "Off draws simpler fog: no clouds, and lasers and explosions don't light it.");
 	/* As for the motion blur amount, a config.yaml value between two steps
 	   is kept until the player moves the slider. */
 	int bloom = (int)lroundf(options->bloom_amount * 100.0f);
