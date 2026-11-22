@@ -166,45 +166,53 @@ environments:
 
 ### Fog
 
-Fog hides what is far away, as inside a nebula: ships, laser bolts,
-explosions and other effects. The farther a ship is, the more the fog's
-colour replaces its own, until it disappears.
+Fog hides what is far away: ships, laser bolts, explosions and other
+effects, the sky and the suns. The farther something is, the more the
+fog's colour replaces its own.
 
 ```yaml
 environments:
-  green_nebula:
+  hazy_sector:
     intensity: 59.2
-    radiance: "flight/environments/green_nebula/sky.ktx2"
-    diffuse: "flight/environments/green_nebula/diffuse.ktx2"
+    radiance: "flight/environments/hazy_sector/sky.ktx2"
+    diffuse: "flight/environments/hazy_sector/diffuse.ktx2"
     diffuse_strength: 1
-    specular: "flight/environments/green_nebula/specular.ktx2"
+    specular: "flight/environments/hazy_sector/specular.ktx2"
     specular_strength: 1
     directional_lights: []
     fog:
       visibility: 8000
-      sky: 0.8
 ```
 
 | Key | Meaning |
 |-|-|
-| `visibility` | Required. The distance in metres at which a ship keeps 5% of its own colour, 1 to 1,000,000. At half that distance, it keeps about 22%. |
+| `visibility` | Required. How thick the fog is, in metres, from 1 to 1,000,000: a ship at this distance keeps 5% of its colour. Above 5,000 m, the fog is thin enough that nothing gets down to 5% (see the table below). |
 | `color` | The fog's colour: `sky`, or `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. The default is `sky`, which needs `specular`. `intensity` doesn't scale an `[r, g, b]` colour. |
 | `sun_glow` | Makes the fog brighter toward the main light, 0 to 16. The default is 0: no glow. |
-| `sky` | How much the fog hides the sky, 0.01 to 1. The fog never hides anything more than this. The default is 0.8. At 1, the fog hides the sky completely. |
+
+How much of a ship's own colour still shows, by `visibility`:
+
+| `visibility` (m) | Ship at 500 m | Ship at 2,000 m | Far ships and the sky |
+|-|-|-|-|
+| 500 | 5% | none | none |
+| 1,000 | 22% | 0.3% | none |
+| 2,000 | 47% | 5% | none |
+| 4,000 | 69% | 22% | 2% |
+| 8,000 | 83% | 47% | 15% |
+| 16,000 | 91% | 69% | 39% |
+| 64,000 | 98% | 91% | 79% |
+
+Ships fade with distance up to 5,000 m. Farther away, they don't fade any
+more and show as much as the sky behind them. So thick fog hides the sky
+completely, and thin fog never hides anything completely. The sky includes
+the backdrops, the stars and the suns, and the suns' lens flares fade with
+it.
 
 With `color: sky`, the fog takes the colour of the sky in each direction,
 read from the `specular` cube and heavily blurred. The fog has the
-nebula's colours, but none of its detail. `color: sky` keeps the fog's
-colour right when you change `intensity` or the sky.
-
-`sky` covers the sky, the backdrops, the stars and the suns, and fades the
-suns' lens flares. The fog stops growing at the distance where it hides
-that much, so a far ship is never hidden more than the sky behind it and
-never stands out in front of a clearer sky. With `visibility: 8000`, the
-fog stops at about 1,900 m with `sky: 0.5`, 4,300 m with `sky: 0.8` and
-8,000 m with `sky: 0.95`. With `sky: 1`, as deep inside a nebula, the fog
-covers the sky: with `color: sky`, the sky then shows blurred and without
-stars.
+sky's colours, but none of its detail, so a hidden sky shows blurred and
+without stars. `color: sky` keeps the fog's colour right when you
+change `intensity` or the sky.
 
 `sun_glow` is the sunlight that the fog scatters toward the player, so it
 is brightest when looking toward the sun. It uses the main light, the one

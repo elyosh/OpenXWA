@@ -8283,7 +8283,7 @@ static void fl_set_fog(const AeronPreparedEnvironment* environment, const FlScen
 	desc.sky_radiance_scale =
 		lighting->captured ? 1.0f : environment->settings.intensity * XwaRemasterEnvironment_IntensityScale();
 	memcpy(desc.color, fog->color_linear, sizeof desc.color);
-	desc.sky = fog->sky;
+	desc.extent = AERON_ENV_FOG_EXTENT_M * AERON_OPT_UNITS_PER_METER;
 	desc.start = fog->start_m * AERON_OPT_UNITS_PER_METER;
 	desc.lights = fog->lights;
 	desc.lights_start = AERON_ENV_FOG_LIGHTS_START_M * AERON_OPT_UNITS_PER_METER;
