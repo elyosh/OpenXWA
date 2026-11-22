@@ -219,11 +219,13 @@ change `intensity` or the sky.
 
 `sun_glow` is the sunlight that the fog scatters toward the player, so it
 is brightest when looking toward the sun. It uses the main light, the one
-that casts the shadows. Start with small values, such as 0.05.
+that casts the shadows. Start with small values, such as 0.05. With the
+Fog Quality video option at Very High, ships cast shadows in the glow, so
+you see shafts of shadow behind them, mostly when looking toward the sun.
+Without `sun_glow`, there are no shafts.
 
-`start`, `lights` and `clouds` need the Fog Quality video option at Medium
-or High. At Low, the game ignores them, and the rest of the fog looks the
-same.
+`start`, `lights` and `clouds` need Fog Quality at Medium or higher. At
+Low, the game ignores them, and the rest of the fog looks the same.
 
 The light from a large ship's engines can reach kilometres, so in thick fog
 it can tint the whole view. Lower `lights` if it does. Lights within 30 m

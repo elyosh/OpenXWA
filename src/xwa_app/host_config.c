@@ -563,7 +563,7 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
-	static const char* const fog_quality_names[] = { "low", "medium", "high" };
+	static const char* const fog_quality_names[] = { "low", "medium", "high", "very_high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
 	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
 	const char* hdr_key = "video.hdr_output";
@@ -1162,7 +1162,7 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
-	static const char* const fog_quality_names[] = { "low", "medium", "high" };
+	static const char* const fog_quality_names[] = { "low", "medium", "high", "very_high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
 	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
 	static const char* const sdr_gamma_names[] = { "2.2", "2.4", "srgb" };
@@ -1186,9 +1186,9 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		options->msaa > XWA_MODERN_MSAA_8X ||
 		(options->fsr_upscaling != XWA_MODERN_FSR_OFF && options->msaa != XWA_MODERN_MSAA_OFF) ||
 		options->motion_blur_quality < XWA_MODERN_MOTION_BLUR_OFF ||
-		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH || options->fog_quality < XWA_MODERN_FOG_LOW ||
-		options->fog_quality > XWA_MODERN_FOG_HIGH || !isfinite(options->motion_blur_amount) ||
-		options->motion_blur_amount < 0.0f ||
+		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH ||
+		options->fog_quality < XWA_MODERN_FOG_LOW || options->fog_quality > XWA_MODERN_FOG_VERY_HIGH ||
+		!isfinite(options->motion_blur_amount) || options->motion_blur_amount < 0.0f ||
 		options->motion_blur_amount > 1.0f || !isfinite(options->bloom_amount) ||
 		options->bloom_amount < 0.0f || options->bloom_amount > XWA_MODERN_BLOOM_AMOUNT_MAX ||
 		options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 || options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||

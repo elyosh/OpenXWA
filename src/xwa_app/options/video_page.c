@@ -102,7 +102,7 @@ static bool XwaVideoPage_FlightRendering(AeronUiContext* ui, XwaModernVideoOptio
 	static const char* const fsr[] = { "Off", "Performance", "Balanced", "Quality", "Native AA" };
 	static const char* const msaa[] = { "Off", "2x", "4x", "8x" };
 	static const char* const blur[] = { "Off", "Low Quality", "High Quality" };
-	static const char* const fog[] = { "Low", "Medium", "High" };
+	static const char* const fog[] = { "Low", "Medium", "High", "Very High" };
 	bool changed = false;
 	int index;
 
@@ -147,7 +147,7 @@ static bool XwaVideoPage_FlightRendering(AeronUiContext* ui, XwaModernVideoOptio
 		}
 	}
 	index = (int)options->fog_quality;
-	if (AeronUi_Selector(ui, "Fog Quality", &index, fog, 3)) {
+	if (AeronUi_Selector(ui, "Fog Quality", &index, fog, 4)) {
 		options->fog_quality = (XwaModernFogQuality)index;
 		changed = true;
 	}

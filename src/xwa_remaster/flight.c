@@ -2106,8 +2106,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	XwaRemasterDc_SetSettings(&dc_settings);
 
 	const int fog_quality = (int)AeronConfigFile_GetInt(cf, "fog.quality", 2);
-	if (fog_quality < 0 || fog_quality > 2) {
-		Aeron_LogError("xwa.remaster", "%s: fog.quality must be between 0 and 2", path);
+	if (fog_quality < 0 || fog_quality > 3) {
+		Aeron_LogError("xwa.remaster", "%s: fog.quality must be between 0 and 3", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
