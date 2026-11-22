@@ -39,12 +39,12 @@ typedef enum XwaModernMotionBlurQuality {
 	XWA_MODERN_MOTION_BLUR_HIGH,
 } XwaModernMotionBlurQuality;
 
-/* Off draws the fog with a formula: no clouds, no clear space around the
- * cockpit, and lasers and explosions don't light it. Low and High fill a grid
- * of 80 or 160 cells across the view (AeronScene_SetFogQuality). */
+/* Low draws the fog with a formula: no clouds, no clear space around the
+ * cockpit, and lasers and explosions don't light it. Medium and High fill a
+ * grid of 80 or 160 cells across the view (AeronScene_SetFogQuality). */
 typedef enum XwaModernFogQuality {
-	XWA_MODERN_FOG_OFF = 0,
-	XWA_MODERN_FOG_LOW,
+	XWA_MODERN_FOG_LOW = 0,
+	XWA_MODERN_FOG_MEDIUM,
 	XWA_MODERN_FOG_HIGH,
 } XwaModernFogQuality;
 

@@ -60,7 +60,7 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 		   (options->fsr_upscaling == XWA_MODERN_FSR_OFF || options->msaa == XWA_MODERN_MSAA_OFF) &&
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
 		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
-		   options->fog_quality >= XWA_MODERN_FOG_OFF && options->fog_quality <= XWA_MODERN_FOG_HIGH &&
+		   options->fog_quality >= XWA_MODERN_FOG_LOW && options->fog_quality <= XWA_MODERN_FOG_HIGH &&
 		   isfinite(options->motion_blur_amount) && options->motion_blur_amount >= 0.0f &&
 		   options->motion_blur_amount <= 1.0f && isfinite(options->bloom_amount) &&
 		   options->bloom_amount >= 0.0f && options->bloom_amount <= XWA_MODERN_BLOOM_AMOUNT_MAX &&

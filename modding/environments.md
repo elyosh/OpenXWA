@@ -221,8 +221,9 @@ change `intensity` or the sky.
 is brightest when looking toward the sun. It uses the main light, the one
 that casts the shadows. Start with small values, such as 0.05.
 
-`start`, `lights` and `clouds` need the Fog Quality video option at Low or
-High. At Off, the game ignores them, and the rest of the fog looks the same.
+`start`, `lights` and `clouds` need the Fog Quality video option at Medium
+or High. At Low, the game ignores them, and the rest of the fog looks the
+same.
 
 The light from a large ship's engines can reach kilometres, so in thick fog
 it can tint the whole view. Lower `lights` if it does. Lights within 30 m
